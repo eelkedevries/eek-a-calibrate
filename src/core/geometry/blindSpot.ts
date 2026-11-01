@@ -7,6 +7,8 @@ import type { Vec2 } from '../types.ts';
 import { requirePositive } from './screen.ts';
 
 const RAD = Math.PI / 180;
+/** Distance assumed for the dot speed before the blind spot has been found (heuristic; spec v0.3 §4.4). */
+export const BLIND_SPOT_ASSUMED_DISTANCE_MM = 600;
 
 /** The dot starts at the square and moves in −x. */
 export const BLIND_SPOT_DIRECTION = -1;
@@ -17,12 +19,12 @@ export function blindSpotSquarePx(viewportWpx: number, viewportHpx: number): Vec
 }
 
 /**
- * Dot speed in CSS px/s: 1.5°/s at a known distance (D·tan 1.5°·pxPerMm); until the distance
- * is known, the specification's fixed 0.25·pxPerMm·10 px/s.
+ * Dot speed in CSS px/s: 1.5°/s at the viewing distance (D·tan 1.5°·pxPerMm). Until the
+ * distance is known, D = BLIND_SPOT_ASSUMED_DISTANCE_MM (specification v0.3, §4.4).
  */
 export function dotSpeedPxPerS(pxPerMm: number, distanceMm: number | null): number {
   requirePositive('dotSpeedPxPerS: pxPerMm', pxPerMm);
-  if (distanceMm === null) return 0.25 * pxPerMm * 10;
+  if (distanceMm === null) distanceMm = BLIND_SPOT_ASSUMED_DISTANCE_MM;
   requirePositive('dotSpeedPxPerS: distance', distanceMm);
   return distanceMm * Math.tan(BLIND_SPOT.dotSpeedDegS * RAD) * pxPerMm;
 }

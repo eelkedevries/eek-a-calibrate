@@ -85,7 +85,8 @@ test('blind spot: square at (0.85 W, 0.5 H), dot moving left, D_bs = d / tan 13.
   assert.deepEqual(blindSpotSquarePx(1920, 1080), [1632, 540]);
   assert.equal(BLIND_SPOT_DIRECTION, -1);
   assert.ok(Math.abs(blindSpotDistanceMm(600 * Math.tan(13.5 * RAD)) - 600) < 1e-9);
-  assert.equal(dotSpeedPxPerS(4, null), 0.25 * 4 * 10);
+  // Before the distance is known: 1.5°/s at the assumed 600 mm (spec v0.3 corrected v0.1's 2.5 mm/s).
+  assert.ok(Math.abs(dotSpeedPxPerS(4, null) - 600 * Math.tan(1.5 * RAD) * 4) < 1e-12);
   assert.ok(Math.abs(dotSpeedPxPerS(4, 600) - 600 * Math.tan(1.5 * RAD) * 4) < 1e-12);
 });
 

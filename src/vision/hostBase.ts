@@ -63,6 +63,7 @@ export abstract class MessageHost implements ManagedVisionHost {
   private probeWaiter: (Waiter<ProbeResult> & { timer: ReturnType<typeof setTimeout> }) | null = null;
   private probeQueue: Promise<unknown> = Promise.resolve();
   private readonly resultListeners = new Set<(r: FrameResult) => void>();
+  private rearmInit: (() => void) | null = null;
   private readonly progressListeners = new Set<(asset: string, loaded: number, total: number) => void>();
   private readonly errorListeners = new Set<(e: HostError) => void>();
 
@@ -85,6 +86,7 @@ export abstract class MessageHost implements ManagedVisionHost {
       const done = (): void => {
         if (timer !== null) clearTimeout(timer);
         this.initWaiter = null;
+        this.rearmInit = null;
       };
       this.initWaiter = {
         resolve: (info) => {
@@ -96,8 +98,18 @@ export abstract class MessageHost implements ManagedVisionHost {
           reject(error);
         },
       };
+      // The limit counts silence, not download time: each progress message re-arms it,
+      // so a slow connection still fetching the WebAssembly and model is not abandoned.
       if (timeoutMs !== undefined) {
-        timer = setTimeout(() => this.initWaiter?.reject(new Error(`the ${this.kind} host did not report ready within ${Math.round(timeoutMs / 1000)} s`)), timeoutMs);
+        const arm = (): void => {
+          if (timer !== null) clearTimeout(timer);
+          timer = setTimeout(
+            () => this.initWaiter?.reject(new Error(`the ${this.kind} host sent nothing for ${Math.round(timeoutMs / 1000)} s before reporting ready`)),
+            timeoutMs,
+          );
+        };
+        this.rearmInit = arm;
+        arm();
       }
       this.lastMessageMs = performance.now();
       this.send({ t: 'init', cfg });
@@ -213,6 +225,7 @@ export abstract class MessageHost implements ManagedVisionHost {
         this.initWaiter?.resolve(message.info);
         break;
       case 'progress':
+        this.rearmInit?.();
         for (const listener of this.progressListeners) listener(message.asset, message.loaded, message.total);
         break;
       case 'engines':
