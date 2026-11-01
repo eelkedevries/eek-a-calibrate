@@ -1,0 +1,63 @@
+# The automated safety net for the commit-to-`main` workflow (spec §10.5): it
+# runs on every push and on pull requests to main, so a broken build, a failing
+# test, a third-party URL or a leaked secret is caught even if local hooks were
+# never installed. Deploying is separate (docs/deployment.md).
+name: Check build
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Gitleaks scans the pushed range (base^..head), which a shallow clone lacks.
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies (reproducible)
+        run: npm ci
+
+      # Build, unit tests, asset and URL checks, public-build check, prompt numbering.
+      - name: Verify (npm run check)
+        run: npm run check
+
+      - name: Install ffmpeg and build the fake camera stream
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          bash scripts/make-fake-video.sh
+
+      - name: Install the Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: npm run test:e2e
+
+      - name: Keep the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

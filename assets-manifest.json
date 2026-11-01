@@ -1,0 +1,160 @@
+{
+  "$comment": "The single list of runtime and model files (spec §8.1). `path` is the published path relative to BASE_URL. `from` is npm:<pkg>@<version>/<file> (copied into public/vendor/ by scripts/copy-assets.mjs) or committed (under public/). A path containing [hash] is emitted by a Vite ?url import, and its [hash] stands for the file name hash Vite adds. `gz`: the build also ships <path>.gz (scripts/precompress.mjs). scripts/verify-assets.mjs checks every entry in dist/.",
+  "schema": "eek-a-calibrate/assets@1",
+  "assets": [
+    {
+      "id": "face-landmarker",
+      "path": "models/face-landmarker-f16-v1/face_landmarker.task",
+      "from": "committed",
+      "sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff",
+      "bytes": 3758596,
+      "licence": "Apache-2.0",
+      "source": "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+      "retrieved": "2026-11-01",
+      "gz": false
+    },
+    {
+      "id": "mp-module-js",
+      "path": "vendor/mediapipe-0.10.35/vision_wasm_module_internal.js",
+      "from": "npm:@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_module_internal.js",
+      "sha256": "1f1d6215324a1fe62f6742d49a3db911170987ca18ad8c1b75f1a1c82acf2b44",
+      "bytes": 322082,
+      "licence": "Apache-2.0",
+      "source": "https://registry.npmjs.org/@mediapipe/tasks-vision/-/tasks-vision-0.10.35.tgz",
+      "retrieved": "2026-11-01",
+      "gz": false
+    },
+    {
+      "id": "mp-module-wasm",
+      "path": "vendor/mediapipe-0.10.35/vision_wasm_module_internal.wasm",
+      "from": "npm:@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_module_internal.wasm",
+      "sha256": "617b8e0248dbd27e9d7ece4218004eae4cefb499196d1bb4fa0e3fef21708756",
+      "bytes": 11153641,
+      "licence": "Apache-2.0",
+      "source": "https://registry.npmjs.org/@mediapipe/tasks-vision/-/tasks-vision-0.10.35.tgz",
+      "retrieved": "2026-11-01",
+      "gz": true
+    },
+    {
+      "id": "mp-simd-js",
+      "path": "vendor/mediapipe-0.10.35/vision_wasm_internal.js",
+      "from": "npm:@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.js",
+      "sha256": "e7fd9858e8e8f221d9b96eddc11f8e077f263e0b7bbd79d3cbe882b134274f8c",
+      "bytes": 322044,
+      "licence": "Apache-2.0",
+      "source": "https://registry.npmjs.org/@mediapipe/tasks-vision/-/tasks-vision-0.10.35.tgz",
+      "retrieved": "2026-11-01",
+      "gz": false
+    },
+    {
+      "id": "mp-simd-wasm",
+      "path": "vendor/mediapipe-0.10.35/vision_wasm_internal.wasm",
+      "from": "npm:@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.wasm",
+      "sha256": "6a5c64584c2ab61c763b6e204afbdbc7ce1caf7f5216187322bca8df94f646bc",
+      "bytes": 11153617,
+      "licence": "Apache-2.0",
+      "source": "https://registry.npmjs.org/@mediapipe/tasks-vision/-/tasks-vision-0.10.35.tgz",
+      "retrieved": "2026-11-01",
+      "gz": true
+    },
+    {
+      "id": "mp-nosimd-js",
+      "path": "vendor/mediapipe-0.10.35/vision_wasm_nosimd_internal.js",
+      "from": "npm:@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_nosimd_internal.js",
+      "sha256": "438d1fe8ff7f4d946025bc211c291543c037d8a3785ed4eee60f1f521b236296",
+      "bytes": 321847,
+      "licence": "Apache-2.0",
+      "source": "https://registry.npmjs.org/@mediapipe/tasks-vision/-/tasks-vision-0.10.35.tgz",
+      "retrieved": "2026-11-01",
+      "gz": false
+    },
+    {
+      "id": "mp-nosimd-wasm",
+      "path": "vendor/mediapipe-0.10.35/vision_wasm_nosimd_internal.wasm",
+      "from": "npm:@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_nosimd_internal.wasm",
+      "sha256": "8a3092d34c79d3f57e6ba8592105e8a90f6b07c27891ffecd14cca428bfd3e31",
+      "bytes": 10481398,
+      "licence": "Apache-2.0",
+      "source": "https://registry.npmjs.org/@mediapipe/tasks-vision/-/tasks-vision-0.10.35.tgz",
+      "retrieved": "2026-11-01",
+      "gz": true
+    },
+    {
+      "id": "tfjs-wasm",
+      "path": "vendor/tfjs-backend-wasm-4.22.0/tfjs-backend-wasm.wasm",
+      "from": "npm:@tensorflow/tfjs-backend-wasm@4.22.0/dist/tfjs-backend-wasm.wasm",
+      "sha256": "70a5d516060464e5269f01c74bac1772d6b8ab6cb612acf16b5cdaf61f78d892",
+      "bytes": 311123,
+      "licence": "Apache-2.0",
+      "source": "https://registry.npmjs.org/@tensorflow/tfjs-backend-wasm/-/tfjs-backend-wasm-4.22.0.tgz",
+      "retrieved": "2026-11-01",
+      "gz": true
+    },
+    {
+      "id": "tfjs-wasm-simd",
+      "path": "vendor/tfjs-backend-wasm-4.22.0/tfjs-backend-wasm-simd.wasm",
+      "from": "npm:@tensorflow/tfjs-backend-wasm@4.22.0/dist/tfjs-backend-wasm-simd.wasm",
+      "sha256": "77ebb28a6d34f371dbbf2086b7f2de8994acd8ea5a3cf1fa24d2c26c840cac7b",
+      "bytes": 424594,
+      "licence": "Apache-2.0",
+      "source": "https://registry.npmjs.org/@tensorflow/tfjs-backend-wasm/-/tfjs-backend-wasm-4.22.0.tgz",
+      "retrieved": "2026-11-01",
+      "gz": true
+    },
+    {
+      "id": "blazegaze-model",
+      "path": "models/blazegaze-75fbd2f/model.json",
+      "from": "committed",
+      "sha256": "a214f074ccd4724cf4ebf008814a05485e7eaa5faf5aaeb85e66b24a1af55688",
+      "bytes": 44988,
+      "licence": "MIT",
+      "source": "https://raw.githubusercontent.com/RedForestAI/WebEyeTrack/75fbd2f5f784f2eb3a39675a8dcbf1b01c697f1c/js/examples/demo-app/public/web/model.json",
+      "retrieved": "2026-11-01",
+      "gz": false
+    },
+    {
+      "id": "blazegaze-weights",
+      "path": "models/blazegaze-75fbd2f/group1-shard1of1.bin",
+      "from": "committed",
+      "sha256": "c030a762a2d21ac0f3c59700a723b2d8790f2003b3f8e72fbe31129fcb234e58",
+      "bytes": 624072,
+      "licence": "MIT",
+      "source": "https://raw.githubusercontent.com/RedForestAI/WebEyeTrack/75fbd2f5f784f2eb3a39675a8dcbf1b01c697f1c/js/examples/demo-app/public/web/group1-shard1of1.bin",
+      "retrieved": "2026-11-01",
+      "gz": false
+    },
+    {
+      "id": "peekr-model",
+      "path": "models/peekr-1.0.7/peekr.onnx",
+      "from": "committed",
+      "sha256": "9abc6c98ee02ee518da98777d1cd879ff9bbaf71491ed2c803a608e9740ce7fb",
+      "bytes": 579176,
+      "licence": "MIT",
+      "source": "https://registry.npmjs.org/peekr/-/peekr-1.0.7.tgz#package/dist/model/peekr.onnx",
+      "retrieved": "2026-11-01",
+      "gz": false
+    },
+    {
+      "id": "ort-wasm",
+      "path": "assets/ort-wasm-simd-threaded-[hash].wasm",
+      "from": "npm:onnxruntime-web@1.30.0/dist/ort-wasm-simd-threaded.wasm",
+      "sha256": "3398c10d07d229bd91b364548e130e0e51a8e5704b88c7c083ebbeb78842dee2",
+      "bytes": 14239897,
+      "licence": "MIT",
+      "source": "https://registry.npmjs.org/onnxruntime-web/-/onnxruntime-web-1.30.0.tgz",
+      "retrieved": "2026-11-01",
+      "gz": true
+    },
+    {
+      "id": "ort-mjs",
+      "path": "assets/ort-wasm-simd-threaded-[hash].mjs",
+      "from": "npm:onnxruntime-web@1.30.0/dist/ort-wasm-simd-threaded.mjs",
+      "sha256": "e13f7f94fc51b4ca72b12faeb1ee95f4ace6dfbc8939bc718aabdc0a27c4299b",
+      "bytes": 24381,
+      "licence": "MIT",
+      "source": "https://registry.npmjs.org/onnxruntime-web/-/onnxruntime-web-1.30.0.tgz",
+      "retrieved": "2026-11-01",
+      "gz": false
+    }
+  ]
+}

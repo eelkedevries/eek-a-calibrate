@@ -1,0 +1,29 @@
+# dependencies (no trailing slash: parallel worktrees symlink node_modules)
+node_modules
+
+# environment and secrets
+.env*
+!.env.example
+
+# build outputs and generated files
+dist/
+public/vendor/
+tests/fixtures/generated/
+.cache/
+
+# test output
+test-results/
+playwright-report/
+
+# temporary internal material
+docs-dev/tmp/
+docs-dev/private/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+*.log
+
+# agent worktrees
+.claude/worktrees/

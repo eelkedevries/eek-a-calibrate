@@ -1,0 +1,37 @@
+# Run: `pre-commit install` once after cloning.
+# Hooks then run automatically on `git commit`.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=2000']
+        # The committed models (spec §3.1) are larger than 2000 KB by design.
+        exclude: ^public/models/
+      - id: detect-private-key
+      - id: end-of-file-fixer
+        # Hash-pinned upstream files (model.json has no final newline): never rewrite them.
+        exclude: ^public/models/
+      - id: trailing-whitespace
+        exclude: ^public/models/
+      - id: check-merge-conflict
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: block-env-files
+        name: Block .env files from being committed
+        entry: bash -c 'if git diff --cached --name-only | grep -E "^\.env($|\.)" | grep -v "\.env\.example$"; then echo "Refusing to commit .env files." >&2; exit 1; fi'
+        language: system
+        pass_filenames: false
+
+      - id: validate-prompts
+        name: Validate prompt numbering
+        entry: bash scripts/validate-prompts.sh
+        language: system
+        pass_filenames: false
+        files: '^docs-dev/agent/prompts/'

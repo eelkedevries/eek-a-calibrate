@@ -1,0 +1,38 @@
+# Lands at /eek-a-calibrate/.htaccess. The eelkedevries.com document-root
+# .htaccess still applies above it (nosniff, no-store for *.html, compression of
+# text types, the site's 404 page). This file adds only what the app needs.
+# config/headers.mjs holds the same CSP and Permissions-Policy strings, and
+# scripts/verify-assets.mjs checks that both copies agree.
+
+# The host sends no Content-Type for these, and nosniff then refuses a module
+# script without one. WebAssembly needs its own type to compile while it downloads.
+AddType text/javascript .mjs
+AddType application/wasm .wasm
+AddType application/octet-stream .task .tflite .onnx .bin
+
+# The host does not compress WebAssembly. scripts/precompress.mjs writes a gzip
+# copy next to each .wasm; the app asks for the .gz name, served here as
+# gzip-encoded WebAssembly that the browser decompresses transparently.
+<FilesMatch "\.wasm\.gz$">
+  ForceType application/wasm
+  <IfModule mod_headers.c>
+    Header set Content-Encoding gzip
+  </IfModule>
+  SetEnv no-gzip 1
+</FilesMatch>
+
+# Runtimes and models live under version-named paths, so a long expiry never
+# pins a stale copy.
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType application/wasm "access plus 30 days"
+  ExpiresByType application/octet-stream "access plus 30 days"
+</IfModule>
+
+<IfModule mod_headers.c>
+  Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' blob: data:; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+  Header set Permissions-Policy "camera=(self), microphone=(), geolocation=()"
+</IfModule>
+# COOP/COEP (threaded WASM) intentionally off in v1; see docs/deployment.md. Uncomment only after a live test:
+# Header set Cross-Origin-Opener-Policy "same-origin"
+# Header set Cross-Origin-Embedder-Policy "require-corp"

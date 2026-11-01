@@ -1,0 +1,40 @@
+{
+  "name": "eek-a-calibrate",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Webcam eye-tracking calibration, validation and live gaze in the browser, with four gaze engines compared on the same frames.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "predev": "node scripts/copy-assets.mjs",
+    "dev": "vite",
+    "prebuild": "node scripts/copy-assets.mjs",
+    "build": "tsc --noEmit && vite build && node scripts/precompress.mjs",
+    "test": "node --test 'tests/unit/**/*.test.ts' 'tests/parity/**/*.test.ts' 'tests/sim/**/*.test.ts'",
+    "test:e2e": "playwright test",
+    "serve:dist": "node scripts/serve-dist.mjs",
+    "check": "npm run build && npm test && node scripts/verify-assets.mjs dist && bash scripts/check-public-build.sh dist && bash scripts/validate-prompts.sh",
+    "check:all": "npm run check && npm run test:e2e",
+    "deploy": "bash scripts/deploy.sh"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "0.10.35",
+    "@tensorflow/tfjs-backend-cpu": "4.22.0",
+    "@tensorflow/tfjs-backend-wasm": "4.22.0",
+    "@tensorflow/tfjs-backend-webgl": "4.22.0",
+    "@tensorflow/tfjs-core": "4.22.0",
+    "@tensorflow/tfjs-layers": "4.22.0",
+    "fflate": "0.8.2",
+    "ml-matrix": "6.12.1",
+    "onnxruntime-web": "1.30.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.20.4",
+    "typescript": "6.0.3",
+    "vite": "8.3.4"
+  }
+}

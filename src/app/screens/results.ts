@@ -1,0 +1,5 @@
+// Placeholder written by WP1. WP8 (prompt 008) replaces this file with the
+// real screen (spec §7). A screen default-exports a Screen (src/app/router.ts).
+import { placeholder } from '../router.ts';
+
+export default placeholder('results', '008');
