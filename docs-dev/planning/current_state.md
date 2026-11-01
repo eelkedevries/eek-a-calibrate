@@ -218,6 +218,38 @@ wins and the gap is work still to be done.
   button; invalidation from `platform/presentation.ts`). Test hooks: `__eek.protocol()` and
   `__eek.simulateFullscreenExit()`. Results re-score the stored validation on every visit.
 
+## Setup, live and data screens (after prompt 009)
+
+- **Flow (§14.1.1):** Welcome → Camera → Calibrate → Validate → Results → Live → Data. `#/screen`
+  → `#/distance` is one optional action (`?from=` names the screen to return to) on Welcome
+  (Advanced), Results and Data. Measuring after calibration only changes `state.geometry` (scale,
+  distance model, D_ref rescaled by f_new/f_fit) and re-scores the current validation at once
+  (`screen.ts` `rescoreValidation`); the camera keeps running through `#/screen` and `#/distance`. `router.ts`'s `FLOW` still
+  lists the v0.1 order but only the WP1 placeholder used it.
+- **Camera (`screens/camera.ts`):** meters (`components/qualityMeter.ts`, `HoldGate` latches after
+  2 s green; "Continue anyway" after 20 s), picker (`session.setPreferredCamera`), eyewear,
+  probe and `decideRunSet` (rule applied for Auto only; a hand-picked list is reported, not cut).
+  `setupRecord()`/`snapshotCapture()` keep camera, host, probe and eyewear for session.json.
+- **Persistence (`platform/storage.ts`):** IndexedDB `eek-a-calibrate` v1 (`geometry`, `profiles`,
+  `sessions`); reads never create the database; failed writes fall back to memory with a
+  published warning; LRU of 8 profiles; `deleteAllStoredData` is the registered delete-all
+  handler (imported by `main.ts`). Profiles store the fit without `oofDeg`/`rowFrameIndex`, the
+  key parts and the camera label: the fake camera (and some browsers) change device ids on
+  reload, so a profile also matches by camera name and frame size; VAL6 decides.
+- **Drift (`core/calibration/drift.ts`):** drift and RECAL5 schedules (nth stream seeds), `driftOffset`
+  (o = mean(Ḡ − T) from `scoreValidation`), `driftDecision` (the correction added to θ is −o),
+  `nextDriftDueMs`, `forcedDriftReasons`.
+- **Live (`screens/live.ts`):** the stage of `stimulusCanvas.ts` with a toolbar; checks reuse
+  `BlockRunner`, `FrameRecorder`, `CaptureLink` and `runSchedule`. Session blocks (live, drift,
+  recalibration, validation-n), the drift log and per-estimator corrections live in module
+  records keyed by the fit lineage (`sessionRecords()`); a new calibration starts them afresh.
+  The profile is saved when Live opens after a validated fit. `restoreProfile` → Live requires
+  VAL6 ≥ acceptable, then a forced drift check. Test hooks: `__eek.live()`, `__eek.camera()`.
+- **Export (`screens/data.ts`, `buildSessionExport`):** assembled file by file (not `buildExport`)
+  so geometry.yaml or events.csv can be left out and named in README.txt (§15.2.2); adds
+  `markers.csv`; recomputes samples per block with that block's fit, corrections and the current
+  geometry (D_t rescaled by focal ratio); live `gaze_*_filt` from the same One Euro stream.
+
 ## In progress
 
 Prompts 002–007 can run in parallel; then 008, 009 and 010 (`docs-dev/plan.md`).

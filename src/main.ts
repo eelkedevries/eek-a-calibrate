@@ -4,6 +4,8 @@ import { hrefFor, startRouter } from './app/router.ts';
 import { deleteAllData, initState, parseSettings } from './app/state.ts';
 import { t } from './app/strings.en-GB.ts';
 import { installTestHooks } from './app/testHooks.ts';
+// Registers the real "Delete all my data" handler before any screen loads (spec §4.15).
+import './platform/storage.ts';
 
 initState(parseSettings(window.location));
 installTestHooks();

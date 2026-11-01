@@ -29,8 +29,12 @@ export interface Capture {
   nominalFps(): number;
 }
 
-/** Routes that keep the camera running; any other route stops it. */
-const CAMERA_ROUTES = new Set(['/camera', '/calibrate', '/validate', '/results', '/live']);
+/**
+ * Routes that keep the camera running; any other route stops it. The distance screen measures the
+ * iris, and the screen-size step before it keeps a running camera, so that measuring from Results
+ * or Live restarts nothing and the stored distance of this camera can be offered.
+ */
+const CAMERA_ROUTES = new Set(['/camera', '/screen', '/distance', '/calibrate', '/validate', '/results', '/live']);
 
 class RunningCapture implements Capture {
   readonly camera: CameraSession;
@@ -93,6 +97,15 @@ class RunningCapture implements Capture {
 }
 
 let capture: RunningCapture | null = null;
+/** The camera chosen in the camera screen's picker; the browser's default when null. */
+let preferredDeviceId: string | null = null;
+
+/** Chooses the camera for the next start; a running capture on another camera is stopped. */
+export function setPreferredCamera(deviceId: string | null): void {
+  if (deviceId === preferredDeviceId) return;
+  preferredDeviceId = deviceId;
+  stopCapture();
+}
 /** Where the running host's asset progress (engine downloads) goes: the latest caller's listener. */
 let assetListener: CaptureListeners['onAsset'] | null = null;
 let starting: Promise<RunningCapture> | null = null;
@@ -143,7 +156,7 @@ export async function ensureCapture(engines: readonly EngineId[], listeners: Cap
     if (!starting) {
       starting = (async () => {
         onStatus('camera');
-        const camera = await openCamera();
+        const camera = await openCamera(preferredDeviceId ? { deviceId: preferredDeviceId } : {});
         let host: ManagedVisionHost | null = null;
         try {
           onStatus('vision');
