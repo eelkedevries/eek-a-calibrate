@@ -21,7 +21,7 @@ wins and the gap is work still to be done.
 - **Assets:** `assets-manifest.json` lists every runtime and model file with its hash.
   `scripts/copy-assets.mjs` (predev, prebuild) copies the MediaPipe 0.10.35 WebAssembly pairs
   (module, SIMD, no-SIMD) and the TF.js WebAssembly files into `public/vendor/` (git-ignored).
-  ONNX Runtime arrives through Vite `?url` imports in `src/engines/runtimes/ort.ts`. Models are
+  ONNX Runtime arrives through Vite `?url` imports in `src/vision/visionCore.ts`. Models are
   committed under `public/models/` with LICENSE and PROVENANCE.
 - **Headers:** `public/.htaccess` (types, `.wasm.gz` as gzip-encoded WebAssembly, enforced CSP
   with `connect-src 'self'`, Permissions-Policy; COOP/COEP off). `config/headers.mjs` holds the
@@ -119,6 +119,28 @@ wins and the gap is work still to be done.
   `canonicalJson` sorts keys so state built in any order gives identical bytes; the zip has
   fixed entry order, deflate level and DOS time. cv.csv and events.csv are written by
   `validationCsv.ts`. targets.csv adds `trial` and `aborted` columns.
+
+## Peekr engine (after prompt 007)
+
+- **Preprocessing (`src/engines/peekr/preprocess.ts`, pure):** the bundle's `B`/`C` boxes on
+  mirrored landmarks m(L) = (1 − x, y) of the tasks-vision points 359, 257, 463, 253 (input1, the
+  subject's left eye) and 243, 27, 130, 23 (input2), `kps` (8, mirrored frame), crop rectangles
+  at sx = W − x − w in the unmirrored frame (drawn by `FrameImage.crop`), and the BGR tensor.
+  Bit-identical to the real bundle's `E`/`F`. `crop-invalid` when a box is under 4 px or does not
+  lie wholly inside the frame; non-finite landmarks throw.
+- **Runtime:** `src/engines/runtimes/ort.ts` imports `onnxruntime-web/wasm` (only the Peekr
+  chunk carries it) and holds no `?url` imports any more: the URLs come from
+  `ctx.assetUrl('ort-wasm' | 'ort-mjs')`, i.e. the vision core's `?url` imports, `.gz` in
+  production. ONNX Runtime remembers a failed WebAssembly start for the life of the realm, so
+  `initOrt` fetches the binary itself, checks it against the manifest hash (one retry with the
+  plain file after a bad `.gz`), and passes it as `env.wasm.wasmBinary` with `wasmPaths` set.
+  One thread unless cross-origin isolated. `peekr/runtime.ts` checks the model's interface and
+  disposes every tensor. Both run in Node for the parity tests.
+- **Mappers:** `prior-affine` (λ_rel 1e-6) and `prior-ridge-pose` (17 columns, raw prior² and
+  x·y). **Lab:** `src/engines/peekr/lab.ts` shows the two crops.
+- **Tests:** `tests/parity/peekr-{boxes,tensor,session}.test.ts` against
+  `tests/reference/peekr-boxes.js` (bundle code with its MIT notice); the Peekr block of
+  `tests/e2e/engines.spec.ts`.
 
 ## In progress
 
