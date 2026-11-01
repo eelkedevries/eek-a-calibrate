@@ -98,7 +98,8 @@ notch, camera cut-out and home indicator).
 - The moving dot follows a 2:3 Lissajous path, `x = 0.5 + 0.42 sin(2π·2t/T)`,
   `y = 0.5 + 0.42 sin(2π·3t/T + π/2)`, with T = 16 s, lengthened if it would exceed 15°/s.
   Each frame is labelled with the target at t − τ, where the lag τ is estimated per session
-  (about 100 ms is typical; Chen and Brat 2026). Fixation dots combined with a moving dot
+  (about 100 ms is typical; Chen and Brat 2026). The default of 100 ms is used when fewer than
+  half of the processed pursuit frames were accepted. Fixation dots combined with a moving dot
   calibrate best (Saxena, Lange and Fink 2022).
 - Head movement: at each of 5 locations, look at the dot while turning the head left and
   right (about ±10° of yaw) and nodding (about ±7° of pitch).
@@ -133,11 +134,15 @@ Metrics use the raw (unfiltered, uncorrected) predictions of valid frames.
 - **Accuracy** = ang(T, Ḡ), the angle between a target and the mean gaze on it; mean, median
   and 90th percentile over targets, and central and peripheral separately. Also in px.
 - **Precision:** RMS-S2S = √(mean ang(Gᵢ, Gᵢ₊₁)²) over consecutive valid samples at most
-  1.5 median frame intervals apart; SD = √(σx² + σy²);
+  1.5 median intervals between processed frames apart (frames the device had no time to analyse
+  do not break a pair); SD = √(σx² + σy²);
   **BCEA₆₈ = 2kπσxσy√(1 − ρ²)** with k = −ln(1 − 0.68) = 1.1394.
-- **Data loss** = 1 − valid / expected, where expected = sampling time × the camera's frame
-  rate (30 if unknown), shown as a funnel: expected, delivered, processed, face, eyes open,
-  head in range, valid.
+- **Data loss** = 1 − valid / expected, where expected = sampling time × the rate at which the
+  device processed frames (the median over targets of processed frames per second, at most the
+  camera's frame rate, 30 if unknown). A device slower than its camera therefore has a lower
+  effective rate, not more data loss; a stall within one target still counts as loss there. The
+  funnel shows every stage from the camera's rate: expected, delivered, processed, face, eyes
+  open, head in range, valid.
 - **Effective rate** = valid samples per second of sampling time (capture clock).
 - **Latency** = mean time from capture to result.
 - **Constant baseline** = the accuracy of always predicting the centroid of the targets;

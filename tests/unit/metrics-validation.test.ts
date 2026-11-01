@@ -142,6 +142,7 @@ test('SD and BCEA against analytic values', () => {
   assert.ok(Number.isNaN(dispersion([[1, 1]]).sdDeg));
 });
 
+
 test('BCEA₆₈ of Gaussian data covers 68 % of it and matches the population value', () => {
   const g = gaussian(mulberry32(9));
   const [sx, sy, rho] = [1, 0.5, 0.6];
@@ -254,6 +255,38 @@ test('the funnel counts each loss at its stage; aborted presentations lose their
   assert.ok(ra !== undefined);
   assert.equal(ra.targets[0]?.funnel.delivered, 9, 'the window ends at the aborted offset');
   assert.ok(Math.abs((ra.targets[0]?.dataLossPct as number) - 70) < 1e-9);
+});
+
+test('frames refused for lack of time are not data loss and do not break RMS-S2S pairs (§16.1)', () => {
+  const rec = buildRecording(VAL6);
+  const g = gaussian(mulberry32(7));
+  const noisy = (every: number): Planner => (f, target) =>
+    f.meta.index % every !== 0 ? { deg: null, flags: Flags.DROPPED } : { deg: target === null ? [0, 0] : [target[0] + 1 + 0.3 * g(), target[1] + 0.3 * g()] };
+  const [all] = scoreValidation(rec, new Map([['geometric', samplesFor(rec, 'geometric', noisy(1))]]), GEOMETRY, 'own', FPS);
+  for (const every of [2, 3]) {
+    const [r] = scoreValidation(rec, new Map([['geometric', samplesFor(rec, 'geometric', noisy(every))]]), GEOMETRY, 'own', FPS);
+    assert.ok(all !== undefined && r !== undefined);
+    assert.ok(r.dataLossPct < 1e-9, `1 in ${every}: loss ${r.dataLossPct} %`);
+    assert.ok(r.targets.every((t) => t.funnel.expected === 30 && t.funnel.processed <= 15 && t.dataLossPct < 1e-9), 'the funnel keeps the nominal count');
+    assert.ok(Math.abs(r.samplingHz - 30 / every) < 0.6, `rate ${r.samplingHz}`);
+    assert.ok(Number.isFinite(r.rmsS2SDeg) && Math.abs(r.rmsS2SDeg / all.rmsS2SDeg - 1) < 0.3, `RMS-S2S ${r.rmsS2SDeg} vs ${all.rmsS2SDeg}`);
+    assert.equal(r.aoiGrid, all.aoiGrid);
+    assert.equal(r.verdict, all.verdict);
+  }
+  // A stall within one target still counts there: the sustained rate is a median over targets.
+  const stall = scoreValidation(
+    rec,
+    new Map([['geometric', samplesFor(rec, 'geometric', (f, target) => (targetAt(rec, f.meta.tCaptureMs) !== null && f.meta.tCaptureMs >= 1100 && f.meta.tCaptureMs < 1600 ? { deg: null, flags: Flags.DROPPED } : offsetBy([0, 0])(f, target)))]]),
+    GEOMETRY,
+    'own',
+    FPS,
+  )[0];
+  assert.ok(stall !== undefined);
+  assert.ok(Math.abs((stall.targets[0]?.dataLossPct as number) - 50) < 4, `stalled target ${stall.targets[0]?.dataLossPct} %`);
+  assert.ok(stall.targets.slice(1).every((t) => t.dataLossPct === 0));
+  // Nothing processed at all: everything is lost.
+  const [dead] = scoreValidation(rec, new Map([['geometric', samplesFor(rec, 'geometric', () => ({ deg: null, flags: Flags.DROPPED }))]]), GEOMETRY, 'own', FPS);
+  assert.equal(dead?.dataLossPct, 100);
 });
 
 test('own and intersection modes', () => {

@@ -5,7 +5,7 @@ import { VERDICT } from '../constants.ts';
 import { angularSeparationDeg, degToPx, pxToDeg, type PlaneGeometry } from '../geometry/angles.ts';
 import { layoutToPx, viewportDiagonalPx, type LayoutGeometry } from '../geometry/screen.ts';
 import { mean, median, percentile, sampleSd } from '../maths/stats.ts';
-import { ENGINE_IDS, Flags } from '../types.ts';
+import { ENGINE_IDS } from '../types.ts';
 import type {
   EstimatorId,
   Funnel,
@@ -20,12 +20,26 @@ import type {
   Vec2,
 } from '../types.ts';
 import { aoiGrid } from './aoi.ts';
-import { dataLossPct, expectedFrames, funnelCounts, isValidSample, nominalFpsOrDefault, sumFunnels, type FunnelEntry } from './funnel.ts';
+import {
+  dataLossPct,
+  expectedFrames,
+  funnelCounts,
+  isProcessedSample,
+  isValidSample,
+  lossBasisFrames,
+  nominalFpsOrDefault,
+  sumFunnels,
+  sustainedRateHz,
+  type FunnelEntry,
+} from './funnel.ts';
 
 /** BCEA coverage and its k = −ln(1 − P) = 1.1394 for P = 0.68. */
 export const BCEA_P = 0.68;
 export const BCEA_K = -Math.log(1 - BCEA_P);
-/** Consecutive samples further apart than this many median frame intervals are not a pair. */
+/**
+ * Consecutive samples further apart than this many median intervals between processed frames are
+ * not a pair (§16.1: frames the host refused for lack of time do not break pairs).
+ */
 export const S2S_MAX_GAP_FACTOR = 1.5;
 /**
  * Central targets lie within this Chebyshev distance of the viewport centre (normalised). It
@@ -230,7 +244,9 @@ interface TargetExtras {
  * accuracy is ang(T̄, Ḡ) of the means over its valid samples; its baseline is ang(T̄, C̄).
  * Targets without a valid sample have NaN metrics and are left out of the summary statistics,
  * which therefore cover the same targets for accuracy and baseline. `dataLossPct` and
- * `accuracyPctDiag` are percentages (0–100).
+ * `accuracyPctDiag` are percentages (0–100). Data loss is counted against the frames the host
+ * could analyse at the rate it sustained (lossBasisFrames, §16.1); the funnel keeps the nominal
+ * expected count, and RMS-S2S pairs follow the interval between processed frames.
  */
 export function scoreValidation(
   rec: Recording,
@@ -244,7 +260,6 @@ export function scoreValidation(
   const fps = nominalFpsOrDefault(nominalFps);
   const windows = targetWindows(rec, g.screen);
   const frames = [...rec.frames].sort((a, b) => a.meta.tCaptureMs - b.meta.tCaptureMs);
-  const maxGapMs = S2S_MAX_GAP_FACTOR * medianFrameIntervalMs(frames.map((f) => f.meta.tCaptureMs));
   const estimators = ESTIMATOR_ORDER.filter((e) => samples.has(e));
   const indexed = new Map<EstimatorId, Map<number, GazeSample>>();
   for (const e of estimators) indexed.set(e, indexSamples(e, samples.get(e) as GazeSample[]));
@@ -254,6 +269,8 @@ export function scoreValidation(
 
   return estimators.map((estimator): ValidationReport => {
     const own = indexed.get(estimator) as Map<number, GazeSample>;
+    const processedTimes = frames.filter((f) => isProcessedSample(own.get(f.meta.index))).map((f) => f.meta.tCaptureMs);
+    const maxGapMs = S2S_MAX_GAP_FACTOR * medianFrameIntervalMs(processedTimes);
     const targets: TargetMetrics[] = [];
     const extras: TargetExtras[] = [];
 
@@ -270,7 +287,7 @@ export function scoreValidation(
         const s = own.get(f.meta.index);
         const valid = mode === 'own' ? isValidSample(s) : validForAll(f.meta.index);
         entries.push({ sample: s, valid });
-        if (s !== undefined && (s.flags & Flags.DROPPED) === 0) {
+        if (isProcessedSample(s)) {
           const received = options.receivedMs?.get(f.meta.index);
           if (received !== undefined && Number.isFinite(received)) extra.latencies.push(received - f.meta.tCaptureMs);
         }
@@ -296,7 +313,7 @@ export function scoreValidation(
         targetPx: w.targetPx,
         region: w.region,
         funnel,
-        dataLossPct: dataLossPct(funnel),
+        dataLossPct: Number.NaN, // set below, once the sustained rate is known
         accuracyDeg: angularSeparationDeg(tBar, gBar),
         medianErrorDeg: median(errors),
         offsetDeg: [gBar[0] - tBar[0], gBar[1] - tBar[1]],
@@ -308,6 +325,11 @@ export function scoreValidation(
       extras.push(extra);
     });
 
+    const rateHz = sustainedRateHz(targets.map((t, k) => ({ processed: t.funnel.processed, windowS: (extras[k] as TargetExtras).windowS })));
+    const bases = windows.map((w) => lossBasisFrames(w.item.sampleMs, fps, rateHz));
+    targets.forEach((t, k) => {
+      t.dataLossPct = dataLossPct(t.funnel, bases[k] as number);
+    });
     const scored = targets.map((t, k) => ({ t, x: extras[k] as TargetExtras })).filter(({ t }) => Number.isFinite(t.accuracyDeg));
     const accs = scored.map(({ t }) => t.accuracyDeg);
     const accuracyMeanDeg = mean(accs);
@@ -317,7 +339,7 @@ export function scoreValidation(
     const allDistances = extras.flatMap((x) => x.distances);
     const reportDistance = positive(g.refDistanceMm) ? g.refDistanceMm : median(allDistances);
     const rms = median(finite(targets.map((t) => t.rmsS2SDeg)));
-    const dataLoss = dataLossPct(pooled);
+    const dataLoss = dataLossPct(pooled, bases.reduce((sum, b) => sum + b, 0));
     const trackingGain = baselineDeg / accuracyMeanDeg;
     const accuracyPctDiag = (100 * mean(finite(scored.map(({ t }) => t.accuracyPx)))) / viewportDiagonalPx(g.screen);
     return {

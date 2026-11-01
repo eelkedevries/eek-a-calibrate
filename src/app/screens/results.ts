@@ -299,6 +299,7 @@ class Results {
       h('h2', null, t('results.funnel.title')),
       h('p', null, t('results.funnel.for', { name: ESTIMATOR_NAMES[inUse] })),
       h('div', { class: 'table-wrap' }, h('table', { class: 'simple-table funnel-table' }, h('tbody', null, ...rows))),
+      h('p', { class: 'note' }, t('results.funnel.note')),
     );
   }
 

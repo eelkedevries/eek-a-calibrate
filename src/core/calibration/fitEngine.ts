@@ -139,9 +139,9 @@ function positive(v: number | null | undefined): v is number {
 }
 
 /**
- * Accepted pursuit frames over the delivered pursuit frames outside the hold and discard. Frames
- * the vision host refused count as not accepted: with too few processed frames the lag is not
- * estimated from them.
+ * Accepted pursuit frames over the processed pursuit frames outside the hold and discard (§16.1).
+ * Frames the vision host refused for lack of time are left out: a device slower than the camera
+ * still has its lag estimated when the frames it did analyse are good.
  */
 function pursuitAcceptance(recs: readonly Recording[]): { frames: number; accepted: number } {
   let frames = 0;
@@ -149,7 +149,7 @@ function pursuitAcceptance(recs: readonly Recording[]): { frames: number; accept
   for (const rec of recs) {
     for (const f of rec.frames) {
       const label = f.label;
-      if (!label || label.phase !== 'pursuit' || label.reject === 'settle') continue;
+      if (!label || label.phase !== 'pursuit' || label.reject === 'settle' || label.reject === 'dropped') continue;
       frames++;
       if (label.accepted) accepted++;
     }

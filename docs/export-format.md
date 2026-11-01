@@ -91,7 +91,9 @@ item; `frame_uncertainty_ms` is the median frame interval of that presentation.
 `validation.csv` holds one row per estimator × mode (`own`: each estimator's valid frames;
 `intersection`: frames valid for every estimator) × target, then one summary row each, with the
 funnel, accuracy, offsets, precision, BCEA, data loss, rate, latency, baseline, gain, % of the
-diagonal, areas-of-interest grid and the heuristic verdict. `cv.csv` lists every engine ×
+diagonal, areas-of-interest grid and the heuristic verdict. The funnel's `expected` count is at
+the camera's frame rate; data loss is counted against the frames the device could analyse (see
+[methods](methods.md#validation-metrics)), so it is not simply 1 − valid / expected. `cv.csv` lists every engine ×
 mapper × relative λ with its cross-validated error and standard error. `events.csv` lists the
 events per recording with their onset, offset, centroid, amplitude, number of samples and the
 thresholds used; it is left out when no validation with valid samples was available to set the

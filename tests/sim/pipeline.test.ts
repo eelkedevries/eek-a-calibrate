@@ -45,6 +45,8 @@ interface SessionOptions {
   seed: number;
   /** Head pose as a function of the item and the time since its onset. */
   pose?: (item: TargetItem | PursuitItem, tRelMs: number) => { yaw: number; pitch: number; roll: number; offsetCm: Vec2; distanceCm: number };
+  /** The vision host takes one frame in this many and refuses the rest (a device slower than the camera). */
+  processEvery?: number;
 }
 
 /** A gentle, item-dependent head wobble inside the fixation gate, and the guided sweeps of block C. */
@@ -88,6 +90,11 @@ function simulate(schedule: Schedule, g: SessionGeometry, opts: SessionOptions, 
       const head: SimHead = headAt(onScreenNormalCm(scene.screen, pose.distanceCm, pose.offsetCm), pose.yaw, pose.pitch, pose.roll);
       const [xPx, yPx] = gazeTarget(item, onset, t, g);
       const sim = simulateFrame(scene, head, { kind: 'screen', xPx, yPx }, { noisePx: opts.noisePx, normal, index, tCaptureMs: t });
+      if (index % (opts.processEvery ?? 1) !== 0) {
+        recorder.addDropped(sim.meta);
+        index++;
+        continue;
+      }
       const x = geometricFeatures(sim.face, sim.meta.videoW, sim.meta.videoH).x;
       const r: FrameResult = {
         meta: sim.meta,
@@ -106,12 +113,12 @@ function simulate(schedule: Schedule, g: SessionGeometry, opts: SessionOptions, 
   return { rec: recorder.finish(), receivedMs: recorder.receivedMs, endMs: t, nextIndex: index };
 }
 
-async function session(noisePx: number, seed = SEED) {
-  const cal = simulate(calibrationSchedule({ preset: 'standard', seed }), { ...geometry }, { noisePx, seed }, 1000, 0);
+async function session(noisePx: number, seed = SEED, processEvery = 1) {
+  const cal = simulate(calibrationSchedule({ preset: 'standard', seed }), { ...geometry }, { noisePx, seed, processEvery }, 1000, 0);
   cal.rec.geometry = { ...cal.rec.geometry, refDistanceMm: referenceDistanceMm([cal.rec]) };
   const fit = await fitRecording(cal.rec, { seed, engines: ['geometric'], maxMs: 15000, featureVersions: { geometric: 'geo-4' } });
   const valGeometry = { ...geometry, refDistanceMm: fit.refDistanceMm };
-  const val = simulate(validationSchedule({ preset: 'standard', seed }), valGeometry, { noisePx, seed: seed + 1 }, cal.endMs + 2000, cal.nextIndex);
+  const val = simulate(validationSchedule({ preset: 'standard', seed }), valGeometry, { noisePx, seed: seed + 1, processEvery }, cal.endMs + 2000, cal.nextIndex);
   const scored = scoreRecording(fit, val.rec, fit.fitGeometry as SessionGeometry, { nominalFps: 30, receivedMs: val.receivedMs });
   return { cal, fit, val, scored };
 }
@@ -151,6 +158,18 @@ test('σ = 0.5 px landmark noise with head poses inside the range: mean accuracy
   assert.ok(r.trackingGain > 3, `tracking gain ${r.trackingGain}`);
   const inRange = s.scored.samples.get('geometric')!.filter((x) => (x.flags & Flags.OUT_OF_RANGE) !== 0).length;
   assert.equal(inRange, 0, 'no validation frame is out of range');
+});
+
+test('a host that analyses every second frame (15 Hz of 30): same verdict, the lag is fitted, RMS-S2S has a value (§16.1)', async () => {
+  const fast = report(await session(0.5));
+  const s = await session(0.5, SEED, 2);
+  const r = report(s);
+  assert.ok(r.dataLossPct < 5, `data loss ${r.dataLossPct} %`);
+  assert.ok(Math.abs(r.samplingHz - 15) < 1, `effective rate ${r.samplingHz} Hz`);
+  assert.equal(r.verdict, fast.verdict);
+  assert.ok(Number.isFinite(r.rmsS2SDeg) && r.aoiGrid === fast.aoiGrid, `RMS-S2S ${r.rmsS2SDeg}, AOI ${r.aoiGrid}`);
+  assert.ok(!s.fit.warnings.some((w) => /pursuit lag is the default/.test(w)), s.fit.warnings.join(' | '));
+  assert.ok(Math.abs(s.fit.pursuitLagMs - PURSUIT_LAG_MS) <= 33, `lag ${s.fit.pursuitLagMs} ms`);
 });
 
 test('out-of-range poses are flagged, and flagged frames still carry a prediction', async () => {
