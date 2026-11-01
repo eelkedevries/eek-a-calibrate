@@ -2,7 +2,7 @@
 // sequences, the poll fallback's detection, and the capture-time choice.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { captureStamp, FrameDeduper } from '../../src/platform/frameClock.ts';
+import { captureStamp, FrameDeduper, needsSnapshot } from '../../src/platform/frameClock.ts';
 
 function run(seq: number[]): { isNew: boolean; cameraGap: number; reset: boolean }[] {
   const d = new FrameDeduper();
@@ -68,4 +68,11 @@ test('tCaptureMs prefers captureTime, then expectedDisplayTime, then the callbac
   assert.deepEqual(captureStamp({ captureTime: 0, expectedDisplayTime: 1040 }, 1033), { tCaptureMs: 1040, clock: 'expectedDisplayTime' });
   assert.deepEqual(captureStamp({ captureTime: Number.NaN }, 1033), { tCaptureMs: 1033, clock: 'callback' });
   assert.deepEqual(captureStamp({}, 1033), { tCaptureMs: 1033, clock: 'callback' });
+});
+
+test('no snapshot for a frame the busy host would refuse, unless a tap needs every frame', () => {
+  assert.equal(needsSnapshot(true, false), false);
+  assert.equal(needsSnapshot(false, false), true);
+  assert.equal(needsSnapshot(undefined, false), true, 'a sink that does not report busy gets every frame');
+  assert.equal(needsSnapshot(true, true), true, 'the diagnostics tap draws every frame');
 });

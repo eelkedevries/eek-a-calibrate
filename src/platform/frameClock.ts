@@ -1,8 +1,10 @@
 // The frame clock (spec §4.1). requestVideoFrameCallback on the hidden source
 // video stamps every new camera frame in the main-thread performance.now()
 // domain, makes an ImageBitmap of it and submits it to the vision host, which
-// takes at most one frame at a time. If rVFC goes quiet for RVFC_STALL_MS while
-// the video plays, a rAF poll takes over until rVFC callbacks return.
+// takes at most one frame at a time. A frame that arrives while the host is
+// busy is dropped without a snapshot (unless a tap needs every frame). If rVFC
+// goes quiet for RVFC_STALL_MS while the video plays, a rAF poll takes over
+// until rVFC callbacks return.
 //
 // The decision logic (FrameDeduper, captureStamp) is pure and unit-tested in
 // Node; the DOM-facing FrameClock and watchPauseConditions use it.
@@ -93,13 +95,24 @@ export class FrameDeduper {
 export interface FrameSink {
   /** False when busy; the sink then closes the bitmap (VisionHost.submit). */
   submit(bitmap: ImageBitmap, meta: FrameMeta): boolean;
+  /** True while submit() would refuse a frame (ManagedVisionHost.busy); absent means unknown. */
+  readonly busy?: boolean;
+}
+
+/**
+ * Whether a new frame needs an ImageBitmap: not when the sink says it is busy and no tap needs
+ * every frame, since the bitmap would be made only to be closed unused. The frame then counts as
+ * dropped, as a refused one does.
+ */
+export function needsSnapshot(sinkBusy: boolean | undefined, hasTap: boolean): boolean {
+  return hasTap || sinkBusy !== true;
 }
 
 export interface FrameClockStats {
   /** New frames seen (FrameMeta.index runs over these). */
   delivered: number;
   submitted: number;
-  /** New frames the host refused because a frame was in flight. */
+  /** New frames the host refused, or that arrived while it was busy, because a frame was in flight. */
   dropped: number;
   /** Frames whose ImageBitmap could not be made. */
   failed: number;
@@ -259,6 +272,11 @@ export class FrameClock {
     this.counters.cameraGapFrames += decision.cameraGap;
     this.lastClock = clock;
     this.lastCaptureMs = tCaptureMs;
+    if (!needsSnapshot(this.sink.busy, this.opts.tap !== undefined)) {
+      this.counters.dropped += 1;
+      this.opts.onFrame?.(meta, false);
+      return;
+    }
     let pending: Promise<ImageBitmap>;
     try {
       pending = createImageBitmap(this.video);
