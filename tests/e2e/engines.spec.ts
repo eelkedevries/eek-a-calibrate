@@ -111,3 +111,151 @@ test.describe('Peekr engine (WP7)', () => {
     await page.getByRole('button', { name: 'Stop' }).click();
   });
 });
+
+test.describe('BlazeGaze engine (WP6)', () => {
+  test.describe.configure({ timeout: 240_000 });
+
+  interface LabFrame {
+    status: string;
+    x: number[] | null;
+    prior: [number, number] | null;
+    computeMs: number;
+  }
+
+  interface LabSnapshot {
+    running: boolean;
+    error: string | null;
+    faces: number;
+    engineStatus: { id: string; ok: boolean; backend?: string; reason?: string; loadMs?: number }[];
+    lastResult: { meta: { index: number }; engines: Record<string, LabFrame> } | null;
+    probe: { frames: number; engines: Record<string, { p50Ms: number; p90Ms: number; okFrames: number }> } | null;
+    probeError: string | null;
+    messages: { stage: string; message: string; recoverable: boolean }[];
+  }
+
+  function snapshot(page: Page): Promise<LabSnapshot | null> {
+    return page.evaluate(() => (window.__eek as unknown as { lab(): unknown }).lab() as LabSnapshot | null);
+  }
+
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      const violations: string[] = [];
+      Object.defineProperty(window, '__cspViolations', { value: violations });
+      document.addEventListener('securitypolicyviolation', (event) => {
+        violations.push(`${event.violatedDirective} ${event.blockedURI}`);
+      });
+    });
+  });
+
+  function watch(page: Page) {
+    const problems: string[] = [];
+    const onConsole = (where: string) => (message: { type(): string; text(): string }) => {
+      if (message.type() === 'error') problems.push(`${where} console error: ${message.text()}`);
+    };
+    page.on('console', onConsole('page'));
+    page.on('worker', (worker) => worker.on('console', onConsole('worker')));
+    page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
+    const requests: string[] = [];
+    page.context().on('request', (request) => requests.push(request.url()));
+    const tfjsWasm: { url: string; status: number; type?: string; encoding?: string }[] = [];
+    page.context().on('response', (response) => {
+      if (/\/tfjs-backend-wasm[^/]*\.wasm(\.gz)?$/.test(response.url())) {
+        const headers = response.headers();
+        tfjsWasm.push({ url: response.url(), status: response.status(), type: headers['content-type'], encoding: headers['content-encoding'] });
+      }
+    });
+    return { problems, requests, tfjsWasm };
+  }
+
+  async function start(page: Page, query: string) {
+    await page.goto(`./?e2e=1${query}#/lab`);
+    await page.getByRole('button', { name: 'Start camera and vision' }).click();
+    await expect.poll(async () => (await snapshot(page))?.faces ?? 0, { timeout: 45_000 }).toBeGreaterThan(0);
+  }
+
+  function loaded(snap: LabSnapshot, backends: string[]) {
+    const status = snap.engineStatus.find((s) => s.id === 'blazegaze');
+    expect(status, JSON.stringify(snap.engineStatus)).toMatchObject({ ok: true });
+    expect(backends, `backend ${status!.backend}`).toContain(status!.backend);
+    expect(status!.loadMs).toBeGreaterThan(0);
+    return status!;
+  }
+
+  /** A processed frame carries x = [emb 512, hv 3, fo 3] and the head's estimate, all finite, and its time. */
+  function checkFrame(frame: LabFrame) {
+    expect(frame.x).toHaveLength(518);
+    expect(frame.x!.every(Number.isFinite)).toBe(true);
+    expect(frame.prior!.every(Number.isFinite)).toBe(true);
+    expect(frame.computeMs).toBeGreaterThan(0);
+  }
+
+  async function finish(page: Page, seen: ReturnType<typeof watch>) {
+    // The lab shows the strip the encoder receives.
+    await expect(page.locator('canvas[aria-label^="Eye strip, 512 × 128"]').first()).toBeVisible({ timeout: 15_000 });
+    const snap = (await snapshot(page))!;
+    const origin = new URL(page.url()).origin;
+    for (const url of seen.requests) {
+      if (url.startsWith('data:') || url.startsWith('blob:')) continue;
+      expect(new URL(url).origin, `request to ${url}`).toBe(origin);
+    }
+    expect(await page.evaluate(() => (window as unknown as { __cspViolations: string[] }).__cspViolations)).toEqual([]);
+    expect(seen.problems).toEqual([]);
+    expect(snap.messages.filter((m) => !m.recoverable)).toEqual([]);
+    expect(snap.messages.filter((m) => m.stage === 'blazegaze')).toEqual([]);
+    await page.getByRole('button', { name: 'Stop' }).click();
+    await expect.poll(async () => (await snapshot(page))?.running).toBe(false);
+  }
+
+  test('returns ok on at least 3 of 10 frames on WebGL or WebAssembly, with backend and timings', async ({ page }) => {
+    const seen = watch(page);
+    await start(page, '');
+    await page.getByRole('button', { name: 'Run each engine on 10 frames' }).click();
+    await expect
+      .poll(async () => {
+        const s = await snapshot(page);
+        return s?.probe ? 'done' : (s?.probeError ?? 'running');
+      }, { timeout: 120_000, intervals: [1000] })
+      .toBe('done');
+    const snap = (await snapshot(page))!;
+    const status = loaded(snap, ['tfjs-webgl', 'tfjs-wasm']);
+    if (status.backend === 'tfjs-wasm') {
+      // setWasmPaths points at the .gz copies (spec §4.6.2): one gzip-encoded download, no plain-file retry.
+      expect(seen.tfjsWasm.map((r) => new URL(r.url).pathname.endsWith('.wasm.gz')), JSON.stringify(seen.tfjsWasm)).toEqual([true]);
+      expect(seen.tfjsWasm[0]).toMatchObject({ status: 200, type: 'application/wasm', encoding: 'gzip' });
+    }
+    const run = snap.probe!.engines.blazegaze;
+    expect(run, JSON.stringify(snap.probe)).toBeDefined();
+    expect(snap.probe!.frames).toBe(10);
+    expect(run.okFrames, JSON.stringify(snap.messages)).toBeGreaterThanOrEqual(3);
+    expect(Number.isFinite(run.p50Ms) && run.p50Ms > 0, `p50 ${run.p50Ms} ms`).toBe(true);
+    await expect(page.getByText(new RegExp(`BlazeGaze \\(WebEyeTrack\\) \\(${status.backend}\\)`)).first()).toBeVisible();
+    await expect.poll(async () => (await snapshot(page))?.lastResult?.engines.blazegaze?.status, { timeout: 30_000 }).toBe('ok');
+    checkFrame((await snapshot(page))!.lastResult!.engines.blazegaze);
+    await finish(page, seen);
+  });
+
+  // About a second and a half a frame on the CPU, so BlazeGaze runs alone and its frames are counted
+  // directly: the lab's 10-frame run allows only 20 s.
+  test('?force=cpu runs it on the TF.js CPU backend', async ({ page }) => {
+    const seen = watch(page);
+    await start(page, '&force=cpu&engines=blazegaze');
+    await expect.poll(async () => (await snapshot(page))?.engineStatus.length ?? 0, { timeout: 60_000 }).toBe(1);
+    loaded((await snapshot(page))!, ['tfjs-cpu']);
+    expect(seen.tfjsWasm, 'the CPU path must not load TF.js WebAssembly').toEqual([]);
+    const statuses = new Map<number, string>();
+    await expect
+      .poll(async () => {
+        const r = (await snapshot(page))?.lastResult;
+        const frame = r?.engines.blazegaze;
+        if (r && frame && !statuses.has(r.meta.index)) {
+          statuses.set(r.meta.index, frame.status);
+          if (frame.status === 'ok') checkFrame(frame);
+        }
+        return [...statuses.values()].filter((v) => v === 'ok').length;
+      }, { timeout: 90_000, intervals: [250] })
+      .toBeGreaterThanOrEqual(3);
+    const ok = [...statuses.values()].filter((v) => v === 'ok').length;
+    expect(ok / Math.min(statuses.size, 10), JSON.stringify([...statuses])).toBeGreaterThanOrEqual(0.3);
+    await finish(page, seen);
+  });
+});

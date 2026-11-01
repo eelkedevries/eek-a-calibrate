@@ -100,6 +100,24 @@ wins and the gap is work still to be done.
   eyeLook* blendshapes and the screen ground truth. `headAt` and `onScreenNormalCm` place the
   head; poses are in MediaPipe's metric frame, screen geometry in the OpenCV camera frame.
 
+## BlazeGaze engine (after prompt 006)
+
+- **Inputs (`src/engines/blazegaze/preprocess.ts`, DOM-free):** `prepareInputs(session, …)` gives
+  the strip plan, `hv`, `fo` and `faceWidthCm` (median of the first 30 open-eye frames, then
+  frozen; `newSession()` restarts). The strip (`planEyeStrip`, `sampleEyeStrip`) and `faceOrigin`
+  reproduce upstream's arithmetic exactly without its 512 × 512 intermediate or per-point
+  matrices (about 3 ms a frame); `vendor/` holds upstream `mathUtils.ts`/`safeSVD.ts` at
+  `75fbd2f`, with `obtainEyePatch` as the parity reference and every change in `UPSTREAM.md`.
+- **Model (`runtime.ts`):** `loadBlazeGaze` (tf.loadLayersModel, split into `cnn_encoder` and
+  `gaze_mlp`), `inferBlazeGaze` → `{ emb, prior }`. `x` = [emb 512, hv 3, fo 3]; the layout
+  constants live in `mappers.ts` so the fit worker never loads the preprocessing.
+- **Backends (`src/engines/runtimes/tfjs.ts`):** WebGL, then WebAssembly (`.gz` URLs, one plain
+  retry), CPU only with `?force=cpu` or in Node. WebGL is set aside when it renders only half
+  floats or in software (SwiftShader), so the headless tests run on `tfjs-wasm`. TF.js is
+  imported only inside `create`; the model files go through `fetchAsset` (size and sha256).
+- **Mappers:** `prior-affine` (λ_rel 1e-6), `prior-ridge-pose` (12), `emb-ridge` (518 raw columns,
+  PCA block [0, 512) → 64, every score primary). `#/lab` shows the strip (`lab.ts`).
+
 ## Geometry, metrics, events and export (after prompt 003)
 
 - **Geometry (`src/core/geometry/`):** `screen.ts` (card, diagonal, assumed scale; `screenKey`),
