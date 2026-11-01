@@ -35,6 +35,20 @@ state (`src/app/state.ts`) already has slots for the recording, fit, validation 
 in test mode `window.__eek` provides injected geometry and `skipFullscreen`, and
 `registerTestHook` adds hooks (010 needs one that simulates a fullscreen exit).
 
+## Specification v0.2 amendments (binding)
+
+Specification §14 overrides earlier sections. For this prompt:
+- Run blocks through `platform/presentation.ts` (from 011): element fullscreen where available,
+  viewport mode otherwise (§14.2.4); orientation changes and large viewport changes abort the
+  block; small viewport changes in viewport mode are tolerated.
+- Place every target, the pursuit path and the head-block locations with `layoutToPx` (safe
+  rectangle, §14.2.5); label, score and export with the same function.
+- Touch equivalents for every key (§14.2.7): tap to continue, corner Pause and Abort buttons.
+- Geometry is optional (§14.1): store `FitResult.fitGeometry`; estimators convert with it; when
+  geometry changes after calibration, re-derive degrees from pixel predictions and re-score
+  validation from the stored frames; px and % of diagonal first while `degreesApproximate`.
+- Calibration must work end to end with assumed geometry (no screen or distance step).
+
 ## Deliverables (required changes)
 
 1. §4.7–§4.10: schedules and layouts (seeded `mulberry32` + Fisher–Yates, `?seed=`), the stimulus

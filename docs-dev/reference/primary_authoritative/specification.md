@@ -1,4 +1,7 @@
-# eek-a-calibrate: final specification, v0.1 (1 November 2026)
+# eek-a-calibrate: final specification, v0.2 (1 November 2026)
+
+> **v0.2:** §14 makes screen size and viewing distance optional and adds smartphone support. It
+> overrides earlier sections where they conflict.
 
 This is the binding, implementation-ready specification for **eek-a-calibrate**. It is a browser
 app for webcam eye-tracking calibration, validation and live gaze, served at
@@ -2062,6 +2065,122 @@ with licence and citation; no unsourced accuracy claims (grep review).
 8. A one-line eek-a-gaze change to treat a `time_ms` column as milliseconds (in that repository).
 
 ---
+
+## 14. Amendment v0.2 (1 November 2026): optional geometry and smartphone support
+
+Requested by the owner after v0.1: screen size and viewing distance must not be mandatory, and
+the app should also work with smartphone cameras. **Where this section conflicts with an earlier
+section, this section wins.**
+
+### 14.1 Screen size and viewing distance are optional
+
+Calibration fits a personal mapping from camera features to screen positions; it needs neither
+the physical screen size nor the viewing distance. Both only make the *degree* figures exact.
+
+1. **Default flow:** Welcome → Camera → Calibrate → Validate → Results → Live → Data.
+   `#/screen` and `#/distance` are **not** steps of the default flow. They are offered as one
+   optional action, "Measure screen and distance (optional; makes degree values exact)", on
+   Welcome (under Advanced), on Results and on Data. Nothing waits for them; at most one
+   dismissible hint appears on Results while degrees are approximate.
+2. **Without measurement:** `pxPerMm = ASSUMED_PX_PER_MM` (`pxPerMmSource = 'assumed'`) and
+   `f_px = (max(videoW, videoH)/2) / tan(DISTANCE.assumedHfovDeg/2)` — the assumed field of view
+   applies to the **long side** of the delivered video, so portrait video is handled
+   (`focalSource = 'assumed-fov'`). `degreesApproximate = true`. Per-frame distance compensation
+   still works, because it depends on `D_t / D_ref`, in which `f_px` cancels.
+3. **Measuring after calibration does not invalidate the fit.** Each estimator keeps converting
+   with the geometry it was fitted under, stored as `FitResult.fitGeometry`. Reports re-derive
+   degrees from the (unchanged) pixel predictions and targets with the new geometry, and
+   validation is re-scored from the stored validation frames. Pixel results never change.
+4. **Reporting while approximate:** Results, Live and Data show **pixels and % of the screen
+   diagonal first**; degrees are shown with "≈" and the note "assumes 96 CSS px per inch and a
+   typical camera field of view; measure screen and distance for exact values". The verdict uses
+   the % of diagonal thresholds (§4.12, already specified).
+5. **Setup meters:** the 450–850 mm distance band is shown only when distance has been measured;
+   otherwise distance guidance uses the face-width fraction alone.
+6. **Export:** `geometry.yaml` keeps its keys with the assumed values; `session.json` records the
+   sources, and `README.txt` states that degree values are approximate when geometry was assumed.
+
+### 14.2 Smartphones and tablets
+
+Targets: current Android Chrome and iOS/iPadOS Safari (17 or later), front camera, portrait and
+landscape. Desktop behaviour is unchanged except where noted.
+
+1. **Device class.** `mobile = matchMedia('(pointer: coarse)').matches &&
+   min(screen.width, screen.height) <= MOBILE.maxShortSidePx` (heuristic); recorded in
+   `session.json`.
+2. **Camera.** `facingMode: 'user'`. On mobile the ladder is `CAMERA_LADDER_MOBILE`
+   (960×540, then 640×480), then `{video: true}`. **Never assume landscape video**: portrait
+   frames (for example 480×640) are normal; all code uses the delivered `videoW`/`videoH`. A change
+   of track settings (phones may switch resolution on rotation) is treated as a camera change.
+3. **Orientation.** A calibration is valid only for the orientation and viewport size it was
+   made in (the profile key already contains `W×H`). An orientation change pauses the active
+   block (and aborts it, as a resize does); in Live the dot greys out with "Rotate back to the
+   orientation you calibrated in, or recalibrate". Where supported (Android in fullscreen),
+   `screen.orientation.lock(<current>)` during calibration and validation; failure is ignored.
+4. **Fullscreen or viewport mode** (`platform/presentation.ts`). Use element fullscreen where
+   available. Where it is not (iPhone Safari), use **viewport mode**: a `position: fixed;
+   inset: 0` stage sized to the visual viewport at block start, with `touch-action: none`,
+   `overscroll-behavior: none` and no text selection. In viewport mode, visual-viewport size
+   changes of at most `MOBILE.viewportToleranceFrac` of either dimension (browser bars) are logged
+   and tolerated; larger changes and orientation changes abort the block. `NOT_FULLSCREEN` is not
+   set in viewport mode; `ScreenGeometry.presentationMode` records which mode was used. In
+   `?e2e=1` both modes remain testable.
+5. **Safe areas.** `index.html` uses `width=device-width, initial-scale=1, viewport-fit=cover`.
+   Normalised layout coordinates map into the **safe rectangle** (viewport minus
+   `env(safe-area-inset-*)`, measured with a probe element) so that no target, pursuit path or
+   button lies under a notch, camera cut-out or home indicator. One function,
+   `layoutToPx(xNorm, yNorm, geometry)`, is used by the stimulus, labelling, metrics and export;
+   `ScreenGeometry.insets` stores the insets.
+6. **Wake lock.** `navigator.wakeLock.request('screen')` during camera setup, calibration,
+   validation and Live; re-acquired when the page becomes visible again; ignored if unsupported.
+7. **Touch.** Every keyboard action has a touch equivalent with a target of at least
+   `MOBILE.minTouchPx` CSS px: tap anywhere on an instruction card to continue; small Pause and
+   Abort buttons in a screen corner during blocks, never at a target position; a large "It
+   disappeared" button in the blind-spot test. No hover-only interface.
+8. **Instructions.** On mobile: "Prop the phone up, or hold it steadily at eye level, about
+   30–40 cm from your face (heuristic). Keep the same orientation throughout." Copy never
+   requires the camera to be above the screen: on phones and tablets it may be at the top or the
+   side.
+9. **Performance.** iOS uses the CPU delegate (§4.2). The probe and run-set rule (§7) applies
+   unchanged; on mobile the warning threshold is `MOBILE.warnMs`. Live shows the effective frame
+   rate.
+10. **Head and hand motion.** On a hand-held phone what matters is the face pose relative to the
+    device; the head-motion block and the pose covariates cover it. No device-motion sensors are
+    used.
+11. **Tests.** WP10 adds `tests/e2e/mobile.spec.ts`: Playwright emulation of a phone (`isMobile`,
+    `hasTouch`, portrait viewport) with a portrait fake video (`scripts/make-fake-video.sh
+    --portrait`, 480×640). The Quick flow completes by taps without element fullscreen, targets
+    lie inside the safe rectangle, and an orientation change pauses and invalidates.
+12. **Manual checklist** adds iPhone Safari and Android Chrome in portrait and landscape, propped
+    and hand-held.
+
+### 14.3 Contract and constant changes (all additive)
+
+```ts
+// src/core/types.ts
+export interface ScreenGeometry { /* …v0.1 fields… */
+  insets?: { top: number; right: number; bottom: number; left: number };
+  presentationMode?: 'fullscreen' | 'viewport'; }
+export interface FitResult { /* …v0.1 fields… */ fitGeometry?: SessionGeometry; }
+// src/core/constants.ts
+export const CAMERA_LADDER_MOBILE = [[960, 540], [640, 480]] as const;
+export const MOBILE = { maxShortSidePx: 820, viewportToleranceFrac: 0.12, warnMs: 80, minTouchPx: 44 };
+```
+
+`DISTANCE.assumedHfovDeg` now refers to the long side of the video.
+
+### 14.4 Work allocation
+
+- **011** `011_optional_geometry_and_mobile_platform.md` runs **before 008**: §14.3; the mobile
+  ladder and a portrait audit of WP3/WP4 code; the long-side focal assumption;
+  `platform/presentation.ts` (fullscreen or viewport mode with tolerance, orientation lock, wake
+  lock, safe rectangle, `layoutToPx`); the viewport meta; `make-fake-video.sh --portrait`; unit
+  tests.
+- **008** uses `presentation.ts` and `layoutToPx`, touch controls, px-first reporting,
+  `fitGeometry` and re-scoring.
+- **009** implements the new default flow, the optional geometry entry points, mobile setup copy
+  and meters, wake lock in Live and touch controls.
+- **010** adds `mobile.spec.ts` and the manual checklist items.
 
 ## Appendix A — `src/core/constants.ts` defaults (WP1)
 

@@ -27,6 +27,15 @@ are listed in the specification's "Scratch material" table. The eelkedevries.com
 requires committing and pushing to its `main`, merging any harness branch first, and saying so.
 Where `gh` has no valid login, use the GitHub API tools named in §9.
 
+## Specification v0.2 amendments (binding)
+
+Specification §14 overrides earlier sections. For this prompt:
+- Add `tests/e2e/mobile.spec.ts` (§14.2.11): phone emulation (`isMobile`, `hasTouch`, portrait
+  viewport) with the portrait fake video; the Quick flow completes by taps without element
+  fullscreen; targets inside the safe rectangle; an orientation change pauses and invalidates.
+- Add the §14.2.12 items to `docs-dev/manual-verification.md`.
+- Check that the default flow never requires the screen or distance step (§14.1.1).
+
 ## Deliverables (required changes)
 
 1. `npm run check:all` green; fixes for any integration defects in the owning files, each noted.

@@ -21,6 +21,7 @@ are in [`agent/prompts/`](agent/prompts/).
 | `008_calibration_fit_validation.md` | WP8: protocol, fitting, selection, validation, results | after 002–005 (uses 006/007 if present) |
 | `009_setup_live_data_screens.md` | WP9: setup, live, data and about screens; drift; persistence; docs | after 008 (setup screens may start after 004) |
 | `010_integration_and_deploy.md` | WP10: integration, failure tests, deploy, manual checklist | last |
+| `011_optional_geometry_and_mobile_platform.md` | v0.2: optional screen size and distance; smartphone platform support (specification §14) | after 007, **before 008** |
 
 Parallel prompts run in separate git worktrees (each with its own `E2E_PORT`), commit to `main`
 and run `git pull --rebase` before pushing.

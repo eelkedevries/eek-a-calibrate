@@ -30,6 +30,21 @@ flow, device probe and run set), §10.4 (`live-data.spec.ts`), Appendix A (`SETU
 The footer's "Delete all my data" button calls the handler registered with
 `setDeleteAllHandler` (`src/app/state.ts`); `storage.ts` registers the real one.
 
+## Specification v0.2 amendments (binding)
+
+Specification §14 overrides earlier sections. For this prompt:
+- The default flow is Welcome → Camera → Calibrate → Validate → Results → Live → Data (§14.1.1).
+  `#/screen` and `#/distance` stay available but only as the optional action "Measure screen and
+  distance (optional; makes degree values exact)" on Welcome (Advanced), Results and Data;
+  nothing waits for them.
+- Camera-screen meters show the distance band only when distance was measured (§14.1.5).
+- Mobile (§14.2): device class, mobile instructions (§14.2.8), touch equivalents for every key
+  (§14.2.7, including the blind-spot test), the wake lock during camera setup and Live
+  (§14.2.6), orientation handling in Live (§14.2.3), the mobile warning threshold (§14.2.9),
+  and px / % of diagonal first while degrees are approximate (§14.1.4).
+- Measuring geometry after calibration re-scores without refitting (§14.1.3); the export
+  states when degree values are approximate (§14.1.6).
+
 ## Deliverables (required changes)
 
 1. §7 screens 0–3: welcome (privacy, sourced expectations, capability check, preset, engines with
