@@ -52,8 +52,8 @@ export const ROUTES: readonly Route[] = [
   { id: 'lab', path: '/lab', immersive: false, load: () => import('./screens/lab.ts') },
 ];
 
-/** The first-run flow (spec §7). */
-export const FLOW: readonly RouteId[] = ['welcome', 'camera', 'screen', 'distance', 'calibrate', 'validate', 'results', 'live', 'data'];
+/** The default flow (spec §14.1.1): screen size and viewing distance are an optional detour, not steps. */
+export const FLOW: readonly RouteId[] = ['welcome', 'camera', 'calibrate', 'validate', 'results', 'live', 'data'];
 
 export function hrefFor(id: RouteId): string {
   const route = ROUTES.find((r) => r.id === id);

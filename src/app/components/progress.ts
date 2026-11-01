@@ -1,7 +1,7 @@
 // Download progress for the face model and the engines' files: one labelled <progress> per asset,
 // added as the vision host reports it. A total of 0 (unknown size) shows an indeterminate bar.
 import { h } from '../dom.ts';
-import { t } from '../strings.en-GB.ts';
+import { STRINGS, t } from '../strings.en-GB.ts';
 
 export const PROGRESS_CSS = `
 .asset-progress { list-style: none; padding: 0; margin: var(--space-2) 0; max-width: var(--measure); }
@@ -11,8 +11,10 @@ export const PROGRESS_CSS = `
 .asset-progress .asset-pct { font-variant-numeric: tabular-nums; font-size: 0.9rem; min-width: 3.5rem; text-align: right; }
 `;
 
-/** A readable name for an asset path or id: the file name without the hashed part. */
+/** A readable name for an asset path or id: a named asset's name, else the file name without the hashed part. */
 export function assetLabel(asset: string): string {
+  const named = STRINGS[`progress.asset.${asset}`];
+  if (named !== undefined) return named;
   const base = asset.split('/').pop() ?? asset;
   return base.replace(/-[A-Za-z0-9_-]{8}(?=\.)/, '');
 }

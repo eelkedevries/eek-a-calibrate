@@ -1,17 +1,25 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
-// Builds the fake camera stream once per checkout (it is git-ignored). Specs
-// that need the camera fail clearly if it could not be made; the smoke test
-// does not use it.
+// Builds the fake camera streams once per checkout (they are git-ignored): the
+// landscape one for the desktop specs and the portrait one (480×640) for
+// mobile.spec.ts. Specs that need a camera fail clearly if theirs could not be
+// made; the smoke test uses neither.
+const STREAMS: readonly { file: string; args: string[] }[] = [
+  { file: 'tests/fixtures/generated/face.mjpeg', args: [] },
+  { file: 'tests/fixtures/generated/face-portrait.mjpeg', args: ['--portrait'] },
+];
+
 export default function globalSetup(): void {
   if (!existsSync('dist/index.html')) {
     throw new Error('dist/ is missing: run `npm run build` before `npm run test:e2e`.');
   }
-  if (existsSync('tests/fixtures/generated/face.mjpeg')) return;
-  try {
-    execFileSync('bash', ['scripts/make-fake-video.sh'], { stdio: 'inherit' });
-  } catch (error) {
-    console.warn(`global-setup: could not build the fake camera stream (${String(error)}); camera specs will fail.`);
+  for (const { file, args } of STREAMS) {
+    if (existsSync(file)) continue;
+    try {
+      execFileSync('bash', ['scripts/make-fake-video.sh', ...args], { stdio: 'inherit' });
+    } catch (error) {
+      console.warn(`global-setup: could not build ${file} (${String(error)}); the specs that use it will fail.`);
+    }
   }
 }

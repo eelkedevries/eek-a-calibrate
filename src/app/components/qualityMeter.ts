@@ -70,7 +70,7 @@ export function evaluateSetup(s: SetupSample): MeterReading[] {
     out.push({ id: 'glare', ok: q.glare <= SETUP.glareMax, value: `${(100 * q.glare).toFixed(1)} %`, advice: q.glare <= SETUP.glareMax ? null : t('meter.advice.glare') });
   }
   const fpsKnown = Number.isFinite(s.fps);
-  out.push({ id: 'fps', ok: fpsKnown ? s.fps >= SETUP.fpsMin : null, value: fpsKnown ? `${s.fps.toFixed(0)} Hz` : '—', advice: fpsKnown && s.fps < SETUP.fpsMin ? t('meter.advice.fps') : null });
+  out.push({ id: 'fps', ok: fpsKnown ? s.fps >= SETUP.fpsMin : null, value: fpsKnown ? `${s.fps.toFixed(1)} Hz` : '—', advice: fpsKnown && s.fps < SETUP.fpsMin ? t('meter.advice.fps') : null });
   if (!f) {
     out.push(unknown('pose'));
   } else {

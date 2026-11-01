@@ -11,14 +11,14 @@ import { engineSpecs, megabytes, SETUP_CSS } from './welcome.ts';
 
 const ABOUT_CSS = `
 .about section { margin-top: var(--space-4); }
-.about dl { display: grid; grid-template-columns: minmax(8rem, max-content) 1fr; gap: var(--space-1) var(--space-3); max-width: var(--measure); }
+.about dl { display: grid; grid-template-columns: minmax(8rem, max-content) minmax(0, 1fr); gap: var(--space-1) var(--space-3); max-width: var(--measure); }
 .about dt { font-weight: 600; }
-.about dd { margin: 0; }
+.about dd { margin: 0; overflow-wrap: anywhere; }
 .about .formula { font-family: var(--font-mono); font-size: 0.9rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-2) var(--space-3); overflow-x: auto; max-width: var(--measure); white-space: pre; }
 .about .engine { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-2) var(--space-3); margin: var(--space-2) 0; max-width: var(--measure); }
 .about .engine h3 { margin: 0 0 var(--space-1); }
 .about .refs li { margin-bottom: var(--space-1); overflow-wrap: anywhere; }
-@media (max-width: 30rem) { .about dl { grid-template-columns: 1fr; } }
+@media (max-width: 30rem) { .about dl { grid-template-columns: minmax(0, 1fr); } }
 `;
 
 /** Paragraph keys `about.<section>.<n>` from 1 up to the first missing one. */

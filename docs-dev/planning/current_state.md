@@ -52,7 +52,7 @@ wins and the gap is work still to be done.
   (`simplex.ts`), `mulberry32`/`fisherYates`, robust statistics and `wilcoxonSignedRank`.
   `src/core/filters/` holds `OneEuroFilter2D` (degrees) and the pure `blinkHold` step.
 - **Deploy:** `scripts/deploy.sh` dispatches `deploy-eek-a-calibrate.yml` in the eelkedevries.com
-  repository (prompt 010 adds that workflow). Not yet deployed.
+  repository; see "Integration and deploy" below.
 
 ## Capture and vision (after prompt 004)
 
@@ -224,8 +224,8 @@ wins and the gap is work still to be done.
   → `#/distance` is one optional action (`?from=` names the screen to return to) on Welcome
   (Advanced), Results and Data. Measuring after calibration only changes `state.geometry` (scale,
   distance model, D_ref rescaled by f_new/f_fit) and re-scores the current validation at once
-  (`screen.ts` `rescoreValidation`); the camera keeps running through `#/screen` and `#/distance`. `router.ts`'s `FLOW` still
-  lists the v0.1 order but only the WP1 placeholder used it.
+  (`screen.ts` `rescoreValidation`); the camera keeps running through `#/screen` and `#/distance`.
+  `router.ts`'s `FLOW` lists this order (only the unused WP1 placeholder reads it).
 - **Camera (`screens/camera.ts`):** meters (`components/qualityMeter.ts`, `HoldGate` latches after
   2 s green; "Continue anyway" after 20 s), picker (`session.setPreferredCamera`), eyewear,
   probe and `decideRunSet` (rule applied for Auto only; a hand-picked list is reported, not cut).
@@ -250,6 +250,41 @@ wins and the gap is work still to be done.
   `markers.csv`; recomputes samples per block with that block's fit, corrections and the current
   geometry (D_t rescaled by focal ratio); live `gaze_*_filt` from the same One Euro stream.
 
+## Integration and deploy (after prompt 010)
+
+- **Live:** <https://eelkedevries.com/eek-a-calibrate/>. eelkedevries.com commit `c64030f` added
+  `.github/workflows/deploy-eek-a-calibrate.yml` (builds this repository's `main`, rsyncs `dist/`
+  into `/eek-a-calibrate/`), the protect line in its `scripts/deploy.sh` and a README sentence;
+  run 1 of the workflow succeeded on 1 November 2026. A push here does not deploy: start the
+  workflow (`npm run deploy`, *Run workflow*, or the GitHub API; `docs/deployment.md`).
+- **End-to-end suite:** `failures.spec.ts` (camera permission denied, in its own new-headless
+  Chromium with the permission denied over CDP, because `--use-fake-ui-for-media-stream` grants
+  the camera regardless; fullscreen exit through `__eek.simulateFullscreenExit()` in calibration
+  and validation; a tampered Peekr model through `context.route`, which also reaches the worker;
+  `__eek.crashWorker()` in the lab and mid-calibration) and `mobile.spec.ts` (390 × 844,
+  `isMobile`, `hasTouch`, the portrait fake camera, safe-area insets set with CDP
+  `Emulation.setSafeAreaInsetsOverride`; the default flow by taps; turning the phone in Live and
+  in a block). A `test.use({ launchOptions })` forces its own worker, so the mobile spec runs in
+  its own browser. `tests/e2e/global-setup.ts` builds both fake videos. Besides the scheduled
+  positions, `mobile.spec.ts` reads the targets as drawn on the stage canvas and matches each to
+  `layoutToPx` with the measured insets (a check without the insets fails).
+- **Narrow phones:** Diagnostics and About no longer scroll sideways at 320–390 CSS px (their
+  definition lists use `minmax(0, …)` tracks; a long camera name in the lab's picker is cut off
+  with an ellipsis; wide lab tables scroll inside their panel).
+- **Iris capture:** at least 2 s, continued until 10 open-eye frames or 6 s, so that a slow phone
+  can finish; the copy says "a little longer on a slow device".
+- **Test hooks:** `__eek.crashWorker()` is registered by `session.ts` as well as by the lab, so it
+  works wherever a capture runs.
+- **Probe limit:** `MessageHost.probe` gives up after 10 s plus, per frame still to come, the
+  longer of 1 s and twice the latest submit-to-result time, re-armed on every result
+  (`probeTimeoutMs`), so the CPU BlazeGaze path finishes.
+- **Copy:** `invalidationText` (calibration) names the calibration; `invalidationReason` gives
+  the cause alone (`invalid.*` strings) for validation and Live.
+- **Manual checks still owed:** `docs-dev/manual-verification.md` (real cameras, phones, glasses,
+  lighting, distances, a low-end laptop, BlazeGaze on WebGL). No accuracy figure is published
+  until it has been done.
+
 ## In progress
 
-Prompts 002–007 can run in parallel; then 008, 009 and 010 (`docs-dev/plan.md`).
+v1 (prompts 001–011) is complete. Next: the owner's manual checks; phase-2 items
+(specification §13) only by new prompts.

@@ -2,7 +2,7 @@
 
 *Webcam eye-tracking calibration, validation and live gaze, running entirely in your browser.*
 
-**Live (once deployed):** <https://eelkedevries.com/eek-a-calibrate/>
+**Live:** <https://eelkedevries.com/eek-a-calibrate/>
 
 ## What it does
 

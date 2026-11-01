@@ -15,7 +15,7 @@ import type { Screen, ScreenContext } from '../router.ts';
 import { currentFit, ensureCapture, requestedEngines, setValidationRun, type Capture, type PendingFit } from '../session.ts';
 import { getState, setState } from '../state.ts';
 import { t } from '../strings.en-GB.ts';
-import { CaptureLink, installProtocolHooks, invalidationText, measuredScale, publishProtocol, reducedMotion, runSchedule, SCREEN_CSS, type ProtocolSnapshot } from './calibrate.ts';
+import { CaptureLink, installProtocolHooks, invalidationReason, measuredScale, publishProtocol, reducedMotion, runSchedule, SCREEN_CSS, type ProtocolSnapshot } from './calibrate.ts';
 
 /** The estimator in use after validation: the one asked for with ?select=, when it was fitted, else Auto's choice. */
 export function chosenEstimator(fit: FitResult): EstimatorId {
@@ -114,7 +114,7 @@ class Validation {
     const g = getState().geometry;
     const v = this.capture.camera.settings;
     this.link = new CaptureLink(this.capture, g?.distance.focalPx ?? focalFromAssumedFov(v.width || 640, v.height || 480), (event) => {
-      this.message = invalidationText(event);
+      this.message = t('validate.invalid', { reason: invalidationReason(event) });
       if (this.runner) this.runner.abort();
       else if (event === 'ended') {
         this.startButton.disabled = true;
@@ -207,7 +207,7 @@ class Validation {
       link.disarm();
       await this.end(block);
       this.phase = 'stopped';
-      this.fail(this.message ?? (outcome.kind === 'invalid' ? t('validate.invalid', { reason: invalidationText(outcome.invalidation) }) : t('validate.aborted')));
+      this.fail(this.message ?? (outcome.kind === 'invalid' ? t('validate.invalid', { reason: invalidationReason(outcome.invalidation) }) : t('validate.aborted')));
       this.startButton.disabled = false;
       this.startButton.focus();
       return;

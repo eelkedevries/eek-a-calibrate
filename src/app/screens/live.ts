@@ -65,7 +65,7 @@ import { currentValidationRun, ensureCapture, resetSessionResults, setValidation
 import { getState, setState, subscribe } from '../state.ts';
 import { t } from '../strings.en-GB.ts';
 import { registerTestHook } from '../testHooks.ts';
-import { CaptureLink, installProtocolHooks, invalidationText, measuredScale, publishProtocol, reducedMotion, runSchedule, SCREEN_CSS } from './calibrate.ts';
+import { CaptureLink, installProtocolHooks, invalidationReason, measuredScale, publishProtocol, reducedMotion, runSchedule, SCREEN_CSS } from './calibrate.ts';
 import { snapshotCapture } from './camera.ts';
 
 // ----- Session blocks and records (read by #/data for the export) --------------------------
@@ -1307,7 +1307,7 @@ class LiveScreen {
     this.showToolbar(false);
     const stage = this.stage;
     stage.clear();
-    const body = [invalidationText(inv), t(inv.reason === 'orientation' ? 'live.paused.rotate' : 'live.paused.layout')];
+    const body = [invalidationReason(inv), t(inv.reason === 'orientation' ? 'live.paused.rotate' : 'live.paused.layout')];
     void stage
       .card({ title: t('live.paused.title'), body, role: 'alertdialog', actions: [{ label: t('live.paused.resume'), value: 'resume' }, { label: t('live.tool.exit'), value: 'exit', secondary: true }] })
       .then(async (value) => {

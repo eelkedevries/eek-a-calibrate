@@ -139,8 +139,8 @@ Parameters pre-fill the settings; they may be placed before the hash or after it
   remembered for the screen.
 - **Distance:** the blind-spot test. Cover your right eye, look at the black square with your
   left eye, and press Space (or tap *It disappeared*) when the red dot vanishes, five times.
-  Then look at the screen with both eyes open for two seconds while the camera measures your
-  irises. The result is remembered for the camera and its resolution.
+  Then look at the screen with both eyes open for two seconds (a little longer on a slow
+  device, until ten frames have been measured) while the camera measures your irises. The result is remembered for the camera and its resolution.
 
 See [methods](methods.md) for the formulae and [troubleshooting](troubleshooting.md) if
 something does not work.

@@ -80,6 +80,11 @@
   box-sizing: border-box;
 }
 
+/* The hidden attribute always hides, whatever display a component's own CSS gives the element. */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
@@ -108,6 +113,11 @@ a {
 :focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
+}
+
+/* The router moves focus to each screen's heading for screen readers; it is not a control, so no ring. */
+main h1[tabindex='-1']:focus {
+  outline: none;
 }
 
 button,

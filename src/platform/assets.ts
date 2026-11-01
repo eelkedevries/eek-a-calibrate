@@ -29,7 +29,7 @@ export interface AssetConfig {
   baseUrl: string;
   /** Request the .gz copy of entries that have one (production builds). */
   gz: boolean;
-  /** URLs for entries whose path contains [hash], keyed by id (the ORT files from runtimes/ort.ts). */
+  /** URLs for entries whose path contains [hash], keyed by id: the ORT files, from the vision core's `?url` imports (visionCore.ts). */
   hashed?: Readonly<Partial<Record<string, string>>>;
 }
 

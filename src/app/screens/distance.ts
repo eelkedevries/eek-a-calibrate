@@ -24,8 +24,13 @@ import { SETUP_CSS } from './welcome.ts';
 
 /** The iris capture after the blind-spot test (§4.4). */
 const IRIS_MS = 2000;
-/** Fewer open-eye frames than this in the 2 s is no measurement. */
+/** Fewer open-eye frames than this is no measurement. */
 const MIN_IRIS_FRAMES = 10;
+/**
+ * A slow device (a phone on the CPU delegate) may process fewer than MIN_IRIS_FRAMES frames in
+ * 2 s, so the capture continues past IRIS_MS until it has them, up to this long (heuristic).
+ */
+const IRIS_MAX_MS = 6000;
 
 /**
  * Puts a measured distance model into the session geometry. With a fit, D_ref is rescaled from
@@ -192,10 +197,11 @@ class Distance {
         const tMs = r.meta.tCaptureMs;
         startMs ??= tMs;
         if (r.face && r.face.eyes.open && Number.isFinite(r.face.eyes.irisDiamPx) && r.face.eyes.irisDiamPx > 0) samples.push(r.face.eyes.irisDiamPx);
-        if (tMs - startMs >= IRIS_MS) finish();
+        const elapsed = tMs - startMs;
+        if ((elapsed >= IRIS_MS && samples.length >= MIN_IRIS_FRAMES) || elapsed >= IRIS_MAX_MS) finish();
       });
       // Without frames the measurement still ends, with too few samples.
-      const timer = setTimeout(finish, IRIS_MS + 3000);
+      const timer = setTimeout(finish, IRIS_MAX_MS + 3000);
       function finish(): void {
         clearTimeout(timer);
         off();

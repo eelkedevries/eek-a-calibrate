@@ -158,15 +158,17 @@ function base64(bytes: Uint8ClampedArray): string {
 }
 
 const LAB_CSS = `
-.lab-grid { display: grid; gap: var(--space-4); }
-.lab-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-3); }
+.lab-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+.lab-panel { min-width: 0; overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-3); }
 .lab-panel h2 { margin-top: 0; font-size: 1.1rem; }
-.lab-dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-1) var(--space-3); margin: 0; }
+.lab-dl { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: var(--space-1) var(--space-3); margin: 0; }
 .lab-dl dt { color: var(--muted); }
 .lab-dl dd { margin: 0; font-family: var(--font-mono); overflow-wrap: anywhere; }
 .lab-table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
 .lab-table th, .lab-table td { text-align: left; padding: var(--space-1) var(--space-2); border-bottom: 1px solid var(--border); }
 .lab-controls { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: end; }
+.lab-controls > * { min-width: 0; max-width: 100%; }
+.lab-controls select { max-width: 100%; text-overflow: ellipsis; }
 .lab-controls fieldset { border: 1px solid var(--border); border-radius: var(--radius); }
 .lab-crops { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: flex-start; }
 .lab-crops figure { margin: 0; }
@@ -176,6 +178,7 @@ const LAB_CSS = `
 .lab-crops canvas, .lab-crops video { display: block; max-width: 100%; background: #000; image-rendering: pixelated; }
 .lab-crops video { width: 320px; }
 .lab-messages { font-family: var(--font-mono); font-size: 0.9rem; max-height: 12rem; overflow: auto; }
+@media (max-width: 30rem) { .lab-dl { grid-template-columns: minmax(0, 1fr); } .lab-dl dd { margin-bottom: var(--space-2); } }
 `;
 
 // ----- Session -------------------------------------------------------------------

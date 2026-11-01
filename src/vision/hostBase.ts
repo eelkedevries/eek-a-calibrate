@@ -40,8 +40,20 @@ interface Waiter<T> {
   reject(error: Error): void;
 }
 
-/** A probe needs this long plus a second per frame before it is given up. */
+/**
+ * A probe is given up after PROBE_BASE_TIMEOUT_MS plus, for each frame still to come, a second
+ * or twice the latest measured frame time if that is longer (spec §15.2.3: TF.js on the CPU
+ * takes about 1.5 s a frame). The limit is re-armed on every result, so it grows with the
+ * measured frame time and counts only the frames the probe still needs.
+ */
 const PROBE_BASE_TIMEOUT_MS = 10_000;
+const PROBE_MIN_PER_FRAME_MS = 1000;
+
+/** The probe's remaining time limit (ms) for `remaining` frames at a measured `frameMs` each. */
+export function probeTimeoutMs(remaining: number, frameMs: number): number {
+  const perFrame = Number.isFinite(frameMs) && frameMs > 0 ? Math.max(PROBE_MIN_PER_FRAME_MS, 2 * frameMs) : PROBE_MIN_PER_FRAME_MS;
+  return PROBE_BASE_TIMEOUT_MS + Math.max(0, remaining) * perFrame;
+}
 
 export abstract class MessageHost implements ManagedVisionHost {
   abstract readonly kind: 'worker' | 'inline';
@@ -60,7 +72,10 @@ export abstract class MessageHost implements ManagedVisionHost {
 
   private initWaiter: Waiter<VisionInfo> | null = null;
   private engineWaiters: Waiter<EngineStatus[]>[] = [];
-  private probeWaiter: (Waiter<ProbeResult> & { timer: ReturnType<typeof setTimeout> }) | null = null;
+  private probeWaiter: (Waiter<ProbeResult> & { timer: ReturnType<typeof setTimeout>; frames: number; seen: number }) | null = null;
+  /** performance.now() when the frame in flight was submitted, and the latest submit-to-result time. */
+  private submittedAtMs = Number.NaN;
+  private lastFrameMs = Number.NaN;
   private probeQueue: Promise<unknown> = Promise.resolve();
   private readonly resultListeners = new Set<(r: FrameResult) => void>();
   private rearmInit: (() => void) | null = null;
@@ -132,6 +147,7 @@ export abstract class MessageHost implements ManagedVisionHost {
       return false;
     }
     this.inFlight = true;
+    this.submittedAtMs = performance.now();
     this.counters.submitted += 1;
     this.send({ t: 'frame', bitmap, meta }, [bitmap]);
     return true;
@@ -160,17 +176,23 @@ export abstract class MessageHost implements ManagedVisionHost {
           reject(new Error('The vision host has been disposed.'));
           return;
         }
-        const timeoutMs = PROBE_BASE_TIMEOUT_MS + Math.max(1, frames) * 1000;
-        const timer = setTimeout(() => {
-          this.probeWaiter = null;
-          reject(new Error(`the probe did not finish within ${Math.round(timeoutMs / 1000)} s (are frames arriving?)`));
-        }, timeoutMs);
-        this.probeWaiter = { resolve, reject, timer };
+        const n = Math.max(1, Math.floor(Number.isFinite(frames) ? frames : 1));
+        this.probeWaiter = { resolve, reject, timer: this.armProbeTimer(n), frames: n, seen: 0 };
         this.send({ t: 'probe', frames });
       });
     const next = this.probeQueue.then(run, run);
     this.probeQueue = next.catch(() => undefined);
     return next;
+  }
+
+  private armProbeTimer(remaining: number): ReturnType<typeof setTimeout> {
+    const timeoutMs = probeTimeoutMs(remaining, this.lastFrameMs);
+    return setTimeout(() => {
+      const waiter = this.probeWaiter;
+      if (!waiter) return;
+      this.probeWaiter = null;
+      waiter.reject(new Error(`the probe received no frame for ${Math.round(timeoutMs / 1000)} s with ${remaining} of ${waiter.frames} frames still to come (are frames arriving?)`));
+    }, timeoutMs);
   }
 
   resetSession(): void {
@@ -202,6 +224,7 @@ export abstract class MessageHost implements ManagedVisionHost {
       this.probeWaiter = null;
     }
     this.inFlight = false;
+    this.submittedAtMs = Number.NaN;
   }
 
   protected emitError(error: HostError): void {
@@ -234,7 +257,15 @@ export abstract class MessageHost implements ManagedVisionHost {
         break;
       case 'result': {
         this.inFlight = false;
+        if (Number.isFinite(this.submittedAtMs)) this.lastFrameMs = performance.now() - this.submittedAtMs;
+        this.submittedAtMs = Number.NaN;
         this.counters.results += 1;
+        const probing = this.probeWaiter;
+        if (probing) {
+          probing.seen += 1;
+          clearTimeout(probing.timer);
+          probing.timer = this.armProbeTimer(probing.frames - probing.seen);
+        }
         const result: FrameResult = { ...message.result, receivedMs: performance.now() };
         for (const listener of this.resultListeners) {
           try {

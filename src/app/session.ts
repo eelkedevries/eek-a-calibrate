@@ -6,9 +6,13 @@ import { ENGINE_IDS } from '../core/types.ts';
 import type { EngineId, FitResult, FrameMeta, FrameResult, Recording } from '../core/types.ts';
 import { openCamera, type CameraSession } from '../platform/camera.ts';
 import { FrameClock } from '../platform/frameClock.ts';
-import { createVisionHost, defaultVisionConfig, type HostError, type ManagedVisionHost } from '../vision/host.ts';
+import { crashWorkerHosts, createVisionHost, defaultVisionConfig, type HostError, type ManagedVisionHost } from '../vision/host.ts';
 import type { EngineStatus } from '../vision/protocol.ts';
 import { getState } from './state.ts';
+import { registerTestHook } from './testHooks.ts';
+
+// failures.spec.ts crashes the worker of a running capture, not only the lab's (test mode only).
+registerTestHook('crashWorker', () => crashWorkerHosts());
 
 export interface Capture {
   readonly camera: CameraSession;

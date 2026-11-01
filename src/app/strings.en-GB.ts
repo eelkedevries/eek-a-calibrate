@@ -112,6 +112,13 @@ export const STRINGS: Record<string, string> = {
   'calibrate.invalid.zoom': 'Calibration stopped because the page was zoomed.',
   'calibrate.invalid.resize': 'Calibration stopped because the window changed size.',
   'calibrate.invalid.camera': 'Calibration stopped because the camera changed its picture size or frame rate.',
+  // The cause alone, for validation and live gaze (calibrate.invalid.* name the calibration).
+  'invalid.fullscreen-exit': 'The screen left fullscreen.',
+  'invalid.orientation': 'The device was rotated.',
+  'invalid.dpr': 'The display scaling changed.',
+  'invalid.zoom': 'The page was zoomed.',
+  'invalid.resize': 'The window changed size.',
+  'invalid.camera': 'The camera changed its picture size or frame rate.',
   'calibrate.invalid.after': 'A calibration is valid only for the screen layout it was made in. Start again when everything is as you want it.',
   'calibrate.error.start': 'The calibration could not start: {message}',
   'calibrate.error.capture': 'The camera or the vision pipeline could not start: {message}',
@@ -129,7 +136,7 @@ export const STRINGS: Record<string, string> = {
   'validate.fitFailed': 'The calibration could not be fitted: {message}',
   'validate.screenChanged': 'The screen has changed since calibration (size or orientation), so the calibration no longer applies. Calibrate again.',
   'validate.aborted': 'Validation abandoned. Start it again when you are ready.',
-  'validate.invalid': 'Validation stopped: {reason} Start it again when everything is as it was during calibration.',
+  'validate.invalid': 'Validation stopped. {reason} Start it again when everything is as it was during calibration.',
   'validate.error': 'Validation could not be scored: {message}',
 
   // Results screen (WP8; spec §7 screen 6) and its components
@@ -338,6 +345,12 @@ export const STRINGS: Record<string, string> = {
   'progress.of': '{loaded} of {total} MB ({percent} %)',
   'progress.loaded': '{loaded} MB',
   'progress.done': 'done',
+  // Names of what the vision host downloads (its progress messages name the face model or an engine).
+  'progress.asset.face-landmarker': 'Face landmark model',
+  'progress.asset.blazegaze': 'BlazeGaze',
+  'progress.asset.peekr': 'Peekr',
+  'progress.asset.geometric': 'Geometric',
+  'progress.asset.eyepixel': 'Eye-pixel (WebGazer method)',
   'storage.memory': 'This browser does not let eek-a-calibrate store data, so measurements and calibrations are kept for this visit only.',
 
   // Welcome (WP9; spec §7 screen 0, §14)
@@ -515,7 +528,7 @@ export const STRINGS: Record<string, string> = {
   'distance.step1': 'Cover your right eye with your hand.',
   'distance.step2': 'Look at the black square with your left eye, and keep looking at it.',
   'distance.step3': 'A red dot moves slowly to the left. Press Space, or tap “It disappeared”, the moment it vanishes. This happens five times.',
-  'distance.step4': 'Then uncover your eye and look at the screen with both eyes open for two seconds while the camera measures your irises.',
+  'distance.step4': 'Then uncover your eye and look at the screen with both eyes open for two seconds (a little longer on a slow device) while the camera measures your irises.',
   'distance.band': 'A distance of 45–85 cm suits a laptop or desktop screen (heuristic).',
   'distance.bandMobile': 'On a phone, about 30–40 cm is usual (heuristic).',
   'distance.narrow': 'The screen is too narrow for the blind-spot test as it is held now: the dot would reach the edge before it disappears. On a phone, turn it sideways (landscape) for the test and the iris measurement; you can turn it back afterwards.',
@@ -581,7 +594,7 @@ export const STRINGS: Record<string, string> = {
   'live.toResults': 'Back to the results',
   'live.blocks': 'Recorded in this session',
   'live.block.none': 'Nothing recorded yet.',
-  'live.block.live': '{trial}: live recording, {n} frames, {markers} markers',
+  'live.block.live': '{trial}: live recording, {n} frames, markers: {markers}',
   'live.block.drift': '{trial}: drift check, {n} frames',
   'live.block.recalibration': '{trial}: quick recalibration, {n} frames',
   'live.block.validation': '{trial}: validation on 6 dots, {n} frames',

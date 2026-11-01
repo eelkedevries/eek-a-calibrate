@@ -249,6 +249,12 @@ export function invalidationText(inv: Invalidation | 'changed' | 'ended'): strin
   return t(`calibrate.invalid.${inv === 'changed' ? 'camera' : inv.reason}`);
 }
 
+/** The cause alone ("The device was rotated."), for screens other than calibration. */
+export function invalidationReason(inv: Invalidation | 'changed' | 'ended'): string {
+  if (inv === 'ended') return t('camera.ended');
+  return t(`invalid.${inv === 'changed' ? 'camera' : inv.reason}`);
+}
+
 /** Every block of a schedule in order, each after its instruction card; stops at the first block that does not finish. */
 export async function runSchedule(runner: BlockRunner, schedule: Schedule): Promise<RunOutcome> {
   for (const b of scheduleBlocks(schedule)) {

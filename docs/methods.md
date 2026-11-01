@@ -53,7 +53,7 @@ Viewing distance:
 
 ```
 D_bs = d / tan(13.5°)          blind-spot test; d = median square-to-dot distance (mm) of 5 trials
-f_px = D_bs · p̄ / 11.7         p̄ = median iris diameter (px) over 2 s with both eyes open
+f_px = D_bs · p̄ / 11.7         p̄ = median iris diameter (px) over 2 s with both eyes open (longer, up to 6 s, until 10 frames)
 f_px = (max(videoW, videoH)/2) / tan(30°)    not measured: a 60° field of view across the long side
 D_t  = f_px · 11.7 / median over the last 1000 ms of the iris diameter (open-eye frames)
 D_ref = median of D_t over the accepted calibration frames

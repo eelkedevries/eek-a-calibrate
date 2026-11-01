@@ -26,6 +26,19 @@ Because of these caveats, eek-a-calibrate is offered for non-commercial research
 Development only: `vite` 8.3.4 (MIT), `typescript` 6.0.3 (Apache-2.0), `@playwright/test`
 1.63.0 (Apache-2.0), `@types/node` 22.20.4 (MIT).
 
+## Code reproduced from MIT-licensed sources
+
+- **WebEyeTrack** (commit `75fbd2f`, MIT, © 2025 Eduardo Davalos, Yike Zhang, Amanda Goodwin,
+  Gautam Biswas): `mathUtils.ts` and `safeSVD.ts` are vendored under
+  `src/engines/blazegaze/vendor/` with the upstream `LICENSE`; every change is listed in
+  `UPSTREAM.md` there.
+- **Peekr 1.0.7** (npm package `peekr`, MIT, © 2025 AryamanTaore): the preprocessing in
+  `src/engines/peekr/preprocess.ts` (the eye boxes of its `convertToYolo`, the landmarks of its
+  `collectCoordinates`, `kps`, the crop rectangles and the BGR tensor of its `preprocess`) is
+  reproduced from the package's MIT bundle (`dist/index.js`). The parity tests compare it with
+  bundle code copied, with its MIT notice, into `tests/reference/peekr-boxes.js`, which is never
+  shipped.
+
 ## Methods re-implemented, no code copied
 
 - The eye-pixel engine re-implements the published method of WebGazer (Papoutsaki et al.,

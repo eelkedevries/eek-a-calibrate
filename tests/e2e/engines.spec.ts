@@ -235,7 +235,7 @@ test.describe('BlazeGaze engine (WP6)', () => {
   });
 
   // About a second and a half a frame on the CPU, so BlazeGaze runs alone and its frames are counted
-  // directly: the lab's 10-frame run allows only 20 s.
+  // directly; then the lab's 10-frame run, whose limit grows with the measured frame time (§15.2.3).
   test('?force=cpu runs it on the TF.js CPU backend', async ({ page }) => {
     const seen = watch(page);
     await start(page, '&force=cpu&engines=blazegaze');
@@ -256,6 +256,12 @@ test.describe('BlazeGaze engine (WP6)', () => {
       .toBeGreaterThanOrEqual(3);
     const ok = [...statuses.values()].filter((v) => v === 'ok').length;
     expect(ok / Math.min(statuses.size, 10), JSON.stringify([...statuses])).toBeGreaterThanOrEqual(0.3);
+    await page.getByRole('button', { name: 'Run each engine on 10 frames' }).click();
+    await expect.poll(async () => {
+      const s = await snapshot(page);
+      return s?.probe ? 'done' : (s?.probeError ?? 'running');
+    }, { timeout: 90_000, intervals: [1000] }).toBe('done');
+    expect((await snapshot(page))!.probe!.engines.blazegaze!.okFrames).toBeGreaterThanOrEqual(3);
     await finish(page, seen);
   });
 });
