@@ -194,7 +194,7 @@ export const STRINGS: Record<string, string> = {
   'results.funnel.open': 'Eyes open',
   'results.funnel.inRange': 'Head within the calibrated range',
   'results.funnel.valid': 'Valid for the estimator',
-  'results.funnel.note': 'Frames that were delivered but not processed are frames this device had no time to analyse. They lower the effective rate but do not count as data loss, which is measured against the frames the device could analyse.',
+  'results.funnel.note': 'Frames the camera did not deliver, or that this device had no time to analyse (delivered but not processed), lower the effective rate but do not count as data loss, which is measured against the frames the device could analyse.',
   'results.cv.title': 'Cross-validation candidates',
   'results.cv.note': 'Each engine’s mapping candidates, scored by leave-one-location-out cross-validation on the calibration data: lower is better. The chosen candidate is marked.',
   'results.cv.engine': 'Engine',
