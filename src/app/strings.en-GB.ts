@@ -730,7 +730,7 @@ export const STRINGS: Record<string, string> = {
   'about.metric.precision': 'Precision',
   'about.metric.precision.text': 'RMS sample-to-sample: √(mean ang(Gᵢ, Gᵢ₊₁)²) over consecutive valid samples at most 1.5 median intervals between analysed frames apart; and SD = √(σx² + σy²).',
   'about.metric.bcea': 'BCEA',
-  'about.metric.bcea.text': 'The bivariate contour ellipse area holding 68 % of the samples: 2kπσxσy√(1 − ρ²), with k = −ln(1 − 0.68) = 1.1394.',
+  'about.metric.bcea.text': 'The bivariate contour ellipse area holding 68 % of the samples: 2kπσxσy√(1 − ρ²), with k = −ln(1 − 0.68) = 1.1394. It needs at least 3 valid samples on a target.',
   'about.metric.loss': 'Data loss',
   'about.metric.loss.text': '1 − valid ÷ expected frames, where expected frames = sampling time × the rate at which this device analysed frames (the median over the dots, at most the camera’s frame rate). Frames the device had no time to analyse lower the effective rate instead; the funnel shows them, from the camera’s frame rate to valid frames.',
   'about.metric.rate': 'Effective rate',

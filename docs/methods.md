@@ -136,7 +136,8 @@ Metrics use the raw (unfiltered, uncorrected) predictions of valid frames.
 - **Precision:** RMS-S2S = √(mean ang(Gᵢ, Gᵢ₊₁)²) over consecutive valid samples at most
   1.5 median intervals between processed frames apart (frames the device had no time to analyse
   do not break a pair); SD = √(σx² + σy²);
-  **BCEA₆₈ = 2kπσxσy√(1 − ρ²)** with k = −ln(1 − 0.68) = 1.1394.
+  **BCEA₆₈ = 2kπσxσy√(1 − ρ²)** with k = −ln(1 − 0.68) = 1.1394, from at least 3 valid samples
+  (two samples always lie on a line, so ρ = ±1 and the area would read as 0).
 - **Data loss** = 1 − valid / expected, where expected = sampling time × the rate at which the
   device processed frames (the median over targets of processed frames per second, at most the
   camera's frame rate, 30 if unknown). A device slower than its camera therefore has a lower

@@ -147,7 +147,14 @@ export function bcea68(sdXDeg: number, sdYDeg: number, rho: number): number {
   return 2 * BCEA_K * Math.PI * sdXDeg * sdYDeg * Math.sqrt(Math.max(0, 1 - rho * rho));
 }
 
-/** Sample (n − 1) SDs and correlation of the θ samples; all NaN with fewer than two samples. */
+/** The fewest samples with a correlation, and so a BCEA: two points always give ρ = ±1 (§16.1). */
+export const BCEA_MIN_SAMPLES = 3;
+
+/**
+ * Sample (n − 1) SDs and correlation of the θ samples; all NaN with fewer than two samples, and ρ
+ * and BCEA NaN with fewer than BCEA_MIN_SAMPLES (two points lie on a line, so their BCEA would
+ * read as a perfect 0).
+ */
 export function dispersion(degs: readonly Vec2[]): Dispersion {
   const n = degs.length;
   if (n < 2) return { sdXDeg: Number.NaN, sdYDeg: Number.NaN, rho: Number.NaN, sdDeg: Number.NaN, bcea68Deg2: Number.NaN };
@@ -159,8 +166,10 @@ export function dispersion(degs: readonly Vec2[]): Dispersion {
   const my = mean(ys);
   let sxy = 0;
   for (let i = 0; i < n; i++) sxy += ((xs[i] as number) - mx) * ((ys[i] as number) - my);
+  const sdDeg = Math.hypot(sx, sy);
+  if (n < BCEA_MIN_SAMPLES) return { sdXDeg: sx, sdYDeg: sy, rho: Number.NaN, sdDeg, bcea68Deg2: Number.NaN };
   const rho = sx > 0 && sy > 0 ? Math.min(1, Math.max(-1, sxy / (n - 1) / (sx * sy))) : Number.NaN;
-  return { sdXDeg: sx, sdYDeg: sy, rho, sdDeg: Math.hypot(sx, sy), bcea68Deg2: bcea68(sx, sy, rho) };
+  return { sdXDeg: sx, sdYDeg: sy, rho, sdDeg, bcea68Deg2: bcea68(sx, sy, rho) };
 }
 
 export interface VerdictInput {

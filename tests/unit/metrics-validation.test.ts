@@ -7,6 +7,7 @@ import { angularSeparationDeg, degToPx, pxToDeg } from '../../src/core/geometry/
 import { gaussian, mulberry32 } from '../../src/core/maths/rng.ts';
 import {
   BCEA_K,
+  BCEA_MIN_SAMPLES,
   bcea68,
   dispersion,
   medianFrameIntervalMs,
@@ -142,6 +143,15 @@ test('SD and BCEA against analytic values', () => {
   assert.ok(Number.isNaN(dispersion([[1, 1]]).sdDeg));
 });
 
+test('two samples have an SD but no correlation or BCEA (they always lie on a line)', () => {
+  assert.equal(BCEA_MIN_SAMPLES, 3);
+  for (const pts of [[[0, 0], [1, 0.5]], [[0, 0], [1, 0]]] as Vec2[][]) {
+    const d = dispersion(pts);
+    assert.ok(Number.isFinite(d.sdDeg) && d.sdDeg > 0);
+    assert.ok(Number.isNaN(d.rho) && Number.isNaN(d.bcea68Deg2), `${JSON.stringify(d)}`);
+  }
+  assert.ok(Number.isFinite(dispersion([[0, 0], [1, 0.5], [0.3, 0.9]]).bcea68Deg2));
+});
 
 test('BCEA₆₈ of Gaussian data covers 68 % of it and matches the population value', () => {
   const g = gaussian(mulberry32(9));
