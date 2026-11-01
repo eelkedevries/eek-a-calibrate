@@ -2,7 +2,7 @@
 // ready with the right WebAssembly variant, finds the fake camera's face
 // within 15 s and returns a finite FaceObservation with the delegate
 // recorded; the .wasm.gz files arrive as gzip-encoded application/wasm; the
-// stub engines report "not implemented" without stopping the frame loop; and
+// engines load, or as stubs report "not implemented", without stopping the frame loop; and
 // nothing leaves the origin, logs an error or violates the CSP.
 import { expect, test, type Page } from '@playwright/test';
 
@@ -112,12 +112,15 @@ async function runHost(page: Page, query: string, expected: { kind: string; vari
   expect(snap!.lastResult!.meta.videoW).toBeGreaterThan(0);
   expect(['captureTime', 'expectedDisplayTime', 'callback', 'poll']).toContain(snap!.lastResult!.meta.clock);
 
-  // Every engine is still a stub: each reports "not implemented", and frames keep flowing.
+  // Every engine either loads (with its backend) or is still a stub reporting "not implemented", and frames keep flowing.
   await page.getByRole('button', { name: 'Run each engine on 10 frames' }).click();
   await expect.poll(async () => (await snapshot(page))?.engineStatus.length ?? 0, { timeout: 30_000 }).toBe(4);
-  const statuses = (await snapshot(page))!.engineStatus;
+  const statuses = (await snapshot(page))!.engineStatus as { id: string; ok: boolean; reason?: string; backend?: string }[];
   expect(statuses.map((s) => s.id)).toEqual(ENGINE_IDS);
-  for (const s of statuses) expect(s, s.id).toMatchObject({ ok: false, reason: 'not implemented' });
+  for (const s of statuses) {
+    if (s.ok) expect(s.backend, s.id).toBeTruthy();
+    else expect(s, s.id).toMatchObject({ ok: false, reason: 'not implemented' });
+  }
   const before = (await snapshot(page))!.results;
   await expect.poll(async () => (await snapshot(page))?.results ?? 0, { timeout: 15_000 }).toBeGreaterThan(before + 5);
   await expect(page.getByText(/Finished: 10 frames timed\./)).toBeVisible({ timeout: 20_000 });

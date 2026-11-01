@@ -82,6 +82,24 @@ wins and the gap is work still to be done.
   Node with `tests/fixtures/landmarks/fixture.ts`; regenerate only on purpose with
   `MAKE_LANDMARK_FIXTURE=1 npx playwright test make-landmark-fixture`.
 
+## Geometric and eye-pixel engines (after prompt 005)
+
+- **Geometric (`src/engines/geometric/`):** `features.ts` (pure) gives `x` of 14 values
+  (`GEO_X_NAMES`: per-eye eye-in-head offsets, dc = E⁻¹e₃, blendshape gaze, openQ, gaze ray);
+  pose, eye midpoint and lnDistRatio come from the `RowContext`, so `geo-linear` (24 columns)
+  and `geo-quadratic` (27) assemble their rows in `mappers.ts`. |det E| < 0.2 uses the planar
+  fallback with dc = (0, 0). A face that cannot give finite features makes `extract` throw with
+  the reason (the vision core reports it and marks the frame `error`).
+- **Eye-pixel (`src/engines/eyepixel/`):** `patches.ts` (pure): padded contour boxes,
+  area-averaged BT.601 luma to 10 × 6, histogram equalisation; `x` = [L 60, R 60], row-major;
+  `crop-invalid` when a box is under 4 px or leaves the ROI. `pix-ridge` (floors 2/255) and
+  `pix-webgazer` (×255, unstandardised, absolute λ 1e-5); every column is primary.
+- **Face simulator (`tests/sim/faceSim.ts`):** `simulateFrame(scene, head, gaze, opts)` returns
+  `{ meta, face, truth }` from the canonical model (`tests/sim/data/`, Apache-2.0), the §10.2
+  eyeball model, pinhole projection with seeded noise (`normalSource`), the column-major matrix,
+  eyeLook* blendshapes and the screen ground truth. `headAt` and `onScreenNormalCm` place the
+  head; poses are in MediaPipe's metric frame, screen geometry in the OpenCV camera frame.
+
 ## In progress
 
 Prompts 002–007 can run in parallel; then 008, 009 and 010 (`docs-dev/plan.md`).
