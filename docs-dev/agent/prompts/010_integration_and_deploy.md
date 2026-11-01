@@ -29,7 +29,7 @@ Where `gh` has no valid login, use the GitHub API tools named in §9.
 
 ## Specification v0.2 amendments (binding)
 
-Specification §14 overrides earlier sections. For this prompt:
+Specification §14 and §15 (v0.3) override earlier sections. Apply the integration rules of §15.2.3. For this prompt:
 - Add `tests/e2e/mobile.spec.ts` (§14.2.11): phone emulation (`isMobile`, `hasTouch`, portrait
   viewport) with the portrait fake video; the Quick flow completes by taps without element
   fullscreen; targets inside the safe rectangle; an orientation change pauses and invalidates.

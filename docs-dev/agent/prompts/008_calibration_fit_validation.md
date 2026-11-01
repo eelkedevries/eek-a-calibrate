@@ -37,7 +37,7 @@ in test mode `window.__eek` provides injected geometry and `skipFullscreen`, and
 
 ## Specification v0.2 amendments (binding)
 
-Specification §14 overrides earlier sections. For this prompt:
+Specification §14 and §15 (v0.3) override earlier sections. Apply the integration rules of §15.2.1. For this prompt:
 - Run blocks through `platform/presentation.ts` (from 011): element fullscreen where available,
   viewport mode otherwise (§14.2.4); orientation changes and large viewport changes abort the
   block; small viewport changes in viewport mode are tolerated.

@@ -32,7 +32,7 @@ The footer's "Delete all my data" button calls the handler registered with
 
 ## Specification v0.2 amendments (binding)
 
-Specification §14 overrides earlier sections. For this prompt:
+Specification §14 and §15 (v0.3) override earlier sections. Apply the integration rules of §15.2.2. For this prompt:
 - The default flow is Welcome → Camera → Calibrate → Validate → Results → Live → Data (§14.1.1).
   `#/screen` and `#/distance` stay available but only as the optional action "Measure screen and
   distance (optional; makes degree values exact)" on Welcome (Advanced), Results and Data;

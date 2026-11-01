@@ -1,7 +1,9 @@
-# eek-a-calibrate: final specification, v0.2 (1 November 2026)
+# eek-a-calibrate: final specification, v0.3 (1 November 2026)
 
 > **v0.2:** §14 makes screen size and viewing distance optional and adds smartphone support. It
 > overrides earlier sections where they conflict.
+>
+> **v0.3:** §15 records corrections and integration rules from the reviews of 002–007.
 
 This is the binding, implementation-ready specification for **eek-a-calibrate**. It is a browser
 app for webcam eye-tracking calibration, validation and live gaze, served at
@@ -2181,6 +2183,52 @@ export const MOBILE = { maxShortSidePx: 820, viewportToleranceFrac: 0.12, warnMs
 - **009** implements the new default flow, the optional geometry entry points, mobile setup copy
   and meters, wake lock in Live and touch controls.
 - **010** adds `mobile.spec.ts` and the manual checklist items.
+
+## 15. Amendment v0.3 (1 November 2026): review findings from 002–007
+
+These decisions follow the independent reviews of packages 002–007. **Where this section
+conflicts with an earlier section, this section wins.**
+
+### 15.1 Corrections (already applied on `main`)
+
+1. **BlazeGaze head vector (§4.6.2).** MediaPipe's JavaScript returns the facial transformation
+   matrix column-major (the translation is at indices 12–14). Upstream WebEyeTrack's JavaScript
+   reads it row-major, so its `hv` is built from Rᵀ, which inverts head yaw and pitch. The model
+   was trained by upstream's Python pipeline, where MediaPipe's Python API transposes
+   column-major data into a proper `[R | t]` (`matrix.T` when the layout is column-major;
+   checked in mediapipe 0.10.14 `face_landmarker.py`), and `get_head_vector` uses that R
+   (`scripts/preprocessing/utils.py`). Following the rule of §4.6 (training-time preprocessing
+   is never altered), **`hv` follows the Python training formula**. `fo` keeps upstream's
+   JavaScript reading, because the Python reconstruction applies Euler angles to `inv(R)` there
+   and the two agree. A parity test pins `hv` to an independent re-implementation of the Python
+   formula and shows that the transposed reading departs from it by more than 0.1 under a 25°
+   head turn.
+2. **Blind-spot dot speed before the distance is known (§4.4).** v0.1's "0.25·pxPerMm·10 px/s"
+   is 2.5 mm/s, about six times slower than the stated 1.5°/s. It is now 1.5°/s at an assumed
+   600 mm (`BLIND_SPOT_ASSUMED_DISTANCE_MM`, heuristic): `600·tan(1.5°)·pxPerMm` px/s.
+3. **Worker start-up limit (§4.2).** The 20 s limit counts silence, not download time: every
+   `progress` message re-arms it, so a slow (for example mobile) connection that is still
+   fetching the WebAssembly and model is not abandoned for the inline host.
+
+### 15.2 Integration rules for 008, 009 and 010
+
+1. **008:** pass a map from frame index to `receivedMs` into `scoreValidation`, or latency
+   stays NaN. Apply `maskBlinks` (±1 frame, `core/face/blink.ts`) to each recorded sequence;
+   `EyeMeasures.open` is the per-frame rule only. Build the `RowContext` (pose in radians, eye
+   midpoint, `lnDistRatio`) for every mapper; the geometric engine's `x` holds only 14 values.
+   Pass an explicit CV `score` mask so that hard-rejected rows do not count in the robust CV
+   score. Use `withIntercept` and `unpenalised = [0]` with the 002 ridge functions.
+2. **009:** `geometryYaml` throws without `D_ref` and `detectEvents` throws when SD₂d is NaN
+   (validation without valid data): the export flow must guard both and still produce the rest
+   of the zip, recording what was left out in `README.txt`. Export is offered once calibration
+   has set `D_ref` (assumed geometry still gives one).
+3. **010:** the lab's "run each engine on 10 frames" limit (`src/vision/hostBase.ts`,
+   10 s + 1 s per frame) must grow with the measured frame time, so that the CPU BlazeGaze path
+   (about 1.5 s per frame) can finish. Add a line to `NOTICE.md` saying that Peekr's
+   preprocessing is reproduced from its MIT bundle. Correct the stale comment in
+   `src/platform/assets.ts` about where the ORT files come from. Add to the manual checklist: on a
+   real GPU, BlazeGaze reports `tfjs-webgl`, its median time is within budget and the lab strip
+   shows both eyes; Peekr's per-frame time against its 15 ms budget.
 
 ## Appendix A — `src/core/constants.ts` defaults (WP1)
 
