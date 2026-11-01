@@ -26,8 +26,7 @@ import {
   type Point,
 } from './vendor/mathUtils.ts';
 
-export const BG_FEATURE_VERSION = 'bg-75fbd2f-1';
-export { BG_EMB_DIM, BG_X, BG_X_DIM } from './mappers.ts';
+export { BG_EMB_DIM, BG_FEATURE_VERSION, BG_X, BG_X_DIM } from './mappers.ts';
 
 export const STRIP_W = 512;
 export const STRIP_H = 128;

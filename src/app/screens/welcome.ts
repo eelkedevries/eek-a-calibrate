@@ -4,7 +4,7 @@
 // optional screen and distance measurement. The default flow goes on to the camera (§14.1.1).
 import { ENGINE_IDS } from '../../core/types.ts';
 import type { EngineId, Preset } from '../../core/types.ts';
-import { ENGINE_LOADERS } from '../../engines/registry.ts';
+import { ENGINE_SPECS } from '../../engines/specs.ts';
 import type { EngineSpec } from '../../engines/types.ts';
 import { detectCapabilities, detectDeviceClass, type CapabilityReport } from '../../platform/capabilities.ts';
 import { listProfiles } from '../../platform/storage.ts';
@@ -49,19 +49,9 @@ export function megabytes(bytes: number): string {
   return bytes >= 100_000 ? `${(bytes / 1_000_000).toFixed(1)} MB` : bytes > 0 ? `${Math.round(bytes / 1000)} kB` : t('welcome.engines.noDownload');
 }
 
-/** Loads every engine's spec through the registry (each engine's code, not its model). */
+/** Every engine's spec, from the static table (§16.4): no engine code is downloaded to show it. */
 export async function engineSpecs(): Promise<Partial<Record<EngineId, EngineSpec>>> {
-  const out: Partial<Record<EngineId, EngineSpec>> = {};
-  await Promise.all(
-    ENGINE_IDS.map(async (id) => {
-      try {
-        out[id] = (await ENGINE_LOADERS[id]()).spec;
-      } catch (error) {
-        console.warn(`The ${id} engine could not be loaded`, error);
-      }
-    }),
-  );
-  return out;
+  return { ...ENGINE_SPECS };
 }
 
 function updateSettings(patch: Partial<Settings>): void {

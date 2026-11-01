@@ -2,27 +2,9 @@
 // head-pose features from the shared face front end, in plain TypeScript. It
 // needs no assets or capabilities, so it is always available.
 import type { BackendId, EngineFrame } from '../../core/types.ts';
-import type { EngineInput, EngineModule, EngineSpec, GazeEngine } from '../types.ts';
-import { GEO_FEATURE_VERSION, GEO_X_DIM, geometricFeatures } from './features.ts';
-
-const spec: EngineSpec = {
-  id: 'geometric',
-  displayName: 'Geometric (landmarks, iris and head pose)',
-  rank: 3,
-  family: 'geometric',
-  version: '1',
-  featureVersion: GEO_FEATURE_VERSION,
-  featureDim: GEO_X_DIM,
-  licence: { code: 'MIT', weights: null },
-  citation: 'eek-a-calibrate: a port of the gaze-lite landmark, iris and head-pose features, with corrections.',
-  sourceUrl: 'https://github.com/eelkedevries/eek-a-calibrate',
-  assets: [],
-  requires: [],
-  frameBudgetMs: 5,
-  mappers: ['geo-linear', 'geo-quadratic'],
-  inCombinedByDefault: true,
-  downloadBytes: 0,
-};
+import type { EngineInput, EngineModule, GazeEngine } from '../types.ts';
+import { geometricFeatures } from './features.ts';
+import { spec } from './spec.ts';
 
 class GeometricEngine implements GazeEngine {
   readonly spec = spec;

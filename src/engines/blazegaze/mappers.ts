@@ -13,6 +13,8 @@ export const BG_EMB_DIM = 512;
 /** x = [emb 512, hv 3, fo 3]. */
 export const BG_X_DIM = BG_EMB_DIM + 6;
 export const BG_X = { emb: 0, hv: BG_EMB_DIM, fo: BG_EMB_DIM + 3 } as const;
+/** The feature version (§4.6.2), here for the same reason: the engine's spec reads it without the preprocessing. */
+export const BG_FEATURE_VERSION = 'bg-75fbd2f-1';
 
 /** λ_rel of prior-affine: in effect unpenalised, which reproduces upstream's least-squares affine correction. */
 export const PRIOR_AFFINE_LAMBDA = 1e-6;

@@ -5,28 +5,10 @@
 import type { BackendId, EngineFrame } from '../../core/types.ts';
 import { AssetError, assetInfo, fetchAsset, readBody, verifyAsset } from '../../platform/assets.ts';
 import { initOrt, ORT_VERSION, ortThreads } from '../runtimes/ort.ts';
-import type { EngineContext, EngineInput, EngineModule, EngineSpec, GazeEngine } from '../types.ts';
-import { bgrTensor, PK_CROP, PK_FEATURE_VERSION, PK_INPUT_SIZE, PK_X_DIM, peekrGeometry } from './preprocess.ts';
+import type { EngineContext, EngineInput, EngineModule, GazeEngine } from '../types.ts';
+import { bgrTensor, PK_CROP, PK_INPUT_SIZE, PK_X_DIM, peekrGeometry } from './preprocess.ts';
 import { PeekrSession } from './runtime.ts';
-
-const spec: EngineSpec = {
-  id: 'peekr',
-  displayName: 'Peekr',
-  rank: 2,
-  family: 'appearance-cnn',
-  version: '1.0.7',
-  featureVersion: PK_FEATURE_VERSION,
-  featureDim: PK_X_DIM,
-  licence: { code: 'MIT', weights: 'MIT' },
-  citation: 'Taore, A. (2025). Peekr 1.0.7, browser eye tracking with ONNX (npm package). Accuracy is author-reported and not peer-reviewed.',
-  sourceUrl: 'https://www.npmjs.com/package/peekr',
-  assets: ['peekr-model', 'ort-wasm', 'ort-mjs'],
-  requires: ['wasm-simd'],
-  frameBudgetMs: 15,
-  mappers: ['prior-affine', 'prior-ridge-pose'],
-  inCombinedByDefault: true,
-  downloadBytes: 579_176 + 14_239_897 + 24_381,
-};
+import { spec } from './spec.ts';
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

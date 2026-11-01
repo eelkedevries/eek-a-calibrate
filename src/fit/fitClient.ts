@@ -7,6 +7,7 @@ import { FIT_BUDGET_MS } from '../core/constants.ts';
 import { scoreValidation } from '../core/metrics/validation.ts';
 import type { EngineId, EstimatorId, FitResult, GazeSample, RecordedFrame, Recording, SessionGeometry, ValidationReport } from '../core/types.ts';
 import { MAPPERS } from '../engines/mappers.ts';
+import { ENGINE_SPECS } from '../engines/specs.ts';
 
 export type { Estimator };
 export { EstimatorSet, frameBaseFlags };
@@ -15,7 +16,7 @@ export interface FitOptions {
   seed: number;
   engines: EngineId[];
   maxMs: number;
-  /** Each engine's featureVersion, stored in its mapping state; read from the engine modules when absent. */
+  /** Each engine's featureVersion, stored in its mapping state; from the static engine specs when absent. */
   featureVersions?: Partial<Record<EngineId, string>>;
   /** Quick-recalibration recordings (§4.13), fitted with the calibration at weight ×2. */
   recalibration?: readonly Recording[];
@@ -41,17 +42,9 @@ class WorkerStartError extends Error {}
 
 let nextId = 1;
 
-async function engineFeatureVersions(ids: readonly EngineId[]): Promise<Partial<Record<EngineId, string>>> {
-  const { ENGINE_LOADERS } = await import('../engines/registry.ts');
-  const out: Partial<Record<EngineId, string>> = {};
-  for (const id of ids) {
-    try {
-      out[id] = (await ENGINE_LOADERS[id]()).spec.featureVersion;
-    } catch {
-      out[id] = 'unknown';
-    }
-  }
-  return out;
+/** The engines' feature versions from their static specs (§16.4), so a fit never loads an engine module. */
+export function engineFeatureVersions(ids: readonly EngineId[]): Partial<Record<EngineId, string>> {
+  return Object.fromEntries(ids.map((id) => [id, ENGINE_SPECS[id].featureVersion]));
 }
 
 function runInWorker(recs: Recording[], opts: WorkerFitOptions, onProgress: Progress): Promise<FitResult> {
@@ -100,7 +93,7 @@ async function runInline(recs: Recording[], opts: WorkerFitOptions, onProgress: 
  * Rejects with the reason when nothing can be fitted.
  */
 export async function fitRecording(rec: Recording, opts: FitOptions, onProgress: Progress = () => {}): Promise<FitResult> {
-  const featureVersions = opts.featureVersions ?? (await engineFeatureVersions(opts.engines));
+  const featureVersions = opts.featureVersions ?? engineFeatureVersions(opts.engines);
   const recs = [rec, ...(opts.recalibration ?? [])];
   const workerOpts: WorkerFitOptions = { seed: opts.seed, engines: [...opts.engines], maxMs: Number.isFinite(opts.maxMs) ? opts.maxMs : FIT_BUDGET_MS, featureVersions };
   if (typeof Worker === 'function') {
