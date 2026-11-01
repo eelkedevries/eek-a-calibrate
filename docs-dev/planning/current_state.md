@@ -160,6 +160,36 @@ wins and the gap is work still to be done.
   `tests/reference/peekr-boxes.js` (bundle code with its MIT notice); the Peekr block of
   `tests/e2e/engines.spec.ts`.
 
+## Optional geometry and mobile platform (after prompt 011, specification v0.2 §14)
+
+- **Contracts (additive, §14.3):** `ScreenGeometry.insets` and `.presentationMode`,
+  `FitResult.fitGeometry`; `CAMERA_LADDER_MOBILE` and `MOBILE` in `constants.ts`.
+- **Assumed geometry:** `focalFromAssumedFov(videoW, videoH)` applies the 60° field of view to
+  the long side of the delivered video, so portrait frames give the landscape focal length.
+  `screenKey` puts the long side first, so a measured scale survives rotation.
+- **Safe rectangle:** `layoutToPx` / `pxToLayout` / `safeRect` live in
+  `core/geometry/screen.ts` (core code may use them) and are re-exported by
+  `platform/presentation.ts`. Without insets `layoutToPx` is exactly (xNorm·W, yNorm·H).
+- **Device class:** `isMobileDevice` (pure) and `detectDeviceClass()` in `capabilities.ts`;
+  `openCamera` walks the mobile ladder on mobile (`CameraInfo.ladder`).
+  `CameraSession.onChange` reports a change of the delivered frame size or frame rate
+  (`settingsChange`, pure), to be treated as a camera change.
+- **Presentation (`platform/presentation.ts`):** `startPresentation(stage, { mode, scale })` from
+  the block's user gesture gives `{ mode, geometry(), onInvalidate, onTolerated, check(), end() }`:
+  element fullscreen (orientation locked where allowed) or viewport mode (a fixed stage sized
+  to the visual viewport, changes within `MOBILE.viewportToleranceFrac` tolerated); invalidation
+  reasons `fullscreen-exit`, `orientation` (including a 180° turn), `dpr`, `zoom`, `resize`
+  (call `check()` once per stimulus frame: some pixel-ratio changes fire no event). It
+  holds the wake lock (`holdWakeLock`, also usable alone) and measures the safe-area insets.
+  With `?e2e=1` mode `auto` is viewport mode; `mode: 'fullscreen'` keeps fullscreen testable.
+  `watchOrientation` serves Live.
+- **Portrait audit:** `ear4` normalises portrait frames as the same camera held landscape, so the
+  open-eye rule keeps its landscape thresholds. BlazeGaze's and Peekr's preprocessing are
+  upstream's and stay unchanged (§4.6); on the portrait video all four engines are `ok`.
+  `scripts/make-fake-video.sh --portrait` writes
+  `tests/fixtures/generated/face-portrait.mjpeg` (480×640). Under the mobile ladder Chromium's
+  fake capture crops that file to 480×540 (still portrait).
+
 ## In progress
 
 Prompts 002–007 can run in parallel; then 008, 009 and 010 (`docs-dev/plan.md`).

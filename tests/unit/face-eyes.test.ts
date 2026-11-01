@@ -83,6 +83,40 @@ test('EAR4 follows gaze-lite (normalised coordinates) and openQ = clamp((EAR4 �
   assert.ok(Number.isNaN(ear4(lm, EAR4_L)));
 });
 
+test('EAR4 of a portrait frame equals that of the same eye in the landscape frame of the same camera (§14.2.2)', () => {
+  // One eye in video pixels: corners 64 px apart, lids 20 px apart, placed in a 640 × 480 frame and,
+  // turned upright, in a 480 × 640 frame (and likewise 1280 × 720 against 720 × 1280).
+  const eyeIn = (w: number, h: number, gapPx = 20): Float32Array => {
+    const lm = blank();
+    const [outer, inner, top, bottom] = EAR4_L;
+    put(lm, outer, 0.5 + 32 / w, 0.4);
+    put(lm, inner, 0.5 - 32 / w, 0.4);
+    put(lm, top, 0.5, 0.4 - gapPx / 2 / h);
+    put(lm, bottom, 0.5, 0.4 + gapPx / 2 / h);
+    return lm;
+  };
+  for (const [w, h] of [[640, 480], [1280, 720]]) {
+    const landscape = ear4(eyeIn(w, h), EAR4_L, w, h);
+    const portrait = ear4(eyeIn(h, w), EAR4_L, h, w);
+    assert.ok(close(landscape, (20 / 64) * (w / h), 1e-6), `landscape ${w} × ${h}`);
+    assert.ok(close(portrait, landscape, 1e-6), `portrait ${h} × ${w}: ${portrait} against ${landscape}`);
+    // Unnormalised, the portrait value would be (h/w)² times smaller and the eye would read as closed.
+    assert.ok(close(ear4(eyeIn(h, w), EAR4_L), landscape * (h / w) ** 2, 1e-6));
+  }
+  // Landscape and square frames are bit-identical with and without the frame size.
+  const lm = eyeIn(640, 480);
+  assert.equal(ear4(lm, EAR4_L, 640, 480), ear4(lm, EAR4_L));
+  assert.equal(ear4(lm, EAR4_L, 480, 480), ear4(lm, EAR4_L));
+  // eyeMeasures passes the frame size through. A lowered gaze (lids 12 px apart) is fully open in
+  // a 960 × 540 frame; unnormalised, the same eye in a 540 × 960 frame would read as closed.
+  const bs = new Float32Array(BLENDSHAPE_COUNT);
+  const upright = eyeMeasures(eyeIn(540, 960, 12), bs, 540, 960);
+  const turned = eyeMeasures(eyeIn(960, 540, 12), bs, 960, 540);
+  assert.equal(turned.openQL, 1);
+  assert.ok(close(upright.openQL, turned.openQL, 1e-6));
+  assert.ok(openQuality(ear4(eyeIn(540, 960, 12), EAR4_L)) < 0.2);
+});
+
 test('iris diameter, eye midpoint and outer-corner distance', () => {
   const lm = blank();
   // Horizontal ring diameters of 20 px (right eye) and 24 px (left eye).

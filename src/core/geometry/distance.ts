@@ -34,11 +34,18 @@ export function focalFromIrisSamples(blindSpotMm: number, irisPx: ArrayLike<numb
   return focalFromBlindSpot(blindSpotMm, median(usable), irisMm);
 }
 
-/** Without the blind-spot test: f_px = (videoW/2) / tan(hfov/2), assuming a 60° field of view. */
-export function focalFromAssumedFov(videoW: number, hfovDeg: number = DISTANCE.assumedHfovDeg): number {
+/**
+ * Without the blind-spot test (§14.1.2): f_px = (max(videoW, videoH)/2) / tan(fov/2), the
+ * assumed 60° field of view spanning the long side of the delivered video, so that a portrait
+ * frame of a camera gives the same focal length as its landscape frame.
+ */
+export function focalFromAssumedFov(videoW: number, videoH: number, longSideFovDeg: number = DISTANCE.assumedHfovDeg): number {
   requirePositive('focalFromAssumedFov: video width', videoW);
-  if (!(hfovDeg > 0 && hfovDeg < 180)) throw new RangeError(`focalFromAssumedFov: field of view must lie in (0, 180), got ${hfovDeg}`);
-  return videoW / 2 / Math.tan((hfovDeg / 2) * RAD);
+  requirePositive('focalFromAssumedFov: video height', videoH);
+  if (!(longSideFovDeg > 0 && longSideFovDeg < 180)) {
+    throw new RangeError(`focalFromAssumedFov: field of view must lie in (0, 180), got ${longSideFovDeg}`);
+  }
+  return Math.max(videoW, videoH) / 2 / Math.tan((longSideFovDeg / 2) * RAD);
 }
 
 /** D = f_px · irisMm / irisPx in mm; NaN when the iris diameter is not a positive number. */

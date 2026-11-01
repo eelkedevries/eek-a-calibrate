@@ -1,6 +1,7 @@
 // Capability detection for the welcome check (spec §7) and the engines'
 // RuntimeEnv (spec §6). Everything here works in a worker as well as on the
 // main thread, and nothing touches the DOM until a function is called.
+import { MOBILE } from '../core/constants.ts';
 import type { BackendId } from '../core/types.ts';
 import type { RuntimeEnv } from '../engines/types.ts';
 
@@ -79,6 +80,41 @@ export function prefersCpuDelegate(userAgent: string, maxTouchPoints: number): b
 export function defaultDelegate(): 'GPU' | 'CPU' {
   if (typeof navigator === 'undefined') return 'GPU';
   return prefersCpuDelegate(navigator.userAgent, navigator.maxTouchPoints ?? 0) ? 'CPU' : 'GPU';
+}
+
+export interface DeviceClassInput {
+  /** `matchMedia('(pointer: coarse)').matches`: the primary pointer is a finger. */
+  coarsePointer: boolean;
+  /** `screen.width` and `screen.height`, CSS px. */
+  screenWpx: number;
+  screenHpx: number;
+}
+
+export interface DeviceClass extends DeviceClassInput {
+  mobile: boolean;
+}
+
+/**
+ * The device class of §14.2.1 (heuristic): a phone or small tablet has a coarse primary pointer
+ * and a short screen side of at most MOBILE.maxShortSidePx CSS px. An unknown or non-positive
+ * screen size counts as desktop, whose behaviour is the unchanged default.
+ */
+export function isMobileDevice(d: DeviceClassInput, maxShortSidePx: number = MOBILE.maxShortSidePx): boolean {
+  const shortSide = Math.min(d.screenWpx, d.screenHpx);
+  return d.coarsePointer && Number.isFinite(shortSide) && shortSide > 0 && shortSide <= maxShortSidePx;
+}
+
+/** The device class of this browser, for the camera ladder, the copy and session.json. */
+export function detectDeviceClass(): DeviceClass {
+  let coarsePointer = false;
+  try {
+    coarsePointer = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  } catch {
+    coarsePointer = false;
+  }
+  const scr = typeof screen === 'object' && screen !== null ? screen : null;
+  const input: DeviceClassInput = { coarsePointer, screenWpx: scr ? scr.width : Number.NaN, screenHpx: scr ? scr.height : Number.NaN };
+  return { ...input, mobile: isMobileDevice(input) };
 }
 
 export interface CapabilityReport {

@@ -1,5 +1,6 @@
 // ===== src/core/types.ts =====
-// Contract: specification §6, written verbatim by WP1 (001_scaffold_and_contracts.md).
+// Contract: specification §6, written verbatim by WP1 (001_scaffold_and_contracts.md), with the
+// additive v0.2 fields of §14.3 (ScreenGeometry.insets and .presentationMode, FitResult.fitGeometry).
 // Frozen: changing anything here needs a specification version bump.
 export type Ms = number;
 export type Vec2 = readonly [number, number];
@@ -34,6 +35,8 @@ export interface FrameResult {
 export interface ScreenGeometry {
   viewportWpx: number; viewportHpx: number; screenWpx: number; screenHpx: number; dpr: number;
   fullscreen: boolean; pxPerMm: number; pxPerMmSource: 'card' | 'diagonal' | 'assumed';
+  insets?: { top: number; right: number; bottom: number; left: number };
+  presentationMode?: 'fullscreen' | 'viewport';
 }
 export interface DistanceModel {
   focalPx: number; focalSource: 'blind-spot' | 'assumed-fov';
@@ -86,7 +89,7 @@ export interface Selection { estimator: EstimatorId; reason: string; ranking: { 
 export interface FitResult {
   schema: 'eek-a-calibrate/fit@1'; seed: number; pursuitLagMs: number; refDistanceMm: number;
   fits: Partial<Record<EngineId, EngineFit>>; combined: CombinedModel | null; headRange: HeadRange;
-  selection: Selection; fitMs: number; warnings: string[];
+  selection: Selection; fitMs: number; warnings: string[]; fitGeometry?: SessionGeometry;
 }
 export const Flags = { NO_FACE: 1, BLINK: 2, OUT_OF_RANGE: 4, EXTRAPOLATED: 8, OFFSCREEN: 16,
   DROPPED: 32, ENGINE_ERROR: 64, NOT_FULLSCREEN: 128, HIDDEN: 256 } as const;

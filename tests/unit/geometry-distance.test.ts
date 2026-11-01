@@ -26,10 +26,33 @@ test('focal length from the blind-spot distance and the iris, and from an assume
   assert.equal(focalFromBlindSpot(600, 23.4), 1200);
   assert.equal(focalFromIrisSamples(600, [23.4, Number.NaN, 22, 0, 24.8, -1]), 1200);
   assert.throws(() => focalFromIrisSamples(600, [Number.NaN, 0]), RangeError);
-  assert.ok(Math.abs(focalFromAssumedFov(1280) - 640 / Math.tan(30 * RAD)) < 1e-9);
-  assert.ok(Math.abs(focalFromAssumedFov(1280) - 1108.5125) < 1e-4);
+  assert.ok(Math.abs(focalFromAssumedFov(1280, 720) - 640 / Math.tan(30 * RAD)) < 1e-9);
+  assert.ok(Math.abs(focalFromAssumedFov(1280, 720) - 1108.5125) < 1e-4);
   assert.throws(() => focalFromBlindSpot(0, 23.4), RangeError);
-  assert.throws(() => focalFromAssumedFov(1280, 180), RangeError);
+  assert.throws(() => focalFromAssumedFov(1280, 720, 180), RangeError);
+  assert.throws(() => focalFromAssumedFov(1280, 720, 0), RangeError);
+});
+
+test('the assumed field of view spans the long side of the video, so portrait frames give the same focal length (§14.1.2)', () => {
+  assert.equal(DISTANCE.assumedHfovDeg, 60);
+  // A camera held upright delivers its landscape frame turned through 90°: same long side, same f_px.
+  assert.equal(focalFromAssumedFov(480, 640), focalFromAssumedFov(640, 480));
+  assert.equal(focalFromAssumedFov(540, 960), focalFromAssumedFov(960, 540));
+  assert.ok(Math.abs(focalFromAssumedFov(480, 640) - 320 / Math.tan(30 * RAD)) < 1e-9);
+  assert.ok(Math.abs(focalFromAssumedFov(480, 640) - 554.25626) < 1e-5);
+  // Not the short side: that would make portrait distances 25 % short.
+  assert.ok(Math.abs(focalFromAssumedFov(480, 640) - 240 / Math.tan(30 * RAD)) > 100);
+  // A square frame, and another field of view on the long side.
+  assert.ok(Math.abs(focalFromAssumedFov(720, 720) - 360 / Math.tan(30 * RAD)) < 1e-9);
+  assert.ok(Math.abs(focalFromAssumedFov(720, 1280, 90) - 640) < 1e-9);
+  for (const bad of [0, -1, Number.NaN, Infinity]) {
+    assert.throws(() => focalFromAssumedFov(bad, 480), RangeError);
+    assert.throws(() => focalFromAssumedFov(640, bad), RangeError);
+  }
+  // With an assumed f_px, D_t / D_ref (and so the distance compensation) does not depend on it.
+  const near = distanceFromIris(focalFromAssumedFov(480, 640), 30);
+  const ref = distanceFromIris(focalFromAssumedFov(480, 640), 24);
+  assert.ok(Math.abs(near / ref - 24 / 30) < 1e-12);
 });
 
 test('iris distance D = f·11.7 / iris px inverts the focal-length formula', () => {

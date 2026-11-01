@@ -1,5 +1,6 @@
 // ===== src/core/constants.ts =====
-// Every tunable numeric parameter (specification Appendix A, written verbatim by WP1).
+// Every tunable numeric parameter (specification Appendix A, written verbatim by WP1, and the
+// additive v0.2 constants of §14.3 at the end).
 // Values marked heuristic in the specification are defaults, not values derived from evidence.
 // Frozen: changing a value needs a specification version bump.
 export const CAMERA_LADDER = [[1280, 720], [960, 540], [640, 480]] as const; export const CAMERA_FPS = 30;
@@ -23,6 +24,7 @@ export const SELECT = { combinedGain: 0.95, minCoverage: 0.8 };
 export const CLIP_RANGE_FRACTION = 0.5; export const OFFSCREEN_FRACTION = 0.1;
 export const HEAD_RANGE = { pLow: 2.5, pHigh: 97.5, angleMarginDeg: 4, lnDistMargin: 0.1, eyeMidMargin: 0.05 };
 export const ONE_EURO = { minCutoffHz: 0.8, betaPerDegS: 0.3, dCutoffHz: 1.0, resetGapMs: 200 };
+// assumedHfovDeg is the field of view across the long side of the delivered video (§14.1.2).
 export const DISTANCE = { irisMm: 11.7, medianWindowMs: 1000, assumedHfovDeg: 60 };
 export const BLIND_SPOT = { angleDeg: 13.5, trials: 5, minMm: 300, maxMm: 1200, maxRelSd: 0.15, dotSpeedDegS: 1.5 };
 export const CARD_MM = { w: 85.6, h: 53.98 }; export const ASSUMED_PX_PER_MM = 96 / 25.4;
@@ -32,3 +34,6 @@ export const DRIFT = { everyMin: 5, settleMs: 500, sampleMs: 1000, applyMinDeg: 
 export const PROBE = { frames: 30, budgetMs: { blazegaze: 25, peekr: 15 }, totalMs: 45, warnMs: 66 };
 export const FIT_BUDGET_MS = 15000;
 export const SETUP = { faceWidthMin: 0.15, faceWidthMax: 0.6, centreX: 0.2, centreY: 0.25, lumaMin: 60, lumaMax: 200, backlightMin: 0.8, glareMax: 0.02, fpsMin: 20, poseMaxDeg: 15, distMinMm: 450, distMaxMm: 850, holdMs: 2000 };
+// v0.2 (§14.3): smartphones and tablets. The device-class bound maxShortSidePx is heuristic (§14.2.1).
+export const CAMERA_LADDER_MOBILE = [[960, 540], [640, 480]] as const;
+export const MOBILE = { maxShortSidePx: 820, viewportToleranceFrac: 0.12, warnMs: 80, minTouchPx: 44 };
