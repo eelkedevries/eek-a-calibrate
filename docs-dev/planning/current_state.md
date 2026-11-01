@@ -54,6 +54,34 @@ wins and the gap is work still to be done.
 - **Deploy:** `scripts/deploy.sh` dispatches `deploy-eek-a-calibrate.yml` in the eelkedevries.com
   repository (prompt 010 adds that workflow). Not yet deployed.
 
+## Capture and vision (after prompt 004)
+
+- **Face front end (`src/core/face/`, DOM-free):** `landmarkSets.ts` (indices, the interleaved
+  478 × 3 landmark layout, `BLENDSHAPE_NAMES`, Peekr mirror pairs), `headPose.ts`,
+  `eyeMeasures.ts`, `blink.ts` (`EyeMeasures.open` is the instantaneous rule; apply `maskBlinks`
+  to a frame sequence for the ±1-frame mask), `quality.ts`.
+- **Platform:** `camera.ts` (`openCamera` with the ladder and messages, hidden `source` video,
+  `createPreview`, `listCameras`), `frameClock.ts` (`FrameClock` feeding a host, rVFC with the
+  poll fallback; `watchPauseConditions`), `fullscreen.ts`, `capabilities.ts`
+  (`detectCapabilities`, `runtimeEnv`, `defaultDelegate`), `assets.ts` (manifest URLs with the
+  `.gz` copies, `plainUrl` for the one retry, `fetchAsset` that checks size and sha256).
+- **Vision host:** `createVisionHost(defaultVisionConfig(...), settings.host)` returns a
+  `ManagedVisionHost` (`selection` records kind and reason, `info`, `engineStatus`, `busy`,
+  `onError`, `stats`). Worker and inline hosts run the same `visionCore.ts`; the worker restarts
+  itself after a crash. Engines run in rank order on every frame, errors isolated, outputs copied
+  and checked (finite, `featureDim`); the face arrays are transferred, so engines copy what they
+  keep. The manifest reaches the runtime as a file (`?url`), never inlined into JavaScript.
+  `ctx.env` also carries `forceBackend` (`?force=cpu`), which the frozen `RuntimeEnv` lacks: read
+  it as `(ctx.env as EngineRuntimeEnv).forceBackend` (`platform/capabilities.ts`). The core
+  resolves the ORT `?url` assets itself, so it does not depend on `engines/runtimes/ort.ts`.
+- **`#/lab`:** diagnostics and "Run each engine on 10 frames" (the probe). Crop renderers are
+  discovered from `src/engines/<id>/lab.ts` (default export of the `CropRenderer` shape in
+  `src/app/screens/lab.ts`; DOM-free). Test hooks once `lab.ts` has loaded: `__eek.lab()`,
+  `labStart`, `labRunAll`, `labCaptureFixture`, `crashWorker`.
+- **Landmark fixture:** `tests/fixtures/landmarks/face-01.json` and `face-01.rgba.gz`, loaded in
+  Node with `tests/fixtures/landmarks/fixture.ts`; regenerate only on purpose with
+  `MAKE_LANDMARK_FIXTURE=1 npx playwright test make-landmark-fixture`.
+
 ## In progress
 
 Prompts 002–007 can run in parallel; then 008, 009 and 010 (`docs-dev/plan.md`).
