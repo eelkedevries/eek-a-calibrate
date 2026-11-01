@@ -1,4 +1,4 @@
-// The geometric engine's static description (spec §3.1, §4.6.1, §16.4). Pure; index.ts uses
+// The geometric engine's static description (spec §3.1, §4.6.1, §16.2.4). Pure; index.ts uses
 // the same object.
 import type { EngineSpec } from '../types.ts';
 import { GEO_FEATURE_VERSION, GEO_X_DIM } from './features.ts';

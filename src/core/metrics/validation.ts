@@ -38,7 +38,7 @@ export const BCEA_P = 0.68;
 export const BCEA_K = -Math.log(1 - BCEA_P);
 /**
  * Consecutive samples further apart than this many median intervals between processed frames are
- * not a pair (§16.1: frames the host refused for lack of time do not break pairs).
+ * not a pair (§16.2.1: frames the host refused for lack of time do not break pairs).
  */
 export const S2S_MAX_GAP_FACTOR = 1.5;
 /**
@@ -147,7 +147,7 @@ export function bcea68(sdXDeg: number, sdYDeg: number, rho: number): number {
   return 2 * BCEA_K * Math.PI * sdXDeg * sdYDeg * Math.sqrt(Math.max(0, 1 - rho * rho));
 }
 
-/** The fewest samples with a correlation, and so a BCEA: two points always give ρ = ±1 (§16.1). */
+/** The fewest samples with a correlation, and so a BCEA: two points always give ρ = ±1 (§16.2.1). */
 export const BCEA_MIN_SAMPLES = 3;
 
 /**
@@ -254,7 +254,7 @@ interface TargetExtras {
  * Targets without a valid sample have NaN metrics and are left out of the summary statistics,
  * which therefore cover the same targets for accuracy and baseline. `dataLossPct` and
  * `accuracyPctDiag` are percentages (0–100). Data loss is counted against the frames the host
- * could analyse at the rate it sustained (lossBasisFrames, §16.1); the funnel keeps the nominal
+ * could analyse at the rate it sustained (lossBasisFrames, §16.2.1); the funnel keeps the nominal
  * expected count, and RMS-S2S pairs follow the interval between processed frames.
  */
 export function scoreValidation(

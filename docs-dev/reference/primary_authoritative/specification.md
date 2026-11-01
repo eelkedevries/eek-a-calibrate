@@ -5,7 +5,8 @@
 >
 > **v0.3:** §15 records corrections and integration rules from the reviews of 002–007.
 >
-> **v0.4:** §16 handles corrupt landmarks from mobile GPU delegates (first real-device test).
+> **v0.4:** §16 handles corrupt landmarks from mobile GPU delegates (first real-device test)
+> and records the decisions that follow the final reviews of the integrated app (§16.2).
 
 This is the binding, implementation-ready specification for **eek-a-calibrate**. It is a browser
 app for webcam eye-tracking calibration, validation and live gaze, served at
@@ -2232,7 +2233,7 @@ conflicts with an earlier section, this section wins.**
    real GPU, BlazeGaze reports `tfjs-webgl`, its median time is within budget and the lab strip
    shows both eyes; Peekr's per-frame time against its 15 ms budget.
 
-## 16. Amendment v0.4 (1 November 2026): first real-device findings
+## 16. Amendment v0.4 (1 November 2026): first real-device findings and final-review fixes
 
 The owner's first run on a real Android phone (Chrome) showed the camera checks with face sizes
 of up to 3·10²¹ %, centring values of the order of 10¹⁸, glare "NaN %" and head angles jumping
@@ -2259,6 +2260,71 @@ only emulated there. **Where this section conflicts with an earlier section, it 
    realistic frame rates instead of about 3 Hz.
 5. **Meters:** a non-finite reading (for example glare without eye pixels) shows "—" and is
    neither fine nor a fault.
+
+### 16.2 Final-review fixes
+
+These decisions follow the independent reviews of the integrated app (`main` at `1051d0e`).
+
+#### 16.2.1 Validation metrics on devices slower than their camera, and small samples (§4.12, §4.8.6)
+
+The vision host takes one frame at a time (§4.2), so a device whose per-frame time exceeds the
+camera's frame interval refuses a share of the frames: a steady per-frame time between one and
+two frame intervals (33–67 ms at 30 fps, which includes the 45 ms run-set budget of §7) refuses
+every second frame, and a median just below one interval still refuses some frames whenever a
+frame takes longer than that. Under v0.3 those frames counted as data loss, broke every RMS-S2S pair and failed the
+pursuit acceptance rule, so such a device scored `poor` at any accuracy, could never reuse a
+stored profile (§4.15 requires `acceptable`), had no precision figure or areas-of-interest
+advice, and always used the fallback lag. Compute is now kept apart from data quality:
+
+1. **Data loss** = 1 − valid / basis, per target and pooled (Σ valid / Σ basis), with
+   basis = sampleMs/1000 × min(nominal fps, r). r, the rate the host sustained, is the median
+   over target windows longer than zero of processed frames per second of window. A median, so a
+   stall within one target still counts as loss there; when nothing was processed (r = 0), the
+   nominal rate is used and everything is lost. The funnel keeps `expected` at the nominal rate
+   (§4.12 table), so `dataLossPct` is no longer 1 − valid/expected; the effective rate reports
+   the slowdown. Because r counts the frames the host processed, frames that the camera did not
+   deliver at its nominal rate lower r as well and are not data loss either. No contract
+   changes: `Funnel` and `ValidationReport` are as in §6.
+2. **RMS-S2S** pairs consecutive valid samples with Δt ≤ 1.5 × the median interval between
+   consecutive **processed** (not `DROPPED`) frames, so only a missing processed frame breaks a
+   pair.
+3. **Pursuit lag (§4.8.6 step 4).** The 50 % rule is accepted / processed pursuit frames outside
+   the hold and discard: frames labelled `dropped` are left out.
+4. **BCEA₆₈ and ρ need at least three samples** (`BCEA_MIN_SAMPLES = 3`): with two, the sample
+   correlation is exactly ±1 and the area would read as a perfect 0. SD keeps n ≥ 2. Below three,
+   the target's BCEA is NaN (shown as a dash) and is left out of the pooled median.
+5. With items 1 and 2, RMS-S2S lacks a value only when no target has two consecutive valid
+   processed samples. The areas-of-interest advice stays **0** then (§4.12: "0 if none"; the
+   `aoiGrid` type is unchanged), which is the cautious reading of such data.
+
+#### 16.2.2 A quick recalibration drops the validation run (§4.13)
+
+"Any recalibration invalidates the previous validation" covers the stored validation run as
+well as the reports: after `RECAL5` and the refit, the session's current validation run is
+cleared together with `validation`. Results then says that the calibration in use has not been
+validated yet and links to Live, which requires the `VAL6` revalidation; it never re-scores the
+earlier run with the new fit. The export keeps the session's first validation (scored with the
+first fit) and leaves `events.csv` out until a validation of the fit in use exists (§15.2.2).
+
+#### 16.2.3 Frame clock: no snapshot for a busy host (§4.1)
+
+`FrameSink` gains an optional `readonly busy?: boolean` (`ManagedVisionHost.busy`). When it is
+true and no `tap` needs every frame (only `#/lab` has one), the clock makes no `ImageBitmap`: the
+frame is counted as `dropped` and reported through `onFrame(meta, false)` at once, exactly as a
+refused frame. Otherwise the §4.1 sequence (`createImageBitmap`, then `submit`, which may still
+refuse) is unchanged.
+
+#### 16.2.4 Static engine specs (§5, §6)
+
+Each engine's `EngineSpec` literal moves to a pure `src/engines/<id>/spec.ts` (DOM-free, the
+same layer as `mappers.ts`), which `index.ts` exports unchanged as `EngineModule.spec`.
+`src/engines/specs.ts` collects them as `ENGINE_SPECS: Readonly<Record<EngineId, EngineSpec>>`.
+The main thread reads names, licences, sizes and feature versions from that table (Welcome,
+About, the export, and `fitRecording`'s default `featureVersions`) instead of importing the
+engine modules through `ENGINE_LOADERS`, which stays the only way to load engine code.
+`BG_FEATURE_VERSION` moves to `engines/blazegaze/mappers.ts` beside the layout constants
+(`preprocess.ts` re-exports it), so the BlazeGaze spec does not pull in `ml-matrix`. The frozen
+§6 contracts are unchanged.
 
 ## Appendix A — `src/core/constants.ts` defaults (WP1)
 

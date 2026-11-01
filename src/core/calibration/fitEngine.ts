@@ -139,7 +139,7 @@ function positive(v: number | null | undefined): v is number {
 }
 
 /**
- * Accepted pursuit frames over the processed pursuit frames outside the hold and discard (§16.1).
+ * Accepted pursuit frames over the processed pursuit frames outside the hold and discard (§16.2.1).
  * Frames the vision host refused for lack of time are left out: a device slower than the camera
  * still has its lag estimated when the frames it did analyse are good.
  */

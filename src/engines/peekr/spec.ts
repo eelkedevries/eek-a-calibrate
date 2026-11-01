@@ -1,4 +1,4 @@
-// Peekr's static description (spec §3.1, §4.6.3, §16.4): what the main thread shows and stores
+// Peekr's static description (spec §3.1, §4.6.3, §16.2.4): what the main thread shows and stores
 // without loading the engine or ONNX Runtime. Pure; index.ts uses the same object.
 import type { EngineSpec } from '../types.ts';
 import { PK_FEATURE_VERSION, PK_X_DIM } from './preprocess.ts';

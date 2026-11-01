@@ -76,7 +76,7 @@ test('processed: a sample not flagged DROPPED', () => {
   assert.equal(isProcessedSample(undefined), false);
 });
 
-test('the loss basis: the rate the host sustained (median over windows), capped at the nominal rate (§16.1)', () => {
+test('the loss basis: the rate the host sustained (median over windows), capped at the nominal rate (§16.2.1)', () => {
   // Every other frame processed: 15 per second in every 1 s window.
   assert.equal(sustainedRateHz([1, 2, 3].map(() => ({ processed: 15, windowS: 1 }))), 15);
   // One target stalled: the median ignores it, so that target still loses its frames.

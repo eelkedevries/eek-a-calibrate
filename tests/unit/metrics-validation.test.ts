@@ -267,7 +267,7 @@ test('the funnel counts each loss at its stage; aborted presentations lose their
   assert.ok(Math.abs((ra.targets[0]?.dataLossPct as number) - 70) < 1e-9);
 });
 
-test('frames refused for lack of time are not data loss and do not break RMS-S2S pairs (§16.1)', () => {
+test('frames refused for lack of time are not data loss and do not break RMS-S2S pairs (§16.2.1)', () => {
   const rec = buildRecording(VAL6);
   const g = gaussian(mulberry32(7));
   const noisy = (every: number): Planner => (f, target) =>

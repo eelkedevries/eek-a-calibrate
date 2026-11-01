@@ -1,4 +1,4 @@
-// Every engine's static spec (spec §16.4), without its code: the main thread reads names,
+// Every engine's static spec (spec §16.2.4), without its code: the main thread reads names,
 // licences, sizes and feature versions from here, so showing the engine list or starting a fit
 // downloads no engine module. The registry's modules export the same objects.
 import type { EngineId } from '../core/types.ts';

@@ -1,4 +1,4 @@
-// The eye-pixel engine's static description (spec §3.1, §4.6.4, §16.4). Pure; index.ts uses the
+// The eye-pixel engine's static description (spec §3.1, §4.6.4, §16.2.4). Pure; index.ts uses the
 // same object.
 import type { EngineSpec } from '../types.ts';
 import { EP_FEATURE_VERSION, EP_X_DIM } from './patches.ts';

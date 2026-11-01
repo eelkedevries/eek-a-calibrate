@@ -49,7 +49,7 @@ export function megabytes(bytes: number): string {
   return bytes >= 100_000 ? `${(bytes / 1_000_000).toFixed(1)} MB` : bytes > 0 ? `${Math.round(bytes / 1000)} kB` : t('welcome.engines.noDownload');
 }
 
-/** Every engine's spec, from the static table (§16.4): no engine code is downloaded to show it. */
+/** Every engine's spec, from the static table (§16.2.4): no engine code is downloaded to show it. */
 export async function engineSpecs(): Promise<Partial<Record<EngineId, EngineSpec>>> {
   return { ...ENGINE_SPECS };
 }

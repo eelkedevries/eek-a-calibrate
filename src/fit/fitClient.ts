@@ -42,7 +42,7 @@ class WorkerStartError extends Error {}
 
 let nextId = 1;
 
-/** The engines' feature versions from their static specs (§16.4), so a fit never loads an engine module. */
+/** The engines' feature versions from their static specs (§16.2.4), so a fit never loads an engine module. */
 export function engineFeatureVersions(ids: readonly EngineId[]): Partial<Record<EngineId, string>> {
   return Object.fromEntries(ids.map((id) => [id, ENGINE_SPECS[id].featureVersion]));
 }

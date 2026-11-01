@@ -1,4 +1,4 @@
-// §16.4: every engine's static spec loads in Node without its runtime, agrees with the engine
+// §16.2.4: every engine's static spec loads in Node without its runtime, agrees with the engine
 // modules and the a-priori ranks, and is where the fit client reads the feature versions from.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

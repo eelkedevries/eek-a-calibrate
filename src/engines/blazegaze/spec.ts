@@ -1,4 +1,4 @@
-// BlazeGaze's static description (spec §3.1, §4.6.2, §16.4): what the main thread shows and
+// BlazeGaze's static description (spec §3.1, §4.6.2, §16.2.4): what the main thread shows and
 // stores without loading the engine or TF.js. Pure; index.ts uses the same object.
 import { PROBE } from '../../core/constants.ts';
 import type { EngineSpec } from '../types.ts';

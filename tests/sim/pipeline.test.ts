@@ -160,7 +160,7 @@ test('σ = 0.5 px landmark noise with head poses inside the range: mean accuracy
   assert.equal(inRange, 0, 'no validation frame is out of range');
 });
 
-test('a host that analyses every second frame (15 Hz of 30): same verdict, the lag is fitted, RMS-S2S has a value (§16.1)', async () => {
+test('a host that analyses every second frame (15 Hz of 30): same verdict, the lag is fitted, RMS-S2S has a value (§16.2.1)', async () => {
   const fast = report(await session(0.5));
   const s = await session(0.5, SEED, 2);
   const r = report(s);

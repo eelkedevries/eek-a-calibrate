@@ -284,6 +284,18 @@ wins and the gap is work still to be done.
   lighting, distances, a low-end laptop, BlazeGaze on WebGL). No accuracy figure is published
   until it has been done.
 
+## Final-review fixes (specification v0.4 §16.2)
+
+- **Slow devices (§16.2.1):** data loss is counted against the frames the device could analyse
+  (the median processed rate over targets, capped at the camera's), RMS-S2S pairs follow the
+  interval between processed frames, and the pursuit-lag rule counts processed frames only, so a
+  host slower than its camera lowers the effective rate, not the verdict. BCEA needs ≥ 3 samples.
+- **Recalibration (§16.2.2):** a quick recalibration clears the validation run; Results asks for
+  the VAL6 revalidation instead of re-scoring the old run.
+- **Main-thread loading (§16.2.3, §16.2.4):** the frame clock makes no bitmap while the host is
+  busy; engine specs live in `src/engines/<id>/spec.ts` and `src/engines/specs.ts`, so Welcome,
+  About, the export and `fitRecording` load no engine code.
+
 ## In progress
 
 v1 (prompts 001–011) is complete. Next: the owner's manual checks; phase-2 items

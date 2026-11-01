@@ -1,4 +1,4 @@
-// Data-loss funnel (specification §4.12, §16.1): expected → delivered → processed → face → open →
+// Data-loss funnel (specification §4.12, §16.2.1): expected → delivered → processed → face → open →
 // inRange → valid, each stage a subset of the one before. Data loss is counted against the frames
 // the device could analyse, so a host slower than the camera lowers the effective rate, not the
 // verdict.
