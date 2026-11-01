@@ -190,6 +190,34 @@ wins and the gap is work still to be done.
   `tests/fixtures/generated/face-portrait.mjpeg` (480×640). Under the mobile ladder Chromium's
   fake capture crops that file to 480×540 (still portrait).
 
+## Calibration, fitting and validation (after prompt 008)
+
+- **Protocol (`src/core/protocol/`, DOM-free):** `layouts.ts` (CAL13/CAL9/HEAD5/RECAL5 sharing
+  `loc-<k>` groups, seeded jittered VAL12, VAL6, `nearestCalibrationGroup` measured on the
+  screen), `schedule.ts` (`calibrationSchedule`/`validationSchedule`; each kind draws from
+  `mulberry32(seed ^ salt)`; durations ÷ speed; `minAcceptedFrames`), `pursuit.ts` (path, peak
+  angular speed, `pursuitPeriodMs`), `gating.ts` (`gateFrame` with its precedence,
+  `HeadSpeedMeter`, `applyBlinkMask`), `labelling.ts` (`Labeller` over the recording's
+  presentations, open while on screen; `FrameRecorder`, used by the screens and by
+  `tests/sim/pipeline.test.ts`), `lag.ts`, `headRange.ts`.
+- **Fit (`src/core/calibration/`):** `fitCalibration(recs, opts)` in `fitEngine.ts` runs pruning,
+  τ, every candidate (`fitCandidate`: robust refit with an explicit CV score mask), the one-SE
+  choice, `stack.ts` (Combined), `select.ts` (Auto and its reason) and the head range. Core
+  imports nothing outside core, so the mapper table (`MAPPERS`) and feature versions are passed
+  in. `restore.ts` is the one prediction path (`mappingState` ⇄ `restoreMapping`);
+  `estimator.ts` (`EstimatorSet`, `frameBaseFlags`) converts with `FitResult.fitGeometry` (pixels
+  fixed) and reports degrees under the current geometry (§14.1.3).
+- **Fit worker (`src/fit/`):** `fitRecording` (worker, inline fallback, and in Node),
+  `restoreEstimators`, `restoreEstimatorSet` (for the drift offset), `scoreRecording` (both modes,
+  with the receive-time map; re-scores under a newer geometry).
+- **App:** `src/app/session.ts` holds the running capture (`ensureCapture`, stopped on any route
+  other than camera, calibrate, validate, results, live), the pending fit and the validation run.
+  `components/stimulusCanvas.ts`: the stage lives on `<body>` so calibration hands a fullscreen
+  stage to validation without a gesture; `BlockRunner` presents items (rAF onsets, extension,
+  retry, pause by P, button, face lost > 400 ms of capture time or hidden page; abort by Esc or
+  button; invalidation from `platform/presentation.ts`). Test hooks: `__eek.protocol()` and
+  `__eek.simulateFullscreenExit()`. Results re-score the stored validation on every visit.
+
 ## In progress
 
 Prompts 002–007 can run in parallel; then 008, 009 and 010 (`docs-dev/plan.md`).

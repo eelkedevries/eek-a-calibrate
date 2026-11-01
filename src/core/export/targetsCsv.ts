@@ -1,7 +1,8 @@
 // targets.csv (specification §4.16): one row per presentation, in the order given, with the
 // item's position or pursuit parameters. `trial` (as in samples.csv) and `aborted` are added so
 // that rows from several schedules, and cut-short presentations, can be told apart.
-import type { Presentation, Schedule, ScheduleItem, ScreenGeometry } from '../types.ts';
+import { layoutToPx, type LayoutGeometry } from '../geometry/screen.ts';
+import type { Presentation, Schedule, ScheduleItem } from '../types.ts';
 import { csvTable, fmtBool, fmtInt, fmtMs, fmtPx, fmtSig, relMs, type ExportIdentity } from './csv.ts';
 
 export const TARGETS_HEADER = [
@@ -20,7 +21,7 @@ export interface TargetsBlock {
  * Presentations of instruction items are skipped. A presentation whose item is not in its
  * schedule is a bug and throws, rather than writing a row without a position.
  */
-export function targetsCsv(id: ExportIdentity, blocks: readonly TargetsBlock[], screen: Pick<ScreenGeometry, 'viewportWpx' | 'viewportHpx'>): string {
+export function targetsCsv(id: ExportIdentity, blocks: readonly TargetsBlock[], screen: LayoutGeometry): string {
   const rows: string[][] = [];
   for (const block of blocks) {
     const items = new Map<string, ScheduleItem>(block.schedule.items.map((it) => [it.id, it]));
@@ -28,15 +29,15 @@ export function targetsCsv(id: ExportIdentity, blocks: readonly TargetsBlock[], 
       const item = items.get(p.itemId);
       if (item === undefined) throw new RangeError(`targetsCsv: presentation of unknown item '${p.itemId}' in ${block.trial}`);
       if (item.kind === 'instruction') continue;
-      const target = item.kind === 'target';
       const pursuit = item.kind === 'pursuit' ? item : null;
+      const px = item.kind === 'target' ? layoutToPx(item.xNorm, item.yNorm, screen) : null;
       rows.push([
         block.trial,
         item.id,
         item.phase,
         fmtInt(item.block),
-        target ? fmtPx(item.xNorm * screen.viewportWpx) : '',
-        target ? fmtPx(item.yNorm * screen.viewportHpx) : '',
+        px ? fmtPx(px[0]) : '',
+        px ? fmtPx(px[1]) : '',
         fmtMs(relMs(id, p.onsetMs)),
         fmtMs(relMs(id, p.offsetMs)),
         fmtMs(p.frameIntervalMs),

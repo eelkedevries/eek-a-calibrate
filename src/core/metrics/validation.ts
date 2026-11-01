@@ -3,7 +3,7 @@
 // computed exactly in degree space (`angularSeparationDeg`), never through pixels per degree.
 import { VERDICT } from '../constants.ts';
 import { angularSeparationDeg, degToPx, pxToDeg, type PlaneGeometry } from '../geometry/angles.ts';
-import { viewportDiagonalPx } from '../geometry/screen.ts';
+import { layoutToPx, viewportDiagonalPx, type LayoutGeometry } from '../geometry/screen.ts';
 import { mean, median, percentile, sampleSd } from '../maths/stats.ts';
 import { ENGINE_IDS, Flags } from '../types.ts';
 import type {
@@ -55,24 +55,29 @@ export interface TargetWindow {
  * The sampling window of every presented target: from onset + settle to onset + settle +
  * sample, cut at the presentation's offset (an aborted target keeps its shortened window, and
  * the frames it lost count as data loss). With no retries there is one presentation per target;
- * should there be more, the first attempt is used. Targets never presented are left out.
+ * should there be more (a target shown again after a pause interrupted it), the first complete
+ * one is used, else the first attempt. Targets never presented are left out. Target positions
+ * come from `layoutToPx`, the mapping the stimulus drew them with (§14.2.5).
  */
-export function targetWindows(rec: Recording, screen: Pick<PlaneGeometry, 'viewportWpx' | 'viewportHpx'> = rec.geometry.screen): TargetWindow[] {
-  const { viewportWpx: W, viewportHpx: H } = screen;
+export function targetWindows(rec: Recording, screen: LayoutGeometry = rec.geometry.screen): TargetWindow[] {
   const out: TargetWindow[] = [];
   for (const item of rec.schedule.items) {
     if (item.kind !== 'target') continue;
     let presentation: Presentation | undefined;
     for (const p of rec.presentations) {
       if (p.itemId !== item.id) continue;
-      if (presentation === undefined || p.attempt < presentation.attempt || (p.attempt === presentation.attempt && p.onsetMs < presentation.onsetMs)) {
+      if (
+        presentation === undefined ||
+        (presentation.aborted && !p.aborted) ||
+        (presentation.aborted === p.aborted && (p.attempt < presentation.attempt || (p.attempt === presentation.attempt && p.onsetMs < presentation.onsetMs)))
+      ) {
         presentation = p;
       }
     }
     if (presentation === undefined) continue;
     const startMs = presentation.onsetMs + item.settleMs;
     const endMs = Math.max(startMs, Math.min(startMs + item.sampleMs, presentation.offsetMs));
-    out.push({ item, presentation, startMs, endMs, targetPx: [item.xNorm * W, item.yNorm * H], region: targetRegion(item.xNorm, item.yNorm) });
+    out.push({ item, presentation, startMs, endMs, targetPx: layoutToPx(item.xNorm, item.yNorm, screen), region: targetRegion(item.xNorm, item.yNorm) });
   }
   return out;
 }
@@ -237,7 +242,7 @@ export function scoreValidation(
 ): ValidationReport[] {
   const screen: PlaneGeometry = g.screen;
   const fps = nominalFpsOrDefault(nominalFps);
-  const windows = targetWindows(rec, screen);
+  const windows = targetWindows(rec, g.screen);
   const frames = [...rec.frames].sort((a, b) => a.meta.tCaptureMs - b.meta.tCaptureMs);
   const maxGapMs = S2S_MAX_GAP_FACTOR * medianFrameIntervalMs(frames.map((f) => f.meta.tCaptureMs));
   const estimators = ESTIMATOR_ORDER.filter((e) => samples.has(e));
