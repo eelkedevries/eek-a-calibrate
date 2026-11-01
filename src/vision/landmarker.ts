@@ -12,6 +12,7 @@
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import { LANDMARKER } from '../core/constants.ts';
 import { BLENDSHAPE_COUNT, BLENDSHAPE_INDEX, LANDMARK_COUNT, LANDMARK_STRIDE, type BlendshapeName } from '../core/face/landmarkSets.ts';
+import { implausibleReason } from '../core/face/plausibility.ts';
 
 export const MEDIAPIPE_VERSION = '0.10.35' as const;
 export type WasmVariant = 'module' | 'simd' | 'nosimd';
@@ -150,6 +151,9 @@ export function toDetectedFace(result: {
   return { landmarks, blendshapes, matrix, unknownBlendshapes };
 }
 
+/** Corrupt GPU frames that move the landmarker to the CPU: this many in a row, or this many in all. */
+export const IMPLAUSIBLE_SWITCH = { run: 3, total: 5 } as const;
+
 export interface DetectOutcome {
   face: DetectedFace | null;
   /** Set when this frame's detection failed; the landmarker has been rebuilt (or is being retried). */
@@ -171,6 +175,8 @@ export class FaceFrontEnd {
   private detections = 0;
   private closed = false;
   private failedRebuilds = 0;
+  private implausibleRun = 0;
+  private implausibleTotal = 0;
 
   private constructor(opts: FrontEndOptions, landmarker: FaceLandmarker, binaryUrl: string, delegate: Delegate) {
     this.opts = opts;
@@ -220,6 +226,34 @@ export class FaceFrontEnd {
   }
 
   /**
+   * Discards an implausible result (spec v0.4 §16.1). Some mobile GPUs run the GPU delegate
+   * without an error yet return corrupt landmarks; after IMPLAUSIBLE_SWITCH.run consecutive or
+   * IMPLAUSIBLE_SWITCH.total corrupt GPU frames the landmarker moves to the CPU delegate.
+   */
+  private async screen(outcome: DetectOutcome): Promise<DetectOutcome> {
+    const face = outcome.face;
+    if (!face) return outcome;
+    const reason = implausibleReason(face.landmarks, face.matrix);
+    if (reason === null) {
+      this.implausibleRun = 0;
+      return outcome;
+    }
+    this.implausibleRun += 1;
+    this.implausibleTotal += 1;
+    if (this.delegateInUse === 'GPU' && (this.implausibleRun >= IMPLAUSIBLE_SWITCH.run || this.implausibleTotal >= IMPLAUSIBLE_SWITCH.total)) {
+      this.opts.log('warn', `The GPU delegate returned implausible landmarks (${reason}); switching the face landmarker to the CPU.`);
+      try {
+        await this.replace('CPU');
+        this.implausibleRun = 0;
+        this.implausibleTotal = 0;
+      } catch (error) {
+        this.opts.log('error', `The switch to the CPU delegate failed: ${describe(error)}`);
+      }
+    }
+    return { face: null, error: `implausible landmarks discarded (${reason})` };
+  }
+
+  /**
    * Runs one detection. A throw from detectForVideo is a graph error: on the
    * very first GPU detection the graph is recreated on the CPU and the frame
    * retried; otherwise the graph is rebuilt and this frame has no face.
@@ -242,12 +276,12 @@ export class FaceFrontEnd {
           await this.rebuild();
           return { face: null, error: `face detection failed on GPU (${message}) and CPU (${describe(cpuError)})` };
         }
-        return this.convert(result);
+        return this.screen(this.convert(result));
       }
       await this.rebuild();
       return { face: null, error: `face detection failed (${message}); the landmarker was rebuilt` };
     }
-    return this.convert(result);
+    return this.screen(this.convert(result));
   }
 
   private async replace(delegate: Delegate): Promise<void> {

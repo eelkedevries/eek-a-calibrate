@@ -26,6 +26,8 @@ export interface Settings {
   driftEveryMin: number;
   host: 'worker' | 'inline' | null;
   force: 'cpu' | null;
+  /** `?delegate=cpu|gpu`: the face landmarker's delegate; null = the device default. */
+  delegate?: 'GPU' | 'CPU' | null;
   /** Test mode (`e2e=1`): read-only `window.__eek`, injected geometry, no fullscreen. */
   e2e: boolean;
   /** Divides every protocol duration; honoured only in test mode. */
@@ -87,6 +89,7 @@ export function parseSettings(location: Pick<Location, 'search' | 'hash'>, nowMs
   const e2e = params.get('e2e') === '1';
   const speedParam = Number(params.get('speed'));
 
+  const delegateParam = oneOf(params.get('delegate')?.toLowerCase() ?? null, ['cpu', 'gpu'] as const);
   return {
     pid: text(params.get('pid')),
     session: text(params.get('session')),
@@ -98,6 +101,7 @@ export function parseSettings(location: Pick<Location, 'search' | 'hash'>, nowMs
     driftEveryMin: params.has('driftEveryMin') && Number.isFinite(driftParam) && driftParam >= 0 ? driftParam : DRIFT.everyMin,
     host: oneOf(params.get('host'), ['worker', 'inline'] as const),
     force: oneOf(params.get('force'), ['cpu'] as const),
+    delegate: delegateParam === 'cpu' ? 'CPU' : delegateParam === 'gpu' ? 'GPU' : null,
     e2e,
     speed: e2e && Number.isFinite(speedParam) && speedParam >= 1 ? speedParam : 1,
   };

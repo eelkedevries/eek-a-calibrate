@@ -94,12 +94,14 @@ test('readBody concatenates chunks and sha256Hex matches node:crypto', async () 
   assert.equal(await sha256Hex(payload), createHash('sha256').update(payload).digest('hex'));
 });
 
-test('capability helpers: SIMD detection and the iOS CPU-delegate rule', () => {
+test('capability helpers: SIMD detection and the phone and tablet CPU-delegate rule', () => {
   assert.equal(wasmSimdSupported(), true);
   assert.equal(prefersCpuDelegate('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', 5), true);
   assert.equal(prefersCpuDelegate('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari', 5), true);
   assert.equal(prefersCpuDelegate('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari', 0), false);
   assert.equal(prefersCpuDelegate('Mozilla/5.0 (X11; Linux x86_64) Chrome/153', 0), false);
+  // Android: some GPUs return corrupt landmarks on the GPU delegate (spec v0.4 §16.1).
+  assert.equal(prefersCpuDelegate('Mozilla/5.0 (Linux; Android 15; SM-S921B) AppleWebKit/537.36 Chrome/141 Mobile Safari/537.36', 5), true);
 });
 
 test('the engines’ RuntimeEnv carries ?force=cpu through to the worker', () => {

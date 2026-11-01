@@ -69,12 +69,15 @@ export function runtimeEnv(cfg: { baseUrl: string; dev: boolean; e2e: boolean; f
 }
 
 /**
- * iOS and iPadOS browsers start the face landmarker on the CPU delegate:
- * tasks-vision's GPU path has a history of breaking there (gaze-lite pattern).
- * iPadOS reports itself as a Mac with touch points.
+ * Phones and tablets start the face landmarker on the CPU delegate:
+ * tasks-vision's GPU path has a history of breaking on iOS (gaze-lite pattern),
+ * and on some Android GPUs it returns corrupt landmarks without an error (seen
+ * on a real phone; spec v0.4 §16.1). The CPU delegate is fast enough (about
+ * 30 ms per frame measured in software-rendered headless Chromium). iPadOS
+ * reports itself as a Mac with touch points.
  */
 export function prefersCpuDelegate(userAgent: string, maxTouchPoints: number): boolean {
-  return /iPhone|iPad|iPod/.test(userAgent) || (/Macintosh/.test(userAgent) && maxTouchPoints > 1);
+  return /iPhone|iPad|iPod|Android/.test(userAgent) || (/Macintosh/.test(userAgent) && maxTouchPoints > 1);
 }
 
 export function defaultDelegate(): 'GPU' | 'CPU' {

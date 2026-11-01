@@ -165,7 +165,7 @@ export async function ensureCapture(engines: readonly EngineId[], listeners: Cap
         try {
           onStatus('vision');
           const { settings } = getState();
-          host = await createVisionHost(defaultVisionConfig({ e2e: settings.e2e, force: settings.force }), settings.host ?? undefined);
+          host = await createVisionHost(defaultVisionConfig({ e2e: settings.e2e, force: settings.force, delegate: settings.delegate ?? null }), settings.host ?? undefined);
           host.onProgress((asset, loaded, total) => assetListener?.(asset, loaded, total));
           const c = new RunningCapture(camera, host);
           camera.onEnded(() => {

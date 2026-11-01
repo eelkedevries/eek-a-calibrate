@@ -13,10 +13,13 @@ export type { HostError, HostSelection, HostStats, ManagedVisionHost } from './h
 
 const live = new Set<MessageHost>();
 
-/** The configuration for this build: base path, gzip in production, iOS on the CPU delegate. */
-export function defaultVisionConfig(opts: { e2e: boolean; force: 'cpu' | null }): VisionConfig {
+/** The configuration for this build: base path, gzip in production, phones and tablets on the CPU delegate. */
+export function defaultVisionConfig(opts: { e2e: boolean; force: 'cpu' | null; delegate?: 'GPU' | 'CPU' | null }): VisionConfig {
   const dev = import.meta.env.DEV;
-  const cfg: VisionConfig = { baseUrl: import.meta.env.BASE_URL, dev, gz: !dev, delegate: defaultDelegate(), e2e: opts.e2e };
+  // `?delegate=` overrides the choice. Test mode defaults to the CPU delegate, which runs at
+  // realistic frame rates where the GPU is only emulated in software.
+  const delegate = opts.delegate ?? (opts.e2e ? 'CPU' : defaultDelegate());
+  const cfg: VisionConfig = { baseUrl: import.meta.env.BASE_URL, dev, gz: !dev, delegate, e2e: opts.e2e };
   if (opts.force === 'cpu') cfg.forceBackend = 'tfjs-cpu';
   return cfg;
 }

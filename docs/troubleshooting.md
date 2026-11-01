@@ -29,6 +29,16 @@ The thresholds are heuristic. Typical remedies:
 If a check cannot be met, *Continue anyway* appears after 20 seconds. The results may then be
 less accurate, and the validation will show by how much.
 
+## The camera checks show absurd values, or the face box jumps
+
+Some phone graphics chips run MediaPipe's GPU path without reporting an error but return
+corrupt face landmarks: the checks then show face sizes of millions of per cent, wildly changing
+head angles or a glare reading of "—". Phones and tablets therefore use the CPU path by default,
+and the app discards implausible landmark frames and switches to the CPU path on its own after a
+few of them. If it still happens, add `?delegate=cpu` to the address (for example
+`https://eelkedevries.com/eek-a-calibrate/?delegate=cpu`). `?delegate=gpu` forces the GPU path,
+for comparison. Diagnostics (`#/lab`) shows which path runs, under *Delegate*.
+
 ## The device check leaves out engines, or warns that the device is slow
 
 The learned engines are left out when they need more than their time budget per frame

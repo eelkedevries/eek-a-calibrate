@@ -67,7 +67,8 @@ export function evaluateSetup(s: SetupSample): MeterReading[] {
       advice: luma < SETUP.lumaMin ? t('meter.advice.darker') : luma > SETUP.lumaMax ? t('meter.advice.brighter') : null,
     });
     out.push({ id: 'backlight', ok: q.backlight >= SETUP.backlightMin, value: fixed(q.backlight, 2), advice: q.backlight >= SETUP.backlightMin ? null : t('meter.advice.backlight') });
-    out.push({ id: 'glare', ok: q.glare <= SETUP.glareMax, value: `${(100 * q.glare).toFixed(1)} %`, advice: q.glare <= SETUP.glareMax ? null : t('meter.advice.glare') });
+    const glareKnown = Number.isFinite(q.glare);
+    out.push({ id: 'glare', ok: glareKnown ? q.glare <= SETUP.glareMax : null, value: glareKnown ? `${(100 * q.glare).toFixed(1)} %` : '—', advice: glareKnown && q.glare > SETUP.glareMax ? t('meter.advice.glare') : null });
   }
   const fpsKnown = Number.isFinite(s.fps);
   out.push({ id: 'fps', ok: fpsKnown ? s.fps >= SETUP.fpsMin : null, value: fpsKnown ? `${s.fps.toFixed(1)} Hz` : '—', advice: fpsKnown && s.fps < SETUP.fpsMin ? t('meter.advice.fps') : null });

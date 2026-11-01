@@ -345,7 +345,7 @@ class Lab {
       void this.fillCameras(camera);
       this.setStatus(t('lab.loadingVision'));
       const settings = getState().settings;
-      host = await createVisionHost(defaultVisionConfig({ e2e: settings.e2e, force: settings.force }), settings.host ?? undefined);
+      host = await createVisionHost(defaultVisionConfig({ e2e: settings.e2e, force: settings.force, delegate: settings.delegate ?? null }), settings.host ?? undefined);
       // Leaving the screen while the host started must not leave a camera or worker running.
       if (!this.root) throw new Error('the diagnostics screen was closed');
       const preview = camera.createPreview();

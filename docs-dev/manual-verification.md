@@ -66,6 +66,10 @@ On every phone run, also check:
 - [ ] The camera picture is upright and mirrored in portrait and in landscape, and the face meters
       behave as on the desktop.
 - [ ] iPhone uses the CPU delegate (Diagnostics); note the effective frame rate in Live.
+- [ ] Android phones use the CPU delegate by default (Diagnostics); the camera checks show plausible
+      face size, centring and head angles; note the effective frame rate. Then repeat once with
+      `?delegate=gpu` and record whether the GPU path returns plausible landmarks on this phone
+      (the app should switch to the CPU on its own if it does not; specification v0.4 §16.1).
 - [ ] The default flow (Welcome → Camera → Calibrate → Validate → Results → Live) never asks for
       the screen size or the distance; the optional measurement works if chosen (the blind-spot
       test asks to turn the phone sideways when the screen is too narrow).
