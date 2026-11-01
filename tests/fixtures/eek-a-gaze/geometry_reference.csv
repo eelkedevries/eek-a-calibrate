@@ -1,0 +1,18 @@
+# expected_deg = degrees(arctan2((px - screen_px/2)*screen_mm/screen_px, distance_mm)) for origin=top_left
+# expected_deg = degrees(arctan2(px*screen_mm/screen_px, distance_mm)) for origin=centre
+# negate result if flip_y=True
+px,screen_px,screen_mm,distance_mm,origin,flip_y,expected_deg
+960,1920,531,600,top_left,false,0
+961,1920,531,600,top_left,false,0.0264097714989417268
+970,1920,531,600,top_left,false,0.264095863347061199
+860,1920,531,600,top_left,false,-2.63910934773393713
+1660,1920,531,600,top_left,false,17.8826200685249859
+0,1920,531,600,top_left,false,-23.8693900647320838
+1920,1920,531,600,top_left,false,23.8693900647320838
+1920,1920,1200,600,top_left,false,45
+0,1920,1200,600,top_left,false,-45
+300,1080,300,600,top_left,false,-6.34019174590990975
+540,1080,300,600,top_left,false,0
+100,1920,531,600,centre,false,2.63910934773393713
+-50,1920,531,600,centre,false,-1.32025494671009502
+300,1080,300,600,top_left,true,6.34019174590990975

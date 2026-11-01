@@ -100,6 +100,26 @@ wins and the gap is work still to be done.
   eyeLook* blendshapes and the screen ground truth. `headAt` and `onScreenNormalCm` place the
   head; poses are in MediaPipe's metric frame, screen geometry in the OpenCV camera frame.
 
+## Geometry, metrics, events and export (after prompt 003)
+
+- **Geometry (`src/core/geometry/`):** `screen.ts` (card, diagonal, assumed scale; `screenKey`),
+  `angles.ts` (`pxToDeg`/`degToPx` on the screen-centre normal, the exact
+  `angularSeparationDeg`, and `toExportDeg`, the one place y flips to positive up),
+  `distance.ts` (focal length, iris distance, `refDistanceMm`, `DistanceTracker`: running 1000 ms
+  median over open-eye frames), `blindSpot.ts` (`assessBlindSpot`). Reproduces eek-a-gaze's
+  `tests/fixtures/eek-a-gaze/geometry_reference.csv` to 1e-9°.
+- **Metrics (`src/core/metrics/`):** `scoreValidation` (the §6 signature plus an optional
+  `{ receivedMs }` map, because `RecordedFrame` has no receive time; latency is NaN without it).
+  Per-sample target angles use that frame's distance. `dataLossPct` and `accuracyPctDiag` are
+  percentages. `funnel.ts`, `aoi.ts`, `compare.ts` (paired differences, Wilcoxon, the
+  single-session caveat with its source).
+- **Events (`src/core/events/idt.ts`):** `detectEvents(samples, geometry, sd2dDeg)` and
+  `idtSd2dDeg(validationRecording, samples)` for θ_D.
+- **Export (`src/core/export/`):** `buildExport(input)` returns every file and the zip;
+  `canonicalJson` sorts keys so state built in any order gives identical bytes; the zip has
+  fixed entry order, deflate level and DOS time. cv.csv and events.csv are written by
+  `validationCsv.ts`. targets.csv adds `trial` and `aborted` columns.
+
 ## In progress
 
 Prompts 002–007 can run in parallel; then 008, 009 and 010 (`docs-dev/plan.md`).
