@@ -1,9 +1,11 @@
-# eek-a-calibrate: final specification, v0.3 (1 November 2026)
+# eek-a-calibrate: final specification, v0.4 (1 November 2026)
 
 > **v0.2:** §14 makes screen size and viewing distance optional and adds smartphone support. It
 > overrides earlier sections where they conflict.
 >
 > **v0.3:** §15 records corrections and integration rules from the reviews of 002–007.
+>
+> **v0.4:** §16 handles corrupt landmarks from mobile GPU delegates (first real-device test).
 
 This is the binding, implementation-ready specification for **eek-a-calibrate**. It is a browser
 app for webcam eye-tracking calibration, validation and live gaze, served at
@@ -2229,6 +2231,34 @@ conflicts with an earlier section, this section wins.**
    `src/platform/assets.ts` about where the ORT files come from. Add to the manual checklist: on a
    real GPU, BlazeGaze reports `tfjs-webgl`, its median time is within budget and the lab strip
    shows both eyes; Peekr's per-frame time against its 15 ms budget.
+
+## 16. Amendment v0.4 (1 November 2026): first real-device findings
+
+The owner's first run on a real Android phone (Chrome) showed the camera checks with face sizes
+of up to 3·10²¹ %, centring values of the order of 10¹⁸, glare "NaN %" and head angles jumping
+between ±74°, while brightness, backlight and frame rate (24–25 Hz) were sensible. The face box
+therefore spanned the whole frame: some landmarks were far outside it, and the transformation
+matrix computed from them was corrupt. Headless tests had not shown this, because the GPU is
+only emulated there. **Where this section conflicts with an earlier section, it wins.**
+
+### 16.1 Implausible landmarks and the delegate
+
+1. **Plausibility check** (`core/face/plausibility.ts`), on every landmarker result: all
+   landmark coordinates finite; x and y within [−0.5, 1.5]; |z| ≤ 1; mesh bounding box between
+   0.02 and 2 in each dimension; matrix (when present) finite, last row (0, 0, 0, 1) within
+   10⁻³, rotation column norms within [0.5, 2] and pairwise |cos| ≤ 0.15. An implausible result
+   is discarded (the frame has no face) and logged; it never reaches meters, engines or
+   calibration.
+2. **Automatic switch:** on the GPU delegate, 3 consecutive or 5 cumulative implausible results
+   rebuild the landmarker on the CPU delegate (logged; the host reports the new delegate).
+3. **Default delegate:** CPU on phones and tablets (iOS, iPadOS and **Android**), GPU elsewhere
+   with the check above. `?delegate=cpu|gpu` overrides. Rationale: the CPU delegate took a median
+   30 ms per frame against 163 ms for the software-emulated GPU in headless Chromium here; on
+   phones its speed must still be confirmed (manual checklist).
+4. **Test mode** (`?e2e=1`) defaults to the CPU delegate, so that end-to-end tests run at
+   realistic frame rates instead of about 3 Hz.
+5. **Meters:** a non-finite reading (for example glare without eye pixels) shows "—" and is
+   neither fine nor a fault.
 
 ## Appendix A — `src/core/constants.ts` defaults (WP1)
 
