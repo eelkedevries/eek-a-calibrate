@@ -43,6 +43,14 @@ wins and the gap is work still to be done.
   no console errors or CSP violations, hash-route reload, production headers). The fake camera
   is built from `tests/fixtures/face/portrait.jpg` (public-domain NASA portrait) by
   `scripts/make-fake-video.sh`.
+- **Core maths (002):** `src/core/maths/` holds the DOM-free numerics of specification §4.8.2–§4.9:
+  Cholesky/LU/Jacobi (`linalg.ts`), weighted standardisation with floors, the seeded PCA block
+  and clipping (`standardise.ts`, `pca.ts`), weighted ridge whose design already contains the
+  intercept column (`withIntercept`, `unpenalised = [0]`), exact grouped LOO
+  (`groupedLooResiduals`, the §6 signature, and `groupedLooPath` for a λ grid) with `cvScore`
+  taking the angular error as a parameter, the robust refit (`robustRidgeFit`), simplex stacking
+  (`simplex.ts`), `mulberry32`/`fisherYates`, robust statistics and `wilcoxonSignedRank`.
+  `src/core/filters/` holds `OneEuroFilter2D` (degrees) and the pure `blinkHold` step.
 - **Deploy:** `scripts/deploy.sh` dispatches `deploy-eek-a-calibrate.yml` in the eelkedevries.com
   repository (prompt 010 adds that workflow). Not yet deployed.
 
