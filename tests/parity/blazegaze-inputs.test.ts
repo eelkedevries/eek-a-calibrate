@@ -1,5 +1,6 @@
 // WP6 parity, item 3 (spec §10.3): hv and fo are finite and equal upstream's
-// getHeadVector and computeFaceOrigin3D(faceReconstruction(...)) exactly;
+// training-time head vector (upstream's Python formula; see headVector) and
+// computeFaceOrigin3D(faceReconstruction(...)) exactly;
 // faceWidthCm is the median of the first 30 open-eye frames and then frozen;
 // and the x = [emb, hv, fo] layout reaches the mapper rows of §4.8.4.
 import assert from 'node:assert/strict';
@@ -73,11 +74,44 @@ function scaledAboutNose(landmarks: Float32Array, k: number, dx = 0, dy = 0): Fl
   return out;
 }
 
-test('hv and fo on the fixture are finite and equal upstream exactly', () => {
+/**
+ * Upstream's Python training formula (scripts/preprocessing/utils.py and
+ * webeyetrack/model_based.py get_head_vector), written independently: Euler
+ * angles of the properly oriented R (MediaPipe's JS data are column-major), the
+ * pitch/yaw swap, then pitch_yaw_roll_to_gaze_vector in radians.
+ */
+function pythonHeadVector(m: ArrayLike<number>): [number, number, number] {
+  const R = (i: number, j: number) => m[j * 4 + i];
+  const pitch = Math.asin(-R(2, 0));
+  const yaw = Math.atan2(R(2, 1), R(2, 2));
+  const roll = Math.atan2(R(1, 0), R(0, 0));
+  const [hp, hy, hr] = [-yaw, pitch, roll];
+  const x = Math.cos(hp) * Math.sin(hy);
+  const y = Math.sin(hp);
+  const z = -Math.cos(hp) * Math.cos(hy);
+  const c = Math.cos(hr);
+  const s = Math.sin(hr);
+  return [c * x - s * y, s * x + c * y, z];
+}
+
+test('hv follows the Python training formula, not upstream JavaScript\'s transposed reading', () => {
+  for (const deg of [0, 15, -25]) {
+    const m = yawed(fx.matrix, deg);
+    const mine = headVector(m);
+    const py = pythonHeadVector(m);
+    for (let k = 0; k < 3; k++) assert.ok(Math.abs(mine[k] - py[k]) < 1e-12, `component ${k} at ${deg}°`);
+  }
+  // Upstream JavaScript reads Rᵀ: under a head turn its hv departs from the training formula.
+  const turned = yawed(fx.matrix, 25);
+  const js = getHeadVector(translateMatrix({ rows: 4, columns: 4, data: Array.from(turned) }));
+  const py = pythonHeadVector(turned);
+  assert.ok(Math.hypot(js[0] - py[0], js[1] - py[1], js[2] - py[2]) > 0.1, 'the transposed reading differs under rotation');
+});
+
+test('hv and fo on the fixture are finite; hv matches training and fo equals upstream exactly', () => {
   const prep = prepareInputs(newSession(), fx.landmarks, fx.matrix, true, W, H);
   assert.ok(prep.hv.every(Number.isFinite) && prep.fo.every(Number.isFinite));
-  const hvUp = getHeadVector(translateMatrix({ rows: 4, columns: 4, data: Array.from(fx.matrix) }));
-  assert.deepEqual(prep.hv, hvUp);
+  assert.deepEqual(prep.hv, pythonHeadVector(fx.matrix));
   assert.ok(Math.abs(Math.hypot(...prep.hv) - 1) < 1e-12, 'hv is a unit vector');
   const fw = estimateFaceWidth(pixelLandmarks(fx.landmarks, W, H));
   assert.equal(prep.faceWidthCm, fw, 'the first open-eye frame gives upstream\'s first-frame estimate');

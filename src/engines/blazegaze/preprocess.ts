@@ -331,9 +331,19 @@ export function faceRtMatrix(matrix: ArrayLike<number>): Matrix {
   return translateMatrix(mp);
 }
 
-/** hv = getHeadVector(translateMatrix(matrix)). */
+/**
+ * hv as the model was trained: upstream's Python takes Euler angles of the
+ * properly oriented rotation (MediaPipe's column-major data transposed into
+ * [R | t]). Upstream's JavaScript reads the column-major data row-major and so
+ * feeds the model Rᵀ, which inverts head yaw and pitch; the data are therefore
+ * reordered before getHeadVector. faceOrigin keeps upstream's reading, because
+ * the Python reconstruction inverts R there and the two agree.
+ */
 export function headVector(matrix: ArrayLike<number>): [number, number, number] {
-  const v = getHeadVector(faceRtMatrix(matrix));
+  if (matrix.length !== 16) throw new RangeError(`the facial transformation matrix has ${matrix.length} values, not 16`);
+  const rowMajor = new Array<number>(16);
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) rowMajor[i * 4 + j] = matrix[j * 4 + i];
+  const v = getHeadVector(translateMatrix({ rows: 4, columns: 4, data: rowMajor }));
   return [v[0], v[1], v[2]];
 }
 
