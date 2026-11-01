@@ -485,7 +485,7 @@ class DataScreen {
     const records = sessionRecords();
     const items = [
       getState().calibration || records?.base?.calibration ? t('data.export.has.calibration') : null,
-      currentValidationRun() ? t('data.export.has.validation') : null,
+      (records?.base?.validation ?? currentValidationRun()) ? t('data.export.has.validation') : null,
       records && records.blocks.length > 0 ? t('data.export.has.blocks', { n: records.blocks.length }) : null,
     ].filter((x): x is string => x !== null);
     const g = getState().geometry;

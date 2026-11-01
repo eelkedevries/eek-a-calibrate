@@ -92,6 +92,13 @@ class Results {
     const run = currentValidationRun();
     const container = h('div', { class: 'results' }, h('h1', null, t('route.results')));
     root.append(container);
+    if (fit && geometry && !run) {
+      container.append(
+        h('p', null, t('results.notValidated')),
+        h('p', { class: 'actions' }, h('a', { href: '#/live', class: 'button' }, t('results.toLive')), ' ', h('a', { href: '#/calibrate', class: 'button secondary' }, t('results.toCalibrate'))),
+      );
+      return;
+    }
     if (!fit || !run || !geometry) {
       container.append(h('p', null, t('results.none')), h('p', null, h('a', { href: '#/calibrate', class: 'button' }, t('results.toCalibrate'))));
       return;

@@ -143,6 +143,8 @@ export const STRINGS: Record<string, string> = {
   'results.lead': 'How accurate and precise each gaze engine, and their combination, was for you on the validation dots.',
   'results.none': 'There are no validation results in this session yet.',
   'results.toCalibrate': 'Go to calibration',
+  'results.notValidated': 'The calibration in use has not been validated yet. After a quick recalibration, or once a stored calibration is restored, the earlier validation no longer applies, and live gaze asks for a validation on 6 dots before it continues.',
+  'results.toLive': 'Go to live gaze',
   'results.approx.note': 'Degree values are approximate (≈): they assume 96 CSS px per inch and a typical camera field of view. Measure screen and distance for exact values. Pixels and percentages of the screen diagonal are exact.',
   'results.approx.measure': 'Measure screen and distance (optional; makes degree values exact)',
   'results.approx.dismiss': 'Dismiss',

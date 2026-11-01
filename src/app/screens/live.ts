@@ -1237,6 +1237,8 @@ class LiveScreen {
     this.rec.lineage.push(fit);
     this.rec.corrections = {};
     this.rec.revalidationNeeded = true;
+    // Any recalibration invalidates the previous validation (§4.13): its run belongs to the old fit.
+    setValidationRun(null);
     setState({ fit, validation: null });
     this.set = restoreEstimatorSet(fit, this.geometry);
     this.set.setDrift([0, 0]);
