@@ -296,7 +296,34 @@ wins and the gap is work still to be done.
   busy; engine specs live in `src/engines/<id>/spec.ts` and `src/engines/specs.ts`, so Welcome,
   About, the export and `fitRecording` load no engine code.
 
+## Real-device findings (specification v0.4 §16.1)
+
+- **Implausible landmarks:** `core/face/plausibility.ts` discards a corrupt landmarker result
+  (non-finite or out-of-range coordinates, a degenerate box or a broken transformation matrix);
+  3 consecutive or 5 cumulative ones on the GPU delegate rebuild the landmarker on the CPU
+  delegate. Phones and tablets, and `?e2e=1`, default to the CPU delegate; `?delegate=` overrides.
+
+## The game-first interface (specification v0.5 §17; prompts 013–018)
+
+- **Decision (4 November 2026):** the interface becomes the game "Pop with your eyes":
+  Title → Get ready → warm-up levels (the calibration protocol, unchanged) → Warm-up complete
+  (stars and rectangular zones from the Test round) → Free look → Challenge. Routes `#/`,
+  `#/ready`, `#/warmup`, `#/complete`, `#/look`, `#/challenge`; expert material in one Details
+  sheet (`#/details/<tab>`). No screen ever scrolls (checked at 360×640, 390×844, 844×390,
+  1280×650 and 1440×900).
+- **Canon:** `interface-design-v2/design-spec.md` and its boards are binding for look and
+  behaviour where §17 does not say otherwise. §17 also overrides §14.2.10 (device motion is read
+  for the phone tilt check) and adds `phase: 'game'`, `game.csv`, the tilt covariates and
+  IndexedDB v2.
+- **Contracts (additive, §17.11):** `Phase` gains `'game'`; `RecordedFrame.deviceTiltDeg` and
+  `.deviceRollDeg`; `createVisionHost(cfg, prefer?, hooks?)` registers the progress listener
+  before init.
+- **Status:** specified; nothing of the new interface is built yet. The legacy screens (Welcome,
+  Camera, Calibrate, Validate, Results, Live, Data, About) stay until 018.
+
 ## In progress
 
-v1 (prompts 001–011) is complete. Next: the owner's manual checks; phase-2 items
-(specification §13) only by new prompts.
+v1 (prompts 001–011) is complete, with the final-review fixes of specification §16.2. Next:
+prompts 013–018 (the game-first interface), in order; then the owner's manual checks, including
+the pilot of the bubble target against the ring (§17.12); phase-2 items (specification §13) only
+by new prompts.

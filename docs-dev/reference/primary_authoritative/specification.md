@@ -1,4 +1,4 @@
-# eek-a-calibrate: final specification, v0.4 (1 November 2026)
+# eek-a-calibrate: final specification, v0.5 (4 November 2026)
 
 > **v0.2:** §14 makes screen size and viewing distance optional and adds smartphone support. It
 > overrides earlier sections where they conflict.
@@ -7,6 +7,11 @@
 >
 > **v0.4:** §16 handles corrupt landmarks from mobile GPU delegates (first real-device test)
 > and records the decisions that follow the final reviews of the integrated app (§16.2).
+>
+> **v0.5:** §17 adopts the game-first interface ("Pop with your eyes") of
+> `secondary_background/interface-design-v2/`: new screens and routes, the bubble target, the
+> position guard with device motion, rectangular zones, stars and the challenge. It overrides
+> earlier sections where they conflict.
 
 This is the binding, implementation-ready specification for **eek-a-calibrate**. It is a browser
 app for webcam eye-tracking calibration, validation and live gaze, served at
@@ -2325,6 +2330,424 @@ engine modules through `ENGINE_LOADERS`, which stays the only way to load engine
 `BG_FEATURE_VERSION` moves to `engines/blazegaze/mappers.ts` beside the layout constants
 (`preprocess.ts` re-exports it), so the BlazeGaze spec does not pull in `ml-matrix`. The frozen
 §6 contracts are unchanged.
+
+## 17. Amendment v0.5 (4 November 2026): the game-first interface
+
+The owner asked for a new interface: optimised for smartphone cameras (portrait) and webcams
+(landscape); modern and clean, in the eek-a-style design system; **no horizontal or vertical
+scrollbar on any screen at any supported size**; easy for people who know nothing about eye
+tracking; organised from the first screen as a game, with calibration as its warm-up levels; and
+the position of the phone or camera (distance, angle, framing, tilt, light) signalled
+continuously, especially on phones. The design that answers this, "Pop with your eyes", is in
+`docs-dev/reference/secondary_background/interface-design-v2/`. This section adopts it and
+records what it changes in the earlier sections. **Where this section conflicts with an earlier
+section, this section wins.**
+
+### 17.1 Adoption and precedence
+
+1. **Binding interface documents.** From v0.5 these files are part of the canon by reference,
+   although they stay where they are:
+   - `interface-design-v2/design-spec.md` (version 2, 4 November 2026; cited below as
+     "design §n");
+   - `interface-design-v2/spec-core.md` and `interface-design-v2/shared.css` (tokens and
+     component CSS);
+   - the boards `interface-design-v2/canvas/*.dc.html` (exact markup, CSS and SVG) with their
+     renderings `interface-design-v2/png/*.png` (the visual target), and the per-board briefs
+     `interface-design-v2/briefs/*.md`.
+
+   **They are binding for the interface's look, copy and behaviour wherever this section does
+   not say otherwise.** `interface-design-v2/research/` and `authoring-guide.md` stay
+   non-binding background.
+2. **Order of precedence for the interface:** this section, then design-spec.md, then a board
+   (a board shows one example state of what design-spec.md describes), then its brief. Every
+   number drawn on a board is an example; the app shows the player's real values and never the
+   boards' **Example** badge.
+3. **The pipeline is not redesigned.** Capture and timing (§4.1), the vision host (§4.2), the
+   face front end (§4.3, §16.1), the four engines (§3, §4.6), the protocol blocks, layouts,
+   schedules, durations and their order (§4.7), frame acceptance, labelling and weights (§4.7),
+   the fit, estimators and selection (§4.8–§4.10), filtering (§4.11), validation metrics and the
+   verdict (§4.12, §16.2.1), drift and recalibration (§4.13), events (§4.14), persistence and
+   export (§4.15, §4.16), the headers and the rule that no request leaves the origin (§8) all
+   stand, except where §17.4–§17.10 amend them. The new interface drives that pipeline; it does
+   not reimplement it.
+
+The nine changes that design §9 asks for, and where this section makes them:
+
+| # | Change (design §9) | Here |
+|---|---|---|
+| 1 | Flow and screens become the game's parts, with new routes (§7) | §17.2 |
+| 2 | The target is the bubble: scale-in in the settle window, shrink over the sample window (§4.7) | §17.6.3 |
+| 3 | The head block shows four arcs and no pose dot (§4.7) | §17.6.5 |
+| 4 | Device motion for the phone tilt check (overrides §14.2.10) | §17.5.4 |
+| 5 | Rectangular zones from the validation (columns and rows chosen separately) | §17.7.2 |
+| 6 | Stars from the verdict, and challenge stars | §17.7.3, §17.9.5 |
+| 7 | The drift check is presented as Re-aim, the quick recalibration as Quick warm-up (§4.13) | §17.8.2 |
+| 8 | The set-up chooser (Propped / In hand / Webcam) | §17.4.1 |
+| 9 | Challenge rows in the export as `phase: 'game'` (§4.16) | §17.10 |
+
+### 17.2 Flow, screens and routes (replaces the route table and first-run flow of §7)
+
+**First-run flow:** Title → Get ready → Warm-up (four levels in Standard) → Warm-up complete →
+Free look → Challenge (three rounds). This replaces the flow of §7 and of §14.1.1 item 1.
+
+| Route | Screen (design §) | Mode (design §2.2) | Boards |
+|---|---|---|---|
+| `#/` | Title (§2.4) | framed, dark | `Main`, `desktop-title` |
+| `#/ready` | Get ready, the ready check (§2.5, §3) | immersive, grey veil | `phone-ready`, `desktop-ready`, `position-signals` |
+| `#/warmup` | Level cards, the warm-up levels, "Checking your aim…" (§2.6–§2.11); the Quick warm-up (§2.15) | stimulus, grey | `phone-level1-pop`, `phone-level2-follow`, `desktop-level1-pop`, `desktop-level3-turn`, `phone-landscape-level1` |
+| `#/complete` | Warm-up complete (§2.12) | framed, dark | `phone-level-complete`, `desktop-level-complete` |
+| `#/look` | Free look (§2.13) | immersive, grey | `phone-free-look`, `desktop-free-look` |
+| `#/challenge` | Round cards, rounds, Round complete (§2.14, §5) | stimulus, grey; Round complete framed | `phone-challenge`, `desktop-challenge`, `phone-landscape-challenge` |
+| `#/details/<tab>` | The Details sheet (§2.17) opened on `results`, `settings`, `data`, `device` or `about` over the Title (a deep link for researchers) | sheet | — |
+| `#/methods` | Methods, the long read (a document page; it may scroll, because it is a document) | document | — |
+| `#/screen`, `#/distance` | Measure screen and distance (the card match and blind-spot test of §4.4), opened from Details → Device only, restyled to fit one screen | framed | — |
+| `#/lab` | Diagnostics (§7 row 10), opened from Details → Device only, restyled to fit one screen | framed | — |
+
+1. **Expert material lives in the Details sheet** (design §2.17): per-estimator results,
+   settings, engines, export, saved data, device readings, measurement, diagnostics and the
+   methods. Opening it from a screen never changes the route, so the screen underneath keeps its
+   state; it is reached from the top bar of every screen and from the manual Pause card, never
+   during a running level otherwise. "Delete all my data" sits in the sheet's footer on every tab,
+   which replaces the footer link of §4.15.
+2. **Legacy routes.** `#/camera`, `#/calibrate`, `#/validate`, `#/results`, `#/live`, `#/data`
+   and `#/about` (and the old Welcome, moved to `#/welcome` when `#/` becomes the Title) stay
+   reachable until prompt 018. Then they redirect: `#/welcome` → `#/`; `#/camera`,
+   `#/calibrate` and `#/validate` → `#/ready`; `#/results` → `#/details/results`; `#/live` →
+   `#/look`; `#/data` → `#/details/data`; `#/about` → `#/details/about`.
+3. **Route guards.** A route whose state is missing sends the player to the nearest screen that
+   can run: no camera or no ready check → `#/ready` (or `#/` before Play); `#/complete` without a
+   scored Test round → `#/ready`; `#/look` and `#/challenge` without a validated fit of at least
+   two zones → `#/complete`, or `#/` when there is no fit. A reload inside the fullscreen span
+   lands on `#/ready`, because fullscreen needs a tap.
+4. **The fullscreen span** (design §2.1). "Start warm-up" starts the presentation of
+   `platform/presentation.ts` (element fullscreen, or viewport mode on iPhone, §14.2.4) from its
+   tap; it stays on through the warm-up, Warm-up complete, Free look and the challenge, because
+   any exit invalidates the fit (§4.7). Screens inside the span, the dark menu screens included,
+   render into the presentation stage (the fullscreen element), not into the page outlet. The
+   Details sheet opens above it as a modal dialog (top layer).
+5. The query parameters of §7 keep their meaning (`preset` pre-selects the warm-up length).
+   `?e2e=1&speed=N` divides every new duration as well (level-card countdowns, the hold ring,
+   the challenge's dwell, lifetimes and gaps), and `window.__eek` gains read-only hooks per new
+   screen. `?target=ring` keeps the §4.7 ring instead of the bubble, for the pilot of §17.12.
+
+### 17.3 Shell, theme and the no-scroll rule (amends §7)
+
+1. **Tokens and components.** `shared.css` is brought into `src/app/style.css`: the eek-a-style
+   roles (dark identity by default; light under `:root[data-theme="light"]`, chosen in Details →
+   Settings), the theme-independent stage roles (the grey `#808080` stage is never themed), the
+   game roles and the component classes. Colour is used only through these role tokens.
+2. **Fonts.** Spectral (600), Lexend (400, 500) and JetBrains Mono (400, 500) are self-hosted
+   WOFF2 files under `public/fonts/` with their OFL 1.1 licence and a `PROVENANCE.md`, served as
+   `font/woff2` (`config/headers.mjs`, `public/.htaccess`); the CSP (`font-src 'self'`) is
+   unchanged. If a family cannot be obtained, the token's fallback stack is used and the gap is
+   reported; no font is ever loaded from another origin.
+3. **The no-scroll rule** (design §4.1, binding): the document never scrolls in either
+   direction on any route of §17.2 except `#/methods`; `.app` is `100svh` (with the `100vh`
+   fallback) in normal flow; exactly one flexible region (the stage); layouts switch by aspect
+   ratio (5/4) and height (480 px), components by container queries; type in `rem`; the fit
+   guard ladders of design §4.1 rule 11; the escape hatch of rule 12 (only the panel may scroll,
+   and only under enlarged text or zoom). Automated check: for every route and its main states,
+   at **360×640, 390×844, 844×390, 1280×650 and 1440×900**, `document.documentElement`'s
+   `scrollWidth ≤ innerWidth` and `scrollHeight ≤ innerHeight`, and no visible element extends
+   past the viewport. The further sizes of design §4.1 rule 13 and 125 % text are checked in the
+   accessibility pass of prompt 018.
+4. **Layout templates** per design §4.3 (phone portrait), §4.4 (phone landscape, camera side
+   from `screen.orientation.angle`) and §4.5 (desktop), with the safe-area insets of §14.2.5.
+5. **The level track** (design §2.3) replaces any step indicator: one node per warm-up level of
+   the chosen length plus the star node; states future, current, done, star locked, unlocked and
+   current; never gold; hidden on stimulus screens.
+6. **Copy.** British English, no em dashes in interface copy, within the budget of design §4.6,
+   and the honesty rule of design §7 (a warm-up line never says or implies that looking pops,
+   moves or scores anything; only round cards, the round HUD and Round complete credit the
+   eyes). Copy moves from the one flat `strings.en-GB.ts` to one module per screen under
+   `src/app/strings/`, merged behind the same `t()`.
+7. **Touch and keyboard.** Every target is at least `MOBILE.minTouchPx` (44 px); primaries are
+   56 px tall on `pointer: coarse` and 48 px on `pointer: fine`; one gold primary per screen at
+   most. Keys: Space starts or continues, P pauses, Esc aborts a level as in §4.7 (its touch
+   equivalent is Exit in the Pause card) or closes the sheet, D opens Re-aim in Free look; Expert
+   mode keeps R (record) and M (marker). Under `prefers-reduced-motion` the rules of design §2.6,
+   §2.8 and §5.4 apply.
+
+### 17.4 Title and Get ready (replace §7 rows 0 and 1)
+
+1. **Set-up chooser** (design §2.4): "How are you playing?" with **Propped**, **In hand** and
+   **Webcam**, pre-selected from the device class of §14.2.1 (mobile → Propped, otherwise
+   Webcam). The choice overrides the device class for copy and position thresholds only
+   (design §3.2: In hand relaxes the phone steadiness cue to 30°/s and adds "Hold the phone at
+   eye level"); it never changes the camera ladder, the delegate or the protocol. It is
+   recorded in `session.json` as `setup` (`propped` | `in-hand` | `webcam`).
+2. **Play** asks for the camera only after the tap (permission priming), then, on iOS,
+   `DeviceMotionEvent.requestPermission()` in the same gesture (camera first, motion second;
+   refusing motion changes nothing visible). A refused camera shows "Camera blocked" with the
+   browser-settings guidance and "Try again" on the Title (design §2.16). The wake lock
+   (§14.2.6) is held from Play until the player leaves the game, re-acquired when the page
+   becomes visible again. Web Audio starts on this tap.
+3. **The face model starts downloading when the Title loads** (same origin; its size is shown in
+   Details → Device), and its progress is shown before and after Play ("Getting ready… 62 %" in the
+   Get ready cue). The host's progress listener is registered before its `init` starts (§17.11), so
+   progress is reported from the first byte. A blocking capability gap shows only the blocking
+   message in the Play slot.
+4. **"Skip warm-up"** appears beside Play only when a stored calibration exists for this screen;
+   whether it also matches the camera (§4.15) is checked once the camera is open, and a mismatch
+   falls back to the full warm-up with one line of explanation. It runs Get ready, then a
+   one-level Test round on `VAL6`; at a verdict of at least acceptable (§4.15) a forced Re-aim
+   follows (§4.13) and then Warm-up complete; below acceptable the stored calibration is not
+   used, and Warm-up complete offers only the full warm-up.
+5. **Get ready** (design §2.5, §3.5, §3.6) is the full position guard over the mirrored
+   preview: target oval, live face outline, eye dots, one directional cue, one cue card, the
+   status row (Distance · Position · Light), the hold ring over `SETUP.holdMs`, and the *Ready*
+   latch that stores *home*. **Start warm-up** is enabled only when *Ready* has latched **and** the
+   engines have loaded and the device probe with its run-set rule (§7 row 1, unchanged) has run;
+   the probe runs silently once a face is present. "Start anyway" (secondary) appears after 20 s
+   without *Ready* while a face is present, never without one; "Make the window larger to play"
+   replaces the action when the stage's short side would be under 280 px.
+6. The camera screen's meters of §7 row 1 and their `SETUP` thresholds no longer gate the flow:
+   the position guard of §17.5 replaces them, and Details → Device shows the readings. The
+   eyewear question moves to Details → Settings (Glasses). The camera picker moves to Details →
+   Settings (Camera, shown with two or more cameras). "Measure screen and distance" moves to
+   Details → Device; it stays optional (§14.1). The mobile instruction text of §14.2.8 gives way
+   to the guard's cues; the advised distances of design §3.2 appear in Details → About and
+   Device only.
+
+### 17.5 The position guard (new; replaces the §7 camera meters, overrides §14.2.10)
+
+1. **Pure core.** `src/core/position/*` (DOM-free, unit-tested) implements design §3: the
+   signals and their smoothing (§3.1), the target ranges per device class (§3.2, every value
+   **heuristic**), hysteresis and timing (a new cue persists 300 ms, a shown cue stays 1 s,
+   all clear holds `SETUP.holdMs`), the priority order and the single-instruction rule (§3.4),
+   the status-row grouping, the *home* reference latched at *Ready* (and again at the start of
+   "Lean in"), the tolerances around home during the warm-up, the calibrated head range of §4.10
+   after the fit, and the two grades *drifting* and *out* (§3.3). The thresholds live in
+   `core/position/thresholds.ts`, not in `constants.ts`.
+2. **It is presentation, not gating.** The guard pauses and resumes presentations and shows
+   cues; it never changes frame acceptance, rejection codes, labels or weights (§4.7). A block
+   paused by the guard behaves as one paused by the face-lost pause of §7 row 4: the interrupted
+   item is shown again with its full settle window.
+3. **Auto-pause** (design §3.8): *out* for more than 0.5 s or the face lost for more than 0.4 s in
+   the warm-up and Re-aim; more than 1 s or 0.7 s in Free look and the challenge. The overlay's
+   card, headlines, "Carries on by itself", the resume rule (in range for 1 s, "Back in place")
+   and the extra action after 10 s follow design §3.8; three pauses in one level open "Let's fix
+   the set-up first" (design §2.6). The **compact glyph** (design §3.7) shows Good, Drifting and
+   Lost in the corner cluster and in Free look; words beside it ("nudges") appear only in Free
+   look and the challenge.
+4. **Device motion (overrides §14.2.10).** On phones and tablets the app reads
+   `DeviceMotionEvent` gravity (`accelerationIncludingGravity`) and `rotationRate` for the
+   upright angle θ, the in-plane roll (corrected by `screen.orientation.angle`) and steadiness
+   (design §3.1, §3.9); `DeviceOrientationEvent` is a fallback only where motion is unavailable.
+   It is optional and never blocks: without a sensor or permission the camera-based cues still
+   cover phone height and angle. θ and roll are exported as covariates (§17.10). The readings
+   never leave the device.
+5. **Haptics, sound and speech** (design §3.10) are optional extras and never the only cue:
+   `navigator.vibrate` where supported; Web Audio tones generated in the page (no audio files),
+   on by default at low volume from the first level card and off on Get ready; "Read instructions
+   aloud" (Settings) uses `speechSynthesis` with `lang 'en-GB'` and **only voices whose
+   `localService` is true**, so that no text is sent to a speech service; without such a voice
+   the setting is unavailable.
+
+### 17.6 The warm-up levels (amends §4.7 presentation; the protocol is unchanged)
+
+1. **Levels per warm-up length** (design §2.11): Quick = Pop the dots (`CAL9`) and Test round
+   (`VAL6`); **Standard** = Pop the dots (`CAL13`), Follow the firefly (pursuit), Turn your head
+   (`HEAD5`) and Test round (`VAL12`); Thorough = Standard plus "Lean in" (block A′) before the
+   Test round. These are the presets of §4.7, shown as levels; blocks, layouts, seeds, order and
+   timings are unchanged. "Lean in" re-latches *home* at its start.
+2. **Level cards** (design §2.6) open each level: the previous level's steadiness line (design
+   §2.6 table, heuristic, from that level's frame-acceptance log only), the track, "Level n of
+   N", pictogram, name, rule, hint, a 3 s countdown that starts the level by itself, "Start now"
+   (Space or a tap anywhere also starts it) and the Sound toggle. This satisfies §14.2.7's
+   "tap anywhere on an instruction card". Under reduced motion the pursuit card offers "Skip this
+   level" (§7 allows pursuit to be skipped).
+3. **The bubble replaces the §4.7 ring** (design §2.6, §6.1). For a fixation, validation or drift
+   item (head-motion items: item 5) with onset t₀, the bubble scales in from 0.6× to its full size
+   over the first 150 ms of the settle window and stays static to the window's end; over the sample
+   window its radius shrinks **linearly** from full to the core's radius; during any extension (up
+   to `maxSampleMs`) it holds at the core's radius; when the item ends it pops (a 150 ms burst),
+   outside every sampling window, and the next onset follows. A retried item re-grows. Full
+   diameter: 3° from the geometry, clamped to [64 px, 20 % of the stage's short side]; the core is
+   the ABC target of §4.7, unchanged (0.6°, at least 14 px; 24 px when the geometry is unknown).
+   Under reduced motion the bubble is static at full size and simply disappears. `onsetMs` stays
+   the rAF timestamp of the first frame that shows the item, and the drawing (canvas or SVG) stays
+   on the one grey stage of `components/stimulusCanvas.ts`. The radius as a function of time is a
+   pure, unit-tested function.
+4. **Pursuit** is drawn as the firefly (design §2.8, §6.1): the ABC core on a 44 px light disc
+   with a faint 300 ms trail; no path ahead is drawn. Path, hold, discard and lag are §4.7.
+5. **Head block** (design §2.9): a static bubble (64 px phones, 80 px desktop) and **four arcs**
+   whose fills grow with the measured head turn towards each side; the moving pose dot of §4.7 is
+   not drawn; one caption chip ("Slowly turn your head", then "Now nod slowly"). The 3-of-4
+   sector rule and the 6000 ms limit are §4.7. With **Limited head movement** (Settings) the
+   sector targets are halved (±5° yaw, ±3.5° pitch); the setting is recorded in `session.json`.
+6. **Stimulus HUD** (design §2.6, §4.3–§4.5): the pip line on the camera edge
+   (`role="progressbar"`) and the corner cluster (position glyph and Pause, 44 px) in the corner
+   farthest from the camera. The cluster fades out, and takes no pointer input, while a bubble
+   or the firefly is within 96 px of it, so no control ever sits at a target position
+   (§14.2.7). **Exit** in the Pause card is the abort of §4.7 and §14.2.7 (Esc still aborts on a
+   keyboard). Nothing else is drawn: no score, no text, no level name.
+7. **Screen changes** (§4.7, §14.2.3–4): an invalidation shows "The screen changed" with "Warm
+   up again" (rotation: "Turn the phone back, or warm up again"), design §2.16.
+8. **Checking your aim…** (design §2.10) shows the fit worker's progress (§4.8) and the
+   validation scoring; after 3 s it adds "Almost there". `FIT_BUDGET_MS` is unchanged.
+
+### 17.7 Warm-up complete: zones, stars, marks and cause
+
+1. **Source.** Everything comes from the Test round and the fit, for the **selected estimator**
+   (`FitResult.selection`) in `mode: 'own'`; nothing new is measured.
+2. **Zones (rectangular).** `zoneGrid` in `src/core/game/zones.ts` (pure, unit-tested) chooses
+   the columns and the rows **separately**: for each axis, the largest n ∈ {1, 2, 3, 4} whose
+   smallest half-cell along that axis (as `halfCellDeg` of §4.12, for one axis) is at least
+   need = p75 of the per-target accuracy + 2 × RMS-S2S; 0 on that axis when even n = 1 fails or
+   need is not finite. The number of zones is cols × rows. **At least two zones unlock the
+   challenge.** The square `aoiGrid` of §4.12 and its contract are unchanged and remain the
+   advice in Details → Results and `validation.csv`.
+3. **Stars** (heuristic, shown under "Rule of thumb"): verdict `good` → 3, `acceptable` → 2,
+   `poor` → 1, `not-tracking` or fewer than two zones → 0 (`VERDICT`, Appendix A).
+4. **Marks:** a Test-round bubble is a hit (✓) when the mean gaze on it (Ḡ, in px) lies in the
+   zone that contains its target, a miss (✗) otherwise, and a miss when it had no valid sample.
+5. **Cause** (one line): from the warm-up's frame log and the guard's light readings, the first
+   that applies of: face often lost, backlit, too dark, much head movement, glare, too far
+   (design §2.12; the thresholds are heuristic).
+6. **Outcomes and actions** follow design §2.12 (Great, Good, Rough, Didn't work), with the
+   arrival sequence and "Rule of thumb · How we judge this" opening Details → Results. After a
+   Quick warm-up (§17.8.3) the primary is "Back to the challenge"; after "Skip warm-up" below
+   acceptable, §17.4.4 applies.
+
+### 17.8 Free look, Re-aim and Quick warm-up (replace §7 row 7; §4.11 and §4.13 unchanged)
+
+1. **Free look** (design §2.13): the zones as outlines, the zone of the filtered gaze (§4.11, with
+   the drift correction) lit, and a soft disc at the filtered gaze point whose radius is the 68th
+   percentile of the selected estimator's per-target Test-round accuracy in px. The disc fades
+   with the frame's confidence and greys out, with a dashed edge, outside the calibrated head
+   range (`OUT_OF_RANGE`, §4.10). The dock holds "Tracking", "The zone you look at lights up.",
+   **Re-aim** (secondary) and **Play the challenge** (primary); bar and dock fade after 3 s
+   without input. Live recording with markers, the raw and per-engine dots, the trail and the
+   estimator switch of §7 row 7 are kept for **Expert mode** (Details → Settings); Free look is
+   recorded only when Expert mode recording is started, as Live was.
+2. **Re-aim is the drift check of §4.13** (two bubbles: the centre and one seeded `VAL12`
+   location; settle 500 ms, sample 1000 ms), presented as a two-pip mini-level without a card,
+   over the screen that offered it (the route does not change, and play resumes where it was).
+   It is offered by the triggers of design §2.15 (always in Free look; in a round when the hit
+   rate falls below 50 % over the last six bubbles; after more than 10 s in the auto-pause
+   overlay; 5 min after the warm-up, the `DRIFT.everyMin` prompt; on a Round complete that went
+   badly). A drift check forced by §4.13 (camera, viewport, backend or delegate change, worker
+   restart, restored calibration) is a Re-aim the player cannot skip. **Behaviour is unchanged:**
+   when |o| ≤ max(2°, 1.5 × validation accuracy) the correction is applied, and the chip reads
+   "Your aim was fine" when |o| < 0.5° (heuristic) and "Aim fixed" otherwise; beyond the limit
+   the card "Your aim moved a lot" offers the Quick warm-up.
+3. **Quick warm-up is the quick recalibration of §4.13** (`RECAL5` with the fixation rules, the
+   refit at weight ×2, then the required `VAL6`), shown as two levels ("Pop the dots", 5 bubbles;
+   "Test round", 6 bubbles) on `#/warmup` and ending on Warm-up complete with the new zones
+   (§16.2.2 applies: the earlier validation is dropped).
+
+### 17.9 The challenge (new)
+
+1. **Pure core.** `src/core/game/*` (DOM-free, unit-tested; parameters in `core/game/params.ts`,
+   every value **heuristic**) implements design §5: the board (the safe rectangle minus a 4 %
+   margin per axis, split into the zones of §17.7.2, 16 px gutters); bubble size and placement
+   (zone centre ± 10 % jitter, never the same zone twice in a row, zones balanced over the round,
+   every fifth bubble in the centre zone when both counts are odd, so that a centre zone exists);
+   the **leaky dwell** (fills at 1/dwell per second while the lit zone is the bubble's, drains at
+   twice that rate outside, resets after 300 ms continuously outside; frames held by the blink hold
+   of §4.11 or flagged invalid pause it); the 4 s lifetime, the 500 ms gap and the three rounds
+   (Pop! 1000 ms, Mind the spikes 800 ms with a decoy that bonks after 600 ms, Drifters 700 ms with
+   drift ≤ 3°/s); scoring, streaks and stars (design §5.5); the per-zone statistics and the Re-aim
+   offer rule; all seeded through `mulberry32` so a round is reproducible from its seed.
+2. **Gaze input** is the selected estimator's filtered, drift-corrected gaze (§4.11, §4.13),
+   snapped to a zone. There is no gaze dot on the board (design §5.2).
+3. **The challenge as a quality check** (design §5.6): each pop stores the target, zone, time to
+   pop and the median filtered gaze over the last 400 ms. Consistent offsets in at least three
+   zones (resultant length ≥ 0.6 and a mean offset above a quarter of a zone) give a global
+   offset correction for the next round. That gaze is already drift-corrected, so the offset
+   (converted to degrees) is **added** to the selected estimator's correction in use, never put
+   in its place as a drift check's offset is (§4.13 measures on uncorrected gaze); it is not
+   applied when the resulting correction would exceed the §4.13 limit. It is logged in the drift
+   log with source `game` and announced on Round complete ("We corrected a small shift.").
+4. **Screens** follow design §2.14: round cards ("Round n of 3", rule, hint, "16 bubbles · about
+   1 minute", countdown, Sound), the board with the pip line, the score chip and the corner
+   cluster with nudges, and Round complete (zone map with per-zone pops and marks, Replay of the
+   smoothed gaze trail, stars, headline, one sentence, the score line, and the actions per
+   outcome). Pause and auto-pause freeze the round (lifetime and dwell held); a screen change
+   ends it ("The screen changed").
+5. **Challenge stars** (heuristic, per round): 1 at ≥ 50 % popped, 2 at ≥ 75 %, 3 at ≥ 90 % with a
+   median time to pop ≤ 1.6 s. The best score is kept per zone set on the device (§17.10).
+
+### 17.10 Export and persistence additions (amend §4.15 and §4.16)
+
+1. **Challenge rows** (`phase: 'game'`). Every round played is recorded like a Live block and
+   exported:
+   - `samples.csv`: trial `game-<nnn>` (one per round, numbered from 001 in the session),
+     phase `game`, `item_id` the bubble's id, `target_x`/`target_y` the bubble's centre at that
+     frame (a drifter moves);
+   - `targets.csv`: one row per bubble with phase `game`;
+   - **`game.csv`** (new): one row per bubble or decoy, with trial, round, round name, id, kind
+     (`bubble` | `decoy`), zone column and row, x/y px, onset and offset ms, outcome (`popped` |
+     `missed` | `bonked` | `ignored`), time to pop ms, score change, streak, and the offset of the
+     median filtered gaze over the last 400 ms (px);
+   - `session.json`: the set-up choice, the warm-up length, Limited head movement, the motion
+     permission state, the guard's pauses per level with their reasons, the zones, stars and
+     marks of each Warm-up complete, each round's seed, score, stars and per-zone statistics,
+     and the offset corrections; `README.txt` lists `game.csv`.
+2. **Tilt covariates.** `samples.csv` gains two trailing columns, `device_tilt_deg` and
+   `device_roll_deg` (θ and roll of §17.5.4; empty when unavailable), **after** the per-engine
+   columns, so the column order that eek-a-gaze reads (§4.16) is unchanged.
+3. **Persistence.** IndexedDB `eek-a-calibrate` becomes **version 2**: the upgrade keeps the
+   v1 stores and adds `prefs` (theme, sound, speech, warm-up length, set-up choice, Limited head
+   movement, Expert mode) and `scores` (the best score per zone set: a 1 × 2 board is never
+   compared with a 3 × 2 board). "Delete all my data" clears both. No image or video is ever
+   stored (unchanged).
+
+### 17.11 Contract changes (all additive)
+
+```ts
+// src/core/types.ts
+export type Phase = 'fixation' | 'pursuit' | 'head' | 'validation' | 'drift' | 'game';
+export interface RecordedFrame { /* …v0.4 fields… */
+  deviceTiltDeg?: number | null;   // phone upright angle θ (0 flat, 90 vertical), §17.5.4
+  deviceRollDeg?: number | null; } // in-plane roll, corrected for screen.orientation.angle
+// src/vision/protocol.ts
+export interface HostHooks { onProgress?(asset: string, loaded: number, total: number): void; }
+export declare function createVisionHost(cfg: VisionConfig, prefer?: 'worker' | 'inline',
+  hooks?: HostHooks): Promise<VisionHost>;   // hooks are registered before init starts
+```
+
+`src/core/constants.ts`, `src/engines/types.ts`, `FitResult`, `ValidationReport` (including
+`aoiGrid`) and the remaining §6 contracts are unchanged. App-level types (`Settings` in
+`app/state.ts`, the export input types in `core/export/*`) grow as the prompts need; they are not
+frozen contracts.
+
+### 17.12 Tests and checks (amend §10)
+
+1. **Unit** (`node --test`): `core/position/*` (priority order, hysteresis, timing, home,
+   grades, per-class thresholds, tilt from gravity), the bubble timeline, the steadiness line,
+   `zoneGrid`, stars, marks and cause, `core/game/*` (placement, leaky dwell, lifetimes, decoys,
+   drifters, scoring, streaks, stars, the offset correction and the Re-aim offer), and the export
+   additions (byte-identical output still holds, §4.16).
+2. **End-to-end:** `tests/e2e/no-scroll.spec.ts` with a reusable helper (§17.3.3) at the five
+   sizes for every route; `smoke`, `vision`, `engines`, `flow`, `live-data`, `failures` and
+   `mobile` retargeted at the new screens by prompt 018 (each prompt keeps the suite green for
+   what it touches). Accuracy is still not asserted.
+3. **Visual pass:** each new screen compared with its rendering in `png/` at the board size;
+   the screenshots are kept for the report, not pixel-asserted.
+4. **Pilot and device checks** (design §10) join `docs-dev/manual-verification.md`: the bubble
+   against the ring (`?target=ring`) on at least one phone and one laptop, for accepted frames
+   per target and validation accuracy, before any accuracy figure is published (if the bubble is
+   worse, a later amendment restores the ring); the position thresholds, hysteresis and
+   steadiness lines on real phones (Propped and In hand) and webcams; the camera side in phone
+   landscape; iOS 26 `svh` and the motion permission; contrast on the grey; challenge tuning;
+   reduced motion and Read instructions aloud end to end.
+
+### 17.13 Work allocation
+
+Prompts 013–018 run in order, each after the previous one has landed. Each owns the files its
+prompt names, cites this section and the interface-design-v2 files it builds, and leaves `npm
+run check` green.
+
+| Prompt | Content |
+|---|---|
+| `013_game_shell_and_routes.md` | §17.2 routes and guards (with the legacy routes kept), §17.3 shell, tokens, fonts, theme, track, Details sheet frame, strings split, the no-scroll helper and spec |
+| `014_title_and_ready.md` | §17.4 Title and Get ready, §17.5 position guard (pure core, glyph, overlay, device motion, haptics, sound, speech), the progress hook of §17.11, the tilt covariates |
+| `015_warmup_levels_and_complete.md` | §17.6 warm-up levels over the existing protocol, §17.7 Warm-up complete |
+| `016_free_look_and_challenge.md` | §17.8 Free look, Re-aim and Quick warm-up, §17.9 the challenge, §17.10 game export, `Phase` gains `'game'` |
+| `017_details_sheet.md` | the Details tabs (design §2.17) filled from the existing logic, `#/methods`, the restyled `#/screen`, `#/distance` and `#/lab`, IndexedDB v2 |
+| `018_integration_and_polish.md` | legacy routes removed and redirected, every e2e spec on the new interface, visual and accessibility passes, docs, manual checklist |
 
 ## Appendix A — `src/core/constants.ts` defaults (WP1)
 

@@ -1,9 +1,12 @@
 # Interface design v2: "Pop with your eyes" (game-first)
 
-**Status: non-binding background (4 November 2026).** This folder holds the proposed redesign
-of the user interface. It is not yet part of the binding specification; adopting it needs the
-specification amendment that `design-spec.md` §9 lists (v0.5), followed by implementation
-prompts.
+**Status: adopted by specification v0.5 §17 (4 November 2026).** This folder holds the
+redesign of the user interface. `design-spec.md`, `spec-core.md`, `shared.css`, the boards in
+`canvas/` with their renderings in `png/`, and the briefs are binding for the interface's look,
+copy and behaviour wherever §17 of
+`docs-dev/reference/primary_authoritative/specification.md` does not say otherwise; §17 wins
+where they differ. `research/` and `authoring-guide.md` remain non-binding background. Prompts
+013–018 build it.
 
 ## The owner's brief
 

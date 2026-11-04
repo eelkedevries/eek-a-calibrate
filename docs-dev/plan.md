@@ -1,6 +1,7 @@
 # eek-a-calibrate: plan for v1
 
-**Agreed:** 1 November 2026 · **Specification:** v0.1
+**Agreed:** 1 November 2026 · **Specification:** v0.1 · **Updated:** 4 November 2026 for v0.5
+(the game-first interface; see "v0.5: the game-first interface" below)
 
 The binding detail is in
 [`reference/primary_authoritative/specification.md`](reference/primary_authoritative/specification.md).
@@ -25,6 +26,28 @@ are in [`agent/prompts/`](agent/prompts/).
 
 Parallel prompts run in separate git worktrees (each with its own `E2E_PORT`), commit to `main`
 and run `git pull --rebase` before pushing.
+
+## v0.5: the game-first interface (specification §17)
+
+The owner asked for the whole tool to be a game ("Pop with your eyes"), with calibration as its
+warm-up levels, no scrollbar on any screen, continuous position signals and a clean eek-a-style
+look. Specification v0.5 §17 adopts the design in
+[`reference/secondary_background/interface-design-v2/`](reference/secondary_background/interface-design-v2/)
+(design-spec.md and the boards are binding for look and behaviour where §17 does not say
+otherwise). The eye-tracking pipeline is reused, not rebuilt.
+
+| Prompt | Content | Runs |
+|---|---|---|
+| `012_pipeline_fixes_and_spec_v05.md` | The seven final-review fixes integrated (specification §16.2); specification v0.5 §17; this plan; prompts 013–018 | first |
+| `013_game_shell_and_routes.md` | Tokens and components from `shared.css`, self-hosted fonts, the no-scroll shell, the level track, the Details sheet frame, the new routes (legacy routes kept), strings per screen, the no-scroll e2e helper and spec | after 012 |
+| `014_title_and_ready.md` | Title (set-up chooser, Play, permission priming, model progress), the position guard as pure `core/position/*`, device motion, Get ready, the glyph and auto-pause overlay, haptics, sound, speech, the host progress hook and tilt covariates | after 013 |
+| `015_warmup_levels_and_complete.md` | The warm-up levels over the existing protocol (level cards, bubble, firefly, arcs, Test round, HUD, pauses), "Checking your aim…", Warm-up complete (zones, stars, marks, cause) | after 014 |
+| `016_free_look_and_challenge.md` | Free look, Re-aim and Quick warm-up over the drift and recalibration logic, the challenge as pure `core/game/*` and its screens, `phase: 'game'` export | after 015 |
+| `017_details_sheet.md` | The Details tabs (Results, Settings, Data, Device, About) from the existing logic, the Methods page, the restyled measurement and diagnostics pages, IndexedDB v2 | after 016 |
+| `018_integration_and_polish.md` | Legacy routes removed and redirected, every e2e spec on the new interface, visual and accessibility passes, docs, manual checklist, deploy | last |
+
+They run one after another: each needs the screens and components of the one before. 013–017
+leave the legacy screens working, so the app stays usable at every step; 018 removes them.
 
 Some parallel prompts use files owned by another: 003 imports statistics and the Wilcoxon test
 from 002; 005 uses the landmark sets of 004; 006 and 007 use the landmark fixture, fixture frame
