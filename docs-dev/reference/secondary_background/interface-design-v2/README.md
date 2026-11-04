@@ -36,6 +36,7 @@ lives in one Details sheet.
 | `shared.css` | The shared stylesheet every board embeds (eek-a-style tokens by role) |
 | `briefs/` | One brief per board: content, layout, copy, state and links |
 | `canvas/` | The 17 board sources (`.dc.html`) and the canvas index, as published to the owner's private design canvas |
+| `png/` | A rendering of each board (the visual target for the implementation) |
 | `research/` | The four research reports behind the design: positioning guidance, flow and game, single-screen layout, audit of the current interface |
 | `authoring-guide.md` | The board file format used for `canvas/` |
 
