@@ -21,7 +21,7 @@ test('t() keeps its signature: placeholders filled, a missing key returned as is
 });
 
 test('the shell copy is British English without em dashes (§17.3.6)', () => {
-  for (const name of ['shell', 'track', 'details', 'title', 'ready', 'warmup', 'complete', 'look', 'challenge', 'methods']) {
+  for (const name of ['shell', 'track', 'details', 'title', 'ready', 'guard', 'warmup', 'complete', 'look', 'challenge', 'methods']) {
     for (const [key, value] of Object.entries(STRING_MODULES[name]!)) {
       assert.ok(!value.includes('—'), `${key} has an em dash`);
     }

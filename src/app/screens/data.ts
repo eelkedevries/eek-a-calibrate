@@ -29,7 +29,7 @@ import { deleteProfile, deleteSession, listProfiles, listSessions, onDataDeleted
 import { BANNER_CSS, banner } from '../components/banner.ts';
 import { announce, h } from '../dom.ts';
 import type { Screen, ScreenContext } from '../router.ts';
-import { currentValidationRun } from '../session.ts';
+import { currentValidationRun, gameRecord } from '../session.ts';
 import { deleteAllData, getState, subscribe } from '../state.ts';
 import { t } from '../strings.en-GB.ts';
 import { setupRecord } from './camera.ts';
@@ -155,6 +155,8 @@ function recordingRows(r: ExportRecording, now: SessionGeometry, wanted: Estimat
       irisPx: r.irisPx.get(f.meta.index) ?? null,
       targetPx: targetAt(r.recording, f),
       driftDeg: correction,
+      deviceTiltDeg: f.deviceTiltDeg ?? null,
+      deviceRollDeg: f.deviceRollDeg ?? null,
     };
   });
   return { trial: r.trial, samples, rows, geometry: g, estimator: id };
@@ -192,6 +194,8 @@ function liveRows(b: LiveBlock, now: SessionGeometry, wanted: EstimatorId): Bloc
       irisPx: b.irisPx.get(f.meta.index) ?? null,
       targetPx: null,
       driftDeg: correction,
+      deviceTiltDeg: f.deviceTiltDeg ?? null,
+      deviceRollDeg: f.deviceRollDeg ?? null,
     };
   });
   return { trial: b.trial, samples, rows, geometry: g, estimator: id };
@@ -327,7 +331,8 @@ export async function buildSessionExport(opts: ExportOptions): Promise<SessionEx
     assets,
     environment: {
       userAgent: navigator.userAgent,
-      capabilities: { report: setup.capabilities, deviceClass: setup.deviceClass, eyewear: setup.eyewear, probe: setup.probe, runSet: setup.runSet },
+      // `game`: the Title's set-up choice and the motion sensor's permission state (§17.4).
+      capabilities: { report: setup.capabilities, deviceClass: setup.deviceClass, eyewear: setup.eyewear, probe: setup.probe, runSet: setup.runSet, game: gameRecord() },
     },
     // An unknown delegate is written as null rather than guessed.
     host: { kind: setup.host?.kind ?? 'worker', delegate: (setup.host?.delegate ?? null) as 'GPU' | 'CPU', backends, info: { ...setup.host, engines: setup.engines } },

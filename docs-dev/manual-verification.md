@@ -74,6 +74,35 @@ On every phone run, also check:
       the screen size or the distance; the optional measurement works if chosen (the blind-spot
       test asks to turn the phone sideways when the screen is too narrow).
 
+Title and Get ready (the game-first interface, specification v0.5 §17.4, §17.5; prompt 014):
+
+- [ ] The Title shows a thin bar on the hero card while the face model downloads on a slow
+      connection (throttle the network); on a repeat visit, from the cache, it goes almost at
+      once, and Get ready shows "Getting ready… n %" while anything is still loading.
+- [ ] Play asks for the camera first and then, on iPhone and iPad, for motion and orientation
+      access; refusing motion changes nothing on screen, and `session.json` records `denied`.
+- [ ] Refusing the camera shows "Camera blocked" with "Try again" on the Title.
+- [ ] Get ready on a propped phone reaches *Ready* at a comfortable distance; the cues (closer,
+      back, raise or lower the phone, stand it more upright, tilt it back, hold it straight) each
+      appear when provoked and point the right way in the mirrored picture; record the distance at
+      which "Move a little closer" stops (the thresholds are heuristic, §17.12.4).
+- [ ] With the phone hand-held and **Propped** chosen, the tip "Prop it on books or a mug" appears
+      once; with **In hand** chosen the steadiness cue tolerates normal hand movement.
+- [ ] The phone's tilt reads correctly on both platforms: leaning the top towards you past upright
+      gives "Tilt the phone back slightly", lying it back gives "Stand the phone more upright"
+      (iOS and Android report gravity with the same sign only on current versions); in landscape
+      the in-plane roll reads level when held level, with the camera on either side.
+- [ ] On a webcam, tilting the laptop lid back and forward gives "Tilt the screen back a little" and
+      "Tilt the screen towards you"; sitting too close or far gives the distance cues.
+- [ ] *Ready* gives a short vibration on Android; with "Read instructions aloud" on (`?speech=1`
+      until Settings has the switch), each new instruction is spoken in a British voice only where
+      the device has one locally, never more than once every 2.5 s, and *Ready* adds "Tap anywhere
+      to start".
+- [ ] On a slow device the chip "This device is slow. Close other apps." appears and does not
+      block the start.
+- [ ] Exported `samples.csv` from a phone has `device_tilt_deg` and `device_roll_deg` filled in;
+      from a desktop they are empty.
+
 ## 2. Participants and conditions
 
 With a real participant (the owner is enough) on one desktop and one phone:

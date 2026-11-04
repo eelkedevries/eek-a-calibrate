@@ -318,8 +318,38 @@ wins and the gap is work still to be done.
 - **Contracts (additive, §17.11):** `Phase` gains `'game'`; `RecordedFrame.deviceTiltDeg` and
   `.deviceRollDeg`; `createVisionHost(cfg, prefer?, hooks?)` registers the progress listener
   before init.
-- **Status:** specified; nothing of the new interface is built yet. The legacy screens (Welcome,
-  Camera, Calibrate, Validate, Results, Live, Data, About) stay until 018.
+- **Status:** the shell and routes (013) and the Title and Get ready (014) are built; the warm-up
+  levels, Free look and the challenge follow (015, 016). The legacy screens (Welcome, Camera,
+  Calibrate, Validate, Results, Live, Data, About) stay until 018; Get ready's "Start warm-up"
+  opens the legacy `#/calibrate` until 015.
+
+## Title, Get ready and the position guard (after prompt 014)
+
+- **Start-up (`app/session.ts`):** the Title calls `prestartVision()`, which starts the vision host
+  without the camera; `createVisionHost(cfg, prefer, hooks)` registers `hooks.onProgress` before
+  `init` (worker, inline and the inline fallback), so `loadState()`/`onLoad()` and the hook
+  `__eek.loading()` see the face model's download from its first byte. `startPlay()` (the Play
+  tap) opens the camera, asks for device motion on iOS, unlocks Web Audio and takes the wake lock
+  until the player leaves the game; `ensureCapture` adopts that camera and the started host.
+  `currentSetup()`, `setWarmupMode('restore')` (Skip warm-up), `setReadyHome()`/`readyHome()` and
+  `gameRecord()` (set-up and motion permission, in `session.json`) live there too.
+- **Position guard (`src/core/position/`, DOM-free):** `signals.ts` (the smoothed signals and the
+  face's outline), `thresholds.ts` (per-class ranges, hysteresis, timing, all heuristic),
+  `cues.ts` (conditions in the priority order of design §3.4, the status row, copy keys and
+  directional cues), `home.ts` (home, deviations, grades, the overlay headline and nudges),
+  `guard.ts` (`ReadyGuard` for Get ready; `GradeGuard` and `createPositionGuard(capture, context)`
+  for the screens after it), `tilt.ts` (gravity → θ and roll, steadiness).
+- **Components:** `setupChooser`, `levelMap`, `faceGuide` (the preview layout and SVG),
+  `cueCard`, `statusRow`, `holdRing`, `positionGlyph`, `pauseOverlay` (and
+  `attachPositionGuard`, which wires a guard to the glyph, the overlay, haptics and sound).
+- **Platform:** `motion.ts` (device motion, the orientation fallback, the permission state, the
+  reading log) and `feedback.ts` (vibration, Web Audio tones, local en-GB speech).
+- **Tilt covariates:** `FrameRecorder` stamps `deviceTiltDeg`/`deviceRollDeg` from the lookup set
+  by `setTiltLookup` (the motion source on phones); `samples.csv` ends with `device_tilt_deg`,
+  `device_roll_deg`.
+- **Test hooks and fixtures:** `__eek.guard()` and `__eek.forceGuard(name)`; fixtures
+  `title-skip`, `title-blocked`, `title-unsupported`, `ready-<loading|searching|adjust|holding|
+  ready|anyway>`, `guard-overlay`, `guard-overlay-late`.
 
 ## In progress
 

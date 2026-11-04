@@ -1,6 +1,7 @@
 // ===== src/vision/protocol.ts =====
 // Contract: specification §6, written verbatim by WP1 (001_scaffold_and_contracts.md).
-// Frozen: changing anything here needs a specification version bump.
+// Frozen: changing anything here needs a specification version bump. v0.5 §17.11 added HostHooks
+// and the hooks parameter of createVisionHost (additive).
 // createVisionHost is declared here and implemented by WP4 in src/vision/host.ts.
 import type { BackendId, EngineId, FrameMeta, FrameResult } from '../core/types.ts';
 export interface VisionConfig { baseUrl: string; dev: boolean; gz: boolean; delegate: 'GPU' | 'CPU'; e2e: boolean; forceBackend?: BackendId; }
@@ -34,4 +35,6 @@ export interface VisionHost {
   resetSession(): void;
   dispose(): void;
 }
-export declare function createVisionHost(cfg: VisionConfig, prefer?: 'worker' | 'inline'): Promise<VisionHost>;
+export interface HostHooks { onProgress?(asset: string, loaded: number, total: number): void; }
+export declare function createVisionHost(cfg: VisionConfig, prefer?: 'worker' | 'inline',
+  hooks?: HostHooks): Promise<VisionHost>;   // hooks are registered before init starts

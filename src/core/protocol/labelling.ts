@@ -122,6 +122,23 @@ export interface FrameState {
   distanceMm: number | null;
 }
 
+/** The device tilt nearest a capture time (θ and roll, §17.5.4), or null without a reading. */
+export type TiltLookup = (tCaptureMs: number) => { tiltDeg: number; rollDeg: number } | null;
+
+let defaultTilt: TiltLookup | null = null;
+
+/**
+ * The lookup every FrameRecorder stamps the tilt covariates from (§17.10.2) unless it is given
+ * its own: the app sets it to its motion source once, so every recording carries them.
+ */
+export function setTiltLookup(lookup: TiltLookup | null): void {
+  defaultTilt = lookup;
+}
+
+function finiteOrNull(v: number | undefined): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
 /**
  * The recorder (§4.7): turns each frame the vision host processed, or refused, into a
  * RecordedFrame with its label, in the order the frames arrive. The gate sees the eyes-open rule
@@ -137,8 +154,10 @@ export class FrameRecorder {
   private readonly sx: number;
   private readonly sy: number;
   private last: { index: number; open: boolean } | null = null;
+  private readonly tilt: TiltLookup | null;
 
-  constructor(id: string, schedule: Schedule, geometry: SessionGeometry) {
+  constructor(id: string, schedule: Schedule, geometry: SessionGeometry, opts: { tilt?: TiltLookup | null } = {}) {
+    this.tilt = opts.tilt === undefined ? defaultTilt : opts.tilt;
     this.recording = { id, schedule, geometry, presentations: [], frames: [] };
     this.labeller = new Labeller(schedule, this.recording.presentations);
     const safe = safeRect(geometry.screen);
@@ -182,6 +201,7 @@ export class FrameRecorder {
       open,
       label,
       engines: r.engines,
+      ...this.tiltAt(t),
     };
     this.receivedMs.set(r.meta.index, r.receivedMs);
     this.recording.frames.push(frame);
@@ -201,9 +221,16 @@ export class FrameRecorder {
       open: false,
       label: hit ? makeLabel(hit, recordedGroupId(hit, meta.tCaptureMs, this.sx, this.sy), false, 'dropped') : null,
       engines: {},
+      ...this.tiltAt(meta.tCaptureMs),
     };
     this.recording.frames.push(frame);
     return frame;
+  }
+
+  /** The tilt covariates for a capture time (§17.10.2): the nearest reading, or null. */
+  private tiltAt(tMs: number): Pick<RecordedFrame, 'deviceTiltDeg' | 'deviceRollDeg'> {
+    const r = this.tilt ? this.tilt(tMs) : null;
+    return { deviceTiltDeg: finiteOrNull(r?.tiltDeg), deviceRollDeg: finiteOrNull(r?.rollDeg) };
   }
 
   /** Accepted and labelled (not settle) frames of one presentation so far, for the item's stopping rule. */

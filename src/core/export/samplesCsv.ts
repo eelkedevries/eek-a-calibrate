@@ -1,5 +1,5 @@
 // samples.csv (specification §4.16): one row per frame per session phase for the selected
-// estimator, plus per-engine columns. The header order matters: eek-a-gaze takes the first
+// estimator, plus per-engine columns and the phone's tilt covariates (§17.10.2). The header order matters: eek-a-gaze takes the first
 // header that matches a synonym, so `time_ms`, `gaze_x` and `gaze_y` must come before anything
 // else it could mistake for them.
 import { degToPx, toExportDeg } from '../geometry/angles.ts';
@@ -12,6 +12,8 @@ export const SAMPLES_HEADER = [
   'gaze_x_uncorrected', 'gaze_y_uncorrected', 'gaze_x_deg', 'gaze_y_deg', 'drift_x_deg', 'drift_y_deg', 'valid', 'flags', 'confidence',
   'target_x', 'target_y', 'head_yaw_deg', 'head_pitch_deg', 'head_roll_deg', 'distance_mm', 'iris_px', 'clock',
   'gaze_x_blazegaze', 'gaze_y_blazegaze', 'gaze_x_peekr', 'gaze_y_peekr', 'gaze_x_geometric', 'gaze_y_geometric', 'gaze_x_eyepixel', 'gaze_y_eyepixel',
+  // The tilt covariates of §17.10.2 come last, so the columns before them keep their order.
+  'device_tilt_deg', 'device_roll_deg',
 ] as const;
 
 export type TrialKind = 'calibration' | 'validation' | 'drift' | 'live';
@@ -40,6 +42,9 @@ export interface SampleRow {
   targetPx: Vec2 | null;
   /** The drift offset in effect (§4.13), internal degrees (y down); null before any drift check. */
   driftDeg: Vec2 | null;
+  /** The phone's upright angle θ and in-plane roll at this frame (§17.5.4); null or absent without a reading. */
+  deviceTiltDeg?: number | null;
+  deviceRollDeg?: number | null;
 }
 
 /** Valid for export: no invalid flag and a finite corrected θ. */
@@ -58,7 +63,7 @@ function xy(v: Vec2 | null | undefined, fmt: (n: number) => string): [string, st
 
 /**
  * Writes the rows in the order given. When a row's sample is not valid, every gaze column is
- * empty (`valid` and `flags` say why). Pixel columns are CSS px of the viewport, origin top
+ * empty (`valid` and `flags` say why); the tilt columns are empty without a reading. Pixel columns are CSS px of the viewport, origin top
  * left; degree columns are positive up (`toExportDeg`). The per-engine columns convert each
  * engine's θ to px at the frame's distance (else D_ref), as the estimator does.
  */
@@ -97,6 +102,8 @@ export function samplesCsv(id: ExportIdentity, rows: readonly SampleRow[], g: Se
       fmtPx(r.irisPx),
       r.clock,
       ...perEngine,
+      fmtDeg(r.deviceTiltDeg),
+      fmtDeg(r.deviceRollDeg),
     ];
   });
   return csvTable(SAMPLES_HEADER, body);

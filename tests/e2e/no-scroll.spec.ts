@@ -39,7 +39,13 @@ async function openDeleteConfirmation(page: Page): Promise<void> {
 
 export const STATES: NoScrollState[] = [
   { name: 'Title', route: '#/' },
+  { name: 'Title, with Skip warm-up', route: '#/', fixture: 'title-skip' },
+  { name: 'Title, camera blocked', route: '#/', fixture: 'title-blocked' },
+  { name: 'Title, Thorough', route: '#/', query: 'preset=thorough' },
   { name: 'Get ready', route: '#/ready' },
+  ...(['loading', 'searching', 'adjust', 'holding', 'ready', 'anyway'] as const).map((state) => ({ name: `Get ready, ${state}`, route: '#/ready', fixture: `ready-${state}` })),
+  { name: 'Auto-pause overlay', route: '#/ready', fixture: 'guard-overlay' },
+  { name: 'Auto-pause overlay after 10 s', route: '#/ready', fixture: 'guard-overlay-late' },
   { name: 'Get ready, Thorough', route: '#/ready', query: 'preset=thorough' },
   { name: 'Warm-up', route: '#/warmup' },
   { name: 'Warm-up, Thorough', route: '#/warmup', query: 'preset=thorough' },

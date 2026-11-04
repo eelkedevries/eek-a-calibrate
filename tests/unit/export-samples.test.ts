@@ -1,11 +1,14 @@
 // WP3: samples.csv: header order, time_ms, eek-a-gaze's synonym rule, the y sign convention,
-// empty gaze columns for invalid frames, and byte-identical output.
+// empty gaze columns for invalid frames, and byte-identical output. v0.5 (§17.10.2): the tilt
+// covariates after the per-engine columns, stamped by FrameRecorder from the nearest reading.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { degToPx } from '../../src/core/geometry/angles.ts';
 import { SAMPLES_HEADER, samplesCsv, trialName, type SampleRow } from '../../src/core/export/samplesCsv.ts';
+import { FrameRecorder, setTiltLookup } from '../../src/core/protocol/labelling.ts';
+import { calibrationSchedule } from '../../src/core/protocol/schedule.ts';
 import { Flags } from '../../src/core/types.ts';
-import type { GazeSample, SessionGeometry, Vec2 } from '../../src/core/types.ts';
+import type { FaceObservation, FrameResult, GazeSample, SessionGeometry, Vec2 } from '../../src/core/types.ts';
 
 const GEOMETRY: SessionGeometry = {
   screen: { viewportWpx: 1920, viewportHpx: 1080, screenWpx: 1920, screenHpx: 1080, dpr: 1, fullscreen: true, pxPerMm: 1920 / 531, pxPerMmSource: 'card' },
@@ -15,12 +18,13 @@ const GEOMETRY: SessionGeometry = {
 };
 const ID = { participant: 'P01', session: 'S1', sessionStartMs: 5000 };
 
-// Specification §4.16, verbatim.
-const SPEC_HEADER =
+// Specification §4.16, verbatim, then the two columns of §17.10.2.
+const V04_HEADER =
   'participant,session,trial,phase,item_id,time_ms,frame_index,estimator,gaze_x,gaze_y,gaze_x_filt,gaze_y_filt,' +
   'gaze_x_uncorrected,gaze_y_uncorrected,gaze_x_deg,gaze_y_deg,drift_x_deg,drift_y_deg,valid,flags,confidence,' +
   'target_x,target_y,head_yaw_deg,head_pitch_deg,head_roll_deg,distance_mm,iris_px,clock,' +
   'gaze_x_blazegaze,gaze_y_blazegaze,gaze_x_peekr,gaze_y_peekr,gaze_x_geometric,gaze_y_geometric,gaze_x_eyepixel,gaze_y_eyepixel';
+const SPEC_HEADER = `${V04_HEADER},device_tilt_deg,device_roll_deg`;
 
 // eek-a-gaze `data/columns.py` (SYNONYMS, normalise, find_column), re-implemented: the first
 // header, in header order, whose normalised name is a synonym.
@@ -49,7 +53,7 @@ function sample(frameIndex: number, deg: Vec2 | null, flags = 0, perEngineDeg: G
 function rows(): SampleRow[] {
   const base = { trial: trialName('validation', 1), phase: 'validation', itemId: 'val-3', clock: 'captureTime' as const, headDeg: [1.5, -2.25, 0.125] as const, irisPx: 23.456, targetPx: [729.6, 540] as const, driftDeg: null };
   return [
-    { ...base, sample: sample(0, [2, -3], 0, { blazegaze: [2.1, -3.1], geometric: [1.9, -2.9] }) },
+    { ...base, deviceTiltDeg: 82.123456, deviceRollDeg: -3.5, sample: sample(0, [2, -3], 0, { blazegaze: [2.1, -3.1], geometric: [1.9, -2.9] }) },
     { ...base, sample: sample(1, [2, -3], Flags.EXTRAPOLATED) },
     { ...base, sample: sample(2, [2, -3], Flags.BLINK, { peekr: [2, -3] }) },
     { ...base, trial: trialName('live', 7), phase: 'live', itemId: null, targetPx: null, driftDeg: [0.5, 0.25], sample: sample(3, null, Flags.NO_FACE) },
@@ -60,6 +64,8 @@ const parse = (csv: string): string[][] => csv.trimEnd().split('\n').map((l) => 
 
 test('the header is the specification’s, in its order, and starts with no byte-order mark', () => {
   assert.equal(SAMPLES_HEADER.join(','), SPEC_HEADER);
+  // The v0.4 columns keep their places: the tilt covariates only follow them.
+  assert.ok(SAMPLES_HEADER.join(',').startsWith(`${V04_HEADER},`));
   const csv = samplesCsv(ID, rows(), GEOMETRY);
   assert.equal(csv.split('\n')[0], SPEC_HEADER);
   assert.ok(csv.startsWith('participant,'));
@@ -121,6 +127,43 @@ test('invalid frames have every gaze column empty; flags and drift remain', () =
   assert.equal(at(live, 'drift_x_deg'), '0.5000');
   assert.equal(at(live, 'drift_y_deg'), '-0.2500', 'drift in the export convention too');
   assert.equal(at(live, 'target_x'), '');
+});
+
+test('the tilt covariates: degrees with four decimals, empty without a reading, never invalidated', () => {
+  const [header, first, extrapolated, blink] = parse(samplesCsv(ID, rows(), GEOMETRY)) as string[][];
+  const at = (row: string[] | undefined, name: string): string => (row as string[])[(header as string[]).indexOf(name)] as string;
+  assert.deepEqual((header as string[]).slice(-2), ['device_tilt_deg', 'device_roll_deg']);
+  assert.equal(at(first, 'device_tilt_deg'), '82.1235');
+  assert.equal(at(first, 'device_roll_deg'), '-3.5000');
+  assert.equal(at(extrapolated, 'device_tilt_deg'), '');
+  assert.equal(at(blink, 'device_roll_deg'), '');
+});
+
+test('FrameRecorder stamps θ and roll from the reading nearest each capture, or null', () => {
+  const schedule = calibrationSchedule({ preset: 'quick', seed: 3 });
+  const readings = [
+    { t: 100, tiltDeg: 80, rollDeg: 1 },
+    { t: 140, tiltDeg: 81, rollDeg: 2 },
+  ];
+  const lookup = (t: number) => {
+    const near = readings.reduce((a, b) => (Math.abs(b.t - t) < Math.abs(a.t - t) ? b : a));
+    return Math.abs(near.t - t) <= 500 ? near : null;
+  };
+  const meta = (index: number, tCaptureMs: number) => ({ index, tCaptureMs, clock: 'captureTime' as const, presentedFrames: index, cameraGap: 0, videoW: 640, videoH: 480 });
+  const result = (index: number, t: number): FrameResult => ({ meta: meta(index, t), face: null as FaceObservation | null, engines: {}, workerMs: 1, receivedMs: t });
+  const state = { hidden: false, notFullscreen: false, distanceMm: null };
+  const own = new FrameRecorder('rec', schedule, GEOMETRY, { tilt: lookup });
+  assert.deepEqual([own.addResult(result(0, 130), state).deviceTiltDeg, own.addResult(result(1, 130), state).deviceRollDeg], [81, 2]);
+  assert.equal(own.addDropped(meta(2, 1000)).deviceTiltDeg, null, 'no reading within 500 ms');
+  // The app sets one lookup for every recorder; without one the fields are null.
+  setTiltLookup(lookup);
+  try {
+    assert.equal(new FrameRecorder('rec', schedule, GEOMETRY).addResult(result(0, 95), state).deviceTiltDeg, 80);
+    assert.equal(new FrameRecorder('rec', schedule, GEOMETRY, { tilt: null }).addResult(result(0, 95), state).deviceTiltDeg, null);
+  } finally {
+    setTiltLookup(null);
+  }
+  assert.equal(new FrameRecorder('rec', schedule, GEOMETRY).addResult(result(0, 95), state).deviceRollDeg, null);
 });
 
 test('identical state gives byte-identical output; strings are quoted and UTF-8', () => {

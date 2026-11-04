@@ -44,6 +44,12 @@ export function setupRecord(): Readonly<SetupRecord> {
   return record;
 }
 
+/** Records the device probe and its run set when Get ready runs them (spec §17.4.5). */
+export function recordProbe(probe: ProbeResult, decision: RunSetDecision): void {
+  record.probe = probe;
+  record.runSet = decision;
+}
+
 /** Copies what the export needs to know about the running camera and vision host. */
 export function snapshotCapture(c: Capture): void {
   const info = c.camera.info;

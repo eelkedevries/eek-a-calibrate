@@ -182,7 +182,7 @@ body{background:var(--color-background);color:var(--color-text);font-family:var(
   --node-line: rgb(0 0 0 / 0.3);
 }
 
-:root[data-theme='light'] :is(.topbar--chip, .stim-card, .cue, .dock) {
+:root[data-theme='light'] :is(.topbar--chip, .stim-card, .cue, .dock, .info-chip, .pause__card, .glyph-cluster) {
   --color-text: var(--stage-chip-text);
   --color-muted-text: var(--stage-chip-muted);
   --color-background: var(--badge-ink);
@@ -329,36 +329,6 @@ html[data-layout='document'] body {
   margin-block-start: var(--space-lg);
 }
 
-.app[data-screen='title'] .panel__title {
-  font-size: 2.25rem;
-}
-
-.app[data-screen='title'] .panel__body {
-  max-inline-size: 380px;
-  text-wrap: balance;
-}
-
-/* The Title puts its title block above the hero (design §2.4). */
-@media not all and (min-aspect-ratio: 5/4) {
-  .app[data-screen='title'] {
-    grid-template: 'top' 48px 'panel' auto 'stage' minmax(0, 1fr) 'actions' auto / minmax(0, 1fr);
-  }
-
-  .app[data-screen='title'] .stage {
-    margin-block-start: var(--space-lg);
-  }
-
-  .app[data-screen='title'] .panel {
-    align-items: center;
-    text-align: center;
-  }
-
-  .app[data-screen='title'] .panel__body {
-    max-inline-size: 300px;
-    text-wrap: balance;
-  }
-}
-
 /* Regular landscape: aspect ratio of at least 5/4 and at least 480 px tall. */
 @media (min-aspect-ratio: 5/4) and (min-height: 480px) {
   .app[data-mode='framed'] {
@@ -392,14 +362,6 @@ html[data-layout='document'] body {
 
   .app[data-mode='framed'] .panel__title {
     font-size: 2.25rem;
-  }
-
-  .app[data-screen='title'] .panel {
-    gap: 12px;
-  }
-
-  .app[data-screen='title'] .panel__title {
-    font-size: 3rem;
   }
 }
 
@@ -650,6 +612,673 @@ html[data-layout='document'] body {
   .stim-card {
     inline-size: min(100%, 400px);
     padding: 32px;
+  }
+}
+
+/* ---------------------------------------------------------------- Title (design §2.4; boards Main, desktop-title) */
+
+/* Phone portrait: the title block above the hero, the chooser and Play below it. */
+.app[data-screen='title'] {
+  grid-template: 'top' 48px 'head' auto 'stage' minmax(0, 1fr) 'choose' auto 'actions' auto / minmax(0, 1fr);
+  row-gap: var(--space-lg);
+}
+
+.app[data-screen='title'] .stage {
+  margin: 0;
+}
+
+.title-head {
+  grid-area: head;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  min-inline-size: 0;
+  text-align: center;
+}
+
+.title-head__name {
+  font-family: var(--font-serif);
+  font-size: 2.25rem;
+  font-weight: 600;
+  line-height: var(--line-height-tight);
+  white-space: nowrap;
+}
+
+.title-head__pitch {
+  max-inline-size: 300px;
+  font-size: 1rem;
+  line-height: var(--line-height-normal);
+  color: var(--color-muted-text);
+  text-wrap: balance;
+}
+
+.app[data-screen='title'] .chooser,
+.app[data-screen='title'] .title-notice {
+  grid-area: choose;
+}
+
+.title-actions {
+  grid-area: actions;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-inline-size: 0;
+}
+
+.app[data-screen='title'] .title-buttons {
+  margin: 0;
+}
+
+.title-skip.btn {
+  flex: 0 0 auto;
+}
+
+.title-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  font-size: 0.875rem;
+  line-height: 21px;
+  color: var(--color-muted-text);
+  white-space: nowrap;
+}
+
+.title-meta__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.title-meta svg {
+  display: block;
+  flex: none;
+}
+
+.title-notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.title-notice__title {
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: var(--line-height-tight);
+}
+
+.title-notice__body {
+  font-size: 1rem;
+  line-height: var(--line-height-normal);
+  color: var(--color-muted-text);
+}
+
+/* The hero card: the emblem over the level map (design §2.4). */
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  padding: var(--space-md);
+}
+
+.hero__emblem {
+  display: block;
+  inline-size: min(100%, 326px);
+  flex: 0 1 168px;
+  min-block-size: 0;
+}
+
+.hero__map {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  inline-size: min(100%, 326px);
+  flex: none;
+}
+
+.hero__map-svg {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+}
+
+.hero__map-svg--desktop {
+  display: none;
+}
+
+.hero__names {
+  display: grid;
+  grid-template-columns: repeat(var(--map-nodes, 5), minmax(0, 1fr));
+  inline-size: 100%;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+  line-height: var(--line-height-tight);
+  color: var(--color-muted-text);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* A slim determinate bar while the face model downloads (spec §17.4.3); no words. */
+.hero__progress {
+  position: absolute;
+  inset-inline: var(--space-md);
+  inset-block-end: 12px;
+  block-size: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--node-done);
+}
+
+.hero__bar {
+  display: block;
+  inline-size: 0;
+  block-size: 100%;
+  background: var(--color-muted-text);
+  transition: inline-size 0.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero__bar {
+    transition: none;
+  }
+}
+
+.hero[data-fit='1'] .hero__emblem,
+.hero[data-fit='2'] .hero__emblem,
+.hero[data-fit='2'] .hero__names {
+  display: none;
+}
+
+@container (min-width: 640px) {
+  .hero__emblem {
+    inline-size: min(100%, 520px);
+    flex-basis: 267px;
+  }
+
+  .hero__map {
+    inline-size: min(100%, 600px);
+    gap: 12px;
+  }
+
+  .hero__map-svg--phone {
+    display: none;
+  }
+
+  .hero__map-svg--desktop {
+    display: block;
+  }
+
+  .hero__names {
+    font-size: 1rem;
+  }
+}
+
+/* The set-up chooser (design §2.4): three 72 px tiles, icon over label. */
+.chooser {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-inline-size: 0;
+}
+
+.chooser__label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--color-muted-text);
+}
+
+.chooser__tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.choice svg {
+  display: block;
+  flex: none;
+}
+
+/* Regular landscape: the hero is the stage, the rest one group centred in the side column. */
+@media (min-aspect-ratio: 5/4) and (min-height: 480px) {
+  .app[data-screen='title'] {
+    grid-template: 'top top' 48px 'stage side' minmax(0, 1fr) / minmax(0, 1fr) clamp(300px, 30vw, 420px);
+  }
+
+  .app[data-screen='title'] .title-side {
+    container: title-side / inline-size;
+  }
+
+  .title-head {
+    align-items: stretch;
+    gap: 12px;
+    text-align: start;
+  }
+
+  .title-head__name {
+    font-size: 3rem;
+  }
+
+  .title-head__pitch {
+    max-inline-size: 380px;
+  }
+
+  .app[data-screen='title'] .chooser,
+  .app[data-screen='title'] .title-notice {
+    margin-block-start: var(--space-xl);
+  }
+
+  .title-actions {
+    margin-block-start: 32px;
+  }
+
+  .title-meta {
+    justify-content: flex-start;
+  }
+
+  .hero {
+    gap: 56px;
+    padding: var(--space-xl);
+  }
+
+  .hero__progress {
+    inset-inline: var(--space-xl);
+    inset-block-end: var(--space-md);
+  }
+}
+
+@container title-side (max-width: 409px) {
+  .title-head__name {
+    font-size: 2.25rem;
+  }
+}
+
+/* Compact landscape (a phone on its side): the hero on the camera side, the side column beside it. */
+@media (min-aspect-ratio: 5/4) and (max-height: 479.98px) {
+  .app[data-screen='title'] {
+    grid-template: 'stage top' 48px 'stage side' minmax(0, 1fr) / minmax(0, 1fr) clamp(260px, 38vw, 340px);
+    row-gap: 0;
+  }
+
+  .app[data-screen='title'][data-camera='right'] {
+    grid-template: 'top stage' 48px 'side stage' minmax(0, 1fr) / clamp(260px, 38vw, 340px) minmax(0, 1fr);
+  }
+
+  .app[data-screen='title'] .title-side {
+    grid-area: side;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 12px;
+    min-block-size: 0;
+    min-inline-size: 0;
+    overflow: hidden;
+  }
+
+  .title-head {
+    align-items: flex-start;
+    gap: var(--space-xs);
+    text-align: start;
+  }
+
+  .title-head__name {
+    font-size: 1.75rem;
+  }
+
+  .title-head__pitch {
+    font-size: 0.875rem;
+  }
+
+  .app[data-screen='title'] .choice {
+    flex-direction: row;
+    min-block-size: 56px;
+  }
+
+  .title-actions {
+    gap: var(--space-sm);
+  }
+
+  .title-meta {
+    justify-content: flex-start;
+  }
+
+  .title-side[data-fit='1'] .title-head__pitch,
+  .title-side[data-fit='2'] .title-head__pitch,
+  .title-side[data-fit='2'] .title-meta {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------- Get ready (design §2.5, §3.5, §3.6) */
+
+.app[data-screen='ready'] .stage {
+  background: var(--preview-bg);
+}
+
+.ready-video {
+  position: absolute;
+  display: block;
+  max-inline-size: none;
+  object-fit: fill;
+}
+
+.guide {
+  position: absolute;
+  inset: 0;
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+/* The guard ticks ten times a second; the ring glides between ticks rather than stepping. */
+@media (prefers-reduced-motion: no-preference) {
+  .hold-ring path {
+    transition: stroke-dasharray 0.1s linear;
+  }
+}
+
+.cue-stack {
+  grid-area: cue;
+  justify-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.app[data-screen='ready'] .cue {
+  flex-direction: row;
+  gap: 12px;
+  max-inline-size: 320px;
+}
+
+.cue__text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-inline-size: 0;
+}
+
+.cue--icon .cue__text {
+  align-items: flex-start;
+  text-align: start;
+}
+
+.cue__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.cue__icon svg {
+  display: block;
+}
+
+.info-chip {
+  max-inline-size: 320px;
+  padding: 6px 12px;
+  border-radius: var(--radius-card);
+  background: var(--stage-chip);
+  color: var(--stage-chip-text);
+  font-size: 0.875rem;
+  line-height: var(--line-height-tight);
+  text-align: center;
+}
+
+/* The status row (design §3.6): badges and words, no pills. */
+.status-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  min-block-size: 32px;
+}
+
+.status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: var(--line-height-tight);
+  color: var(--stage-chip-text);
+  white-space: nowrap;
+}
+
+.status-item__badge svg {
+  display: block;
+}
+
+.app[data-screen='ready'] .dock__actions {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-sm);
+}
+
+.dock__note {
+  font-size: 0.875rem;
+  line-height: var(--line-height-tight);
+  color: var(--stage-chip-muted);
+  text-align: center;
+}
+
+.dock__larger {
+  display: grid;
+  place-items: center;
+  min-block-size: 48px;
+  font-size: 1rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+@media (min-aspect-ratio: 5/4) and (min-height: 480px) {
+  .app[data-screen='ready'] .dock__actions {
+    align-items: flex-end;
+  }
+
+  .app[data-screen='ready'] .dock[data-note] {
+    min-block-size: 104px;
+  }
+}
+
+@media (min-aspect-ratio: 5/4) and (max-height: 479.98px) {
+  .app[data-screen='ready'] .dock__status {
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .app[data-screen='ready'] .dock__actions {
+    justify-content: flex-end;
+  }
+
+  /* Off the dock, the note and the "larger" message need the dark chip under them. */
+  .app[data-screen='ready'] :is(.dock__note, .dock__larger) {
+    padding: 6px 12px;
+    border-radius: var(--radius-card);
+    background: var(--stage-chip);
+    color: var(--stage-chip-text);
+  }
+}
+
+/* ---------------------------------------------------------------- Position glyph (design §3.7) */
+
+.glyph-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.glyph {
+  flex: none;
+  inline-size: 40px;
+  block-size: 40px;
+  border-radius: var(--radius-pill);
+  background: var(--stage-chip);
+}
+
+.glyph[data-state='good'] {
+  opacity: 0.6;
+}
+
+.glyph svg,
+.nudge svg {
+  display: block;
+  flex: none;
+}
+
+.nudge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  block-size: 32px;
+  padding: 0 12px 0 9px;
+  border-radius: var(--radius-pill);
+  background: var(--stage-chip);
+  color: var(--stage-chip-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: var(--line-height-tight);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- Auto-pause overlay (design §3.8) */
+
+.pause,
+.app[data-mode] > .pause {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l);
+}
+
+.pause__scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--stage-scrim);
+}
+
+.pause__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  inline-size: min(100%, 320px);
+  max-block-size: 100%;
+  padding: var(--space-md);
+  border-radius: var(--radius-card);
+  background: var(--stage-chip);
+  color: var(--stage-chip-text);
+  text-align: center;
+}
+
+.pause__card:focus {
+  outline: none;
+}
+
+.pause__card:focus-visible {
+  outline: 3px solid var(--stage-focus);
+  outline-offset: 2px;
+}
+
+.pause__eyebrow {
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: var(--line-height-tight);
+  color: var(--stage-chip-muted);
+}
+
+.pause__preview {
+  position: relative;
+  flex: none;
+  inline-size: 180px;
+  block-size: 240px;
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  background: var(--preview-bg);
+}
+
+.pause__video {
+  position: absolute;
+  max-inline-size: none;
+  object-fit: fill;
+}
+
+.pause__marks {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+.pause__title {
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: var(--line-height-tight);
+}
+
+.pause__body {
+  font-size: 0.875rem;
+  line-height: var(--line-height-normal);
+  color: var(--stage-chip-muted);
+}
+
+.pause__actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+
+.pause .btn {
+  min-block-size: var(--tap);
+}
+
+.pause .btn--ghost {
+  color: var(--stage-chip-text);
+}
+
+.pause .btn--ghost:hover {
+  background: var(--stage-chip-raise);
+}
+
+@media (min-aspect-ratio: 5/4) and (min-height: 480px) {
+  .pause__card {
+    inline-size: min(100%, 400px);
+  }
+
+  .pause__preview {
+    inline-size: 368px;
+    max-inline-size: 100%;
+    block-size: 230px;
+  }
+}
+
+/* A phone held sideways: the card at the camera side, the preview as tall as the card allows. */
+@media (min-aspect-ratio: 5/4) and (max-height: 479.98px) {
+  .pause,
+  .app[data-mode] > .pause {
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .app[data-mode][data-camera='right'] > .pause {
+    justify-content: flex-end;
+  }
+
+  .pause__preview {
+    block-size: max(96px, min(240px, calc(100svh - 236px)));
+    inline-size: auto;
+    aspect-ratio: 3 / 4;
   }
 }
 

@@ -15,6 +15,7 @@ import { strings as data } from './strings/data.ts';
 import { strings as details } from './strings/details.ts';
 import { strings as distance } from './strings/distance.ts';
 import { strings as drift } from './strings/drift.ts';
+import { strings as guard } from './strings/guard.ts';
 import { strings as lab } from './strings/lab.ts';
 import { strings as live } from './strings/live.ts';
 import { strings as look } from './strings/look.ts';
@@ -41,6 +42,7 @@ export const STRING_MODULES: Readonly<Record<string, StringTable>> = {
   details,
   title,
   ready,
+  guard,
   warmup,
   complete,
   look,

@@ -6,7 +6,7 @@
 import { HOST_INIT_TIMEOUT_MS } from '../core/constants.ts';
 import { defaultDelegate } from '../platform/capabilities.ts';
 import type { HostSelection, ManagedVisionHost, MessageHost } from './hostBase.ts';
-import type { VisionConfig } from './protocol.ts';
+import type { HostHooks, VisionConfig } from './protocol.ts';
 import { WorkerHost } from './workerHost.ts';
 
 export type { HostError, HostSelection, HostStats, ManagedVisionHost } from './hostBase.ts';
@@ -36,9 +36,15 @@ function track<T extends MessageHost>(host: T, selection: HostSelection): T {
   return host;
 }
 
-async function startInline(cfg: VisionConfig, reason: string): Promise<ManagedVisionHost> {
+/** Registers the hooks on a host before its init starts, so progress is reported from the first byte (§17.11). */
+function hook(host: MessageHost, hooks: HostHooks | undefined): void {
+  if (hooks?.onProgress) host.onProgress(hooks.onProgress.bind(hooks));
+}
+
+async function startInline(cfg: VisionConfig, reason: string, hooks?: HostHooks): Promise<ManagedVisionHost> {
   const { InlineHost } = await import('./inlineHost.ts');
   const host = new InlineHost();
+  hook(host, hooks);
   try {
     await host.init(cfg);
   } catch (error) {
@@ -52,15 +58,16 @@ function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export async function createVisionHost(cfg: VisionConfig, prefer?: 'worker' | 'inline'): Promise<ManagedVisionHost> {
-  if (prefer === 'inline') return startInline(cfg, 'requested with ?host=inline');
+export async function createVisionHost(cfg: VisionConfig, prefer?: 'worker' | 'inline', hooks?: HostHooks): Promise<ManagedVisionHost> {
+  if (prefer === 'inline') return startInline(cfg, 'requested with ?host=inline', hooks);
   if (typeof Worker !== 'function') {
     if (prefer === 'worker') throw new Error('This browser has no Web Workers.');
-    return startInline(cfg, 'this browser has no Web Workers');
+    return startInline(cfg, 'this browser has no Web Workers', hooks);
   }
   let worker: WorkerHost | null = null;
   try {
     worker = new WorkerHost();
+    hook(worker, hooks);
     await worker.init(cfg, HOST_INIT_TIMEOUT_MS);
     return track(worker, { kind: 'worker', reason: prefer === 'worker' ? 'requested with ?host=worker' : 'default' });
   } catch (error) {
@@ -68,7 +75,7 @@ export async function createVisionHost(cfg: VisionConfig, prefer?: 'worker' | 'i
     if (prefer === 'worker') throw error;
     const reason = `the worker host failed: ${describe(error)}`;
     console.warn(`Vision host: falling back to the inline host, because ${reason}`);
-    return startInline(cfg, reason);
+    return startInline(cfg, reason, hooks);
   }
 }
 

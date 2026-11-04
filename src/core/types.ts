@@ -1,6 +1,7 @@
 // ===== src/core/types.ts =====
 // Contract: specification §6, written verbatim by WP1 (001_scaffold_and_contracts.md), with the
-// additive v0.2 fields of §14.3 (ScreenGeometry.insets and .presentationMode, FitResult.fitGeometry).
+// additive v0.2 fields of §14.3 (ScreenGeometry.insets and .presentationMode, FitResult.fitGeometry)
+// and the additive v0.5 tilt fields of §17.11 (RecordedFrame.deviceTiltDeg and .deviceRollDeg).
 // Frozen: changing anything here needs a specification version bump.
 export type Ms = number;
 export type Vec2 = readonly [number, number];
@@ -60,7 +61,8 @@ export interface FrameLabel { itemId: string; phase: Phase; groupId: string; tRe
 export interface RecordedFrame {
   meta: FrameMeta; distanceMm: number | null; yawDeg: number | null; pitchDeg: number | null; rollDeg: number | null;
   eyeMidNorm: Vec2 | null; open: boolean; label: FrameLabel | null; engines: Partial<Record<EngineId, EngineFrame>>;
-}
+  deviceTiltDeg?: number | null;   // phone upright angle θ (0 flat, 90 vertical), §17.5.4
+  deviceRollDeg?: number | null; } // in-plane roll, corrected for screen.orientation.angle
 export interface Recording { id: string; schedule: Schedule; geometry: SessionGeometry; presentations: Presentation[]; frames: RecordedFrame[]; }
 
 export type MapperId = 'geo-linear' | 'geo-quadratic' | 'prior-affine' | 'prior-ridge-pose' | 'emb-ridge' | 'pix-ridge' | 'pix-webgazer';

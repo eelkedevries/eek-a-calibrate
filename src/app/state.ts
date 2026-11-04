@@ -2,6 +2,7 @@
 // session's results as they arrive. Leaving mid-flow is allowed; everything a
 // screen needs from an earlier one lives here.
 import { DRIFT } from '../core/constants.ts';
+import { SETUPS, type Setup } from '../core/position/thresholds.ts';
 import { ENGINE_IDS } from '../core/types.ts';
 import type {
   EngineId,
@@ -32,6 +33,15 @@ export interface Settings {
   e2e: boolean;
   /** Divides every protocol duration; honoured only in test mode. */
   speed: number;
+  /**
+   * The Title's set-up chooser (spec §17.4.1): copy and position thresholds only. null until the
+   * player chooses; the chooser then starts from the device class. `?setup=` presets it.
+   */
+  setup: Setup | null;
+  /** Sound effects, on by default at a low volume (design §3.10); `?sound=0` turns them off. */
+  sound: boolean;
+  /** "Read instructions aloud", off by default; `?speech=1` turns it on (Settings in 017). */
+  speech: boolean;
 }
 
 export interface SessionClock {
@@ -104,6 +114,9 @@ export function parseSettings(location: Pick<Location, 'search' | 'hash'>, nowMs
     delegate: delegateParam === 'cpu' ? 'CPU' : delegateParam === 'gpu' ? 'GPU' : null,
     e2e,
     speed: e2e && Number.isFinite(speedParam) && speedParam >= 1 ? speedParam : 1,
+    setup: oneOf(params.get('setup'), SETUPS),
+    sound: params.get('sound') !== '0',
+    speech: params.get('speech') === '1',
   };
 }
 

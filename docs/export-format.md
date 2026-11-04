@@ -51,7 +51,8 @@ synonym:
 participant,session,trial,phase,item_id,time_ms,frame_index,estimator,gaze_x,gaze_y,gaze_x_filt,gaze_y_filt,
 gaze_x_uncorrected,gaze_y_uncorrected,gaze_x_deg,gaze_y_deg,drift_x_deg,drift_y_deg,valid,flags,confidence,
 target_x,target_y,head_yaw_deg,head_pitch_deg,head_roll_deg,distance_mm,iris_px,clock,
-gaze_x_blazegaze,gaze_y_blazegaze,gaze_x_peekr,gaze_y_peekr,gaze_x_geometric,gaze_y_geometric,gaze_x_eyepixel,gaze_y_eyepixel
+gaze_x_blazegaze,gaze_y_blazegaze,gaze_x_peekr,gaze_y_peekr,gaze_x_geometric,gaze_y_geometric,gaze_x_eyepixel,gaze_y_eyepixel,
+device_tilt_deg,device_roll_deg
 ```
 
 - `trial`: `calibration`, `validation-1`, `validation-2`, … (validations after a quick
@@ -77,6 +78,13 @@ gaze_x_blazegaze,gaze_y_blazegaze,gaze_x_peekr,gaze_y_peekr,gaze_x_geometric,gaz
 - `clock`: how the frame was time-stamped (`captureTime`, `expectedDisplayTime`, `callback` or
   `poll`).
 - The per-engine columns give each engine's own uncorrected estimate in px.
+- `device_tilt_deg`, `device_roll_deg`: covariates from a phone's or tablet's motion sensor at
+  that frame (the reading nearest the capture time, within 0.5 s). `device_tilt_deg` is the
+  upright angle θ (0 lying flat, 90 vertical, above 90 leaning towards you);
+  `device_roll_deg` is the rotation in the screen's plane, measured from the screen's own
+  "up" for its current orientation. Both are empty on a computer, where the browser offers no
+  sensor or permission was refused, and whenever no reading was near; they never make a row
+  invalid. They come after every other column, so the order eek-a-gaze reads is unchanged.
 
 ### targets.csv
 
@@ -118,7 +126,8 @@ and the viewing distance is D_ref. With assumed geometry the keys stay, with the
 
 Schema `eek-a-calibrate/session@1`, written with sorted keys: the app version and commit, the
 sha256 of every runtime and model file, the user agent, capabilities, device class, eyewear
-answer and device check, the vision host, delegate and backends, the camera settings and clock,
+answer and device check, the set-up chosen on the title screen (`propped`, `in-hand` or
+`webcam`) and the motion sensor's state (`granted`, `denied`, `unavailable` or `not-asked`), the vision host, delegate and backends, the camera settings and clock,
 the geometry with its sources and uncertainty, the preset, seeds and schedules, the pursuit lag
 τ, the row weights, the full fit (mapping states), Auto's selection and reason, the validation
 reports with paired engine differences, the drift log (the measured offset o = mean(Ḡ − T) and

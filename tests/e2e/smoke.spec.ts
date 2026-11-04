@@ -1,7 +1,7 @@
 // Smoke test (spec §10.4, §17.12): the built app loads under /eek-a-calibrate/ on the Title,
 // every request stays on this origin, nothing logs an error or violates the production CSP, the
 // self-hosted fonts load, a hash route survives a reload, the Details sheet behaves as a modal
-// dialog, and the v1 flow stays reachable from Play.
+// dialog, Play opens Get ready, and the v1 flow stays reachable.
 import { readdirSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 
@@ -179,7 +179,8 @@ test('the deep link opens the sheet over the Title, which stays when it closes',
 test('the pager shows one page at a time; delete all sits behind a confirmation', async ({ page }) => {
   const problems = watch(page);
   await page.goto('./?e2e=1&fixture=sheet-pages#/details/results');
-  expect(await page.evaluate(() => (window.__eek!.fixture as () => unknown)())).toEqual({ name: 'sheet-pages', applied: true });
+  // The fixture is applied once the route's module has loaded, which may follow the load event.
+  await expect.poll(() => page.evaluate(() => (window.__eek!.fixture as () => unknown)())).toEqual({ name: 'sheet-pages', applied: true });
   await expect.poll(() => sheet(page)).toMatchObject({ open: true, tab: 'results', page: 0, pages: 3 });
   const pager = page.getByRole('navigation', { name: 'Pages' });
   await expect(pager).toContainText('1 of 3');
@@ -211,10 +212,13 @@ test('the pager shows one page at a time; delete all sits behind a confirmation'
   expect(problems).toEqual([]);
 });
 
-test('Play opens the v1 flow at #/welcome until the game is built', async ({ page }) => {
+test('Play opens Get ready; the v1 flow stays reachable at #/welcome', async ({ page }) => {
   const problems = watch(page);
   await page.goto('./?e2e=1');
   await page.getByRole('button', { name: 'Play' }).click();
+  await expect.poll(() => route(page)).toBe('ready');
+  expect(await page.evaluate(() => document.documentElement.dataset.layout)).toBe('game');
+  await page.goto('./?e2e=1#/welcome');
   await expect.poll(() => route(page)).toBe('welcome');
   await expect(page.locator('.site-header')).toBeVisible();
   await expect(page.locator('main h1')).toBeVisible();
