@@ -1,7 +1,9 @@
 // The no-scroll rule (spec §17.3.3): every route of §17.2 but the #/methods document, and the
-// Details sheet on every tab, at the five sizes, from a table of states that later prompts
-// extend (a route, an optional query or fixture, an optional action).
+// Details sheet on every page of every tab, with and without a result, at the five sizes, from a
+// table of states that later prompts extend (a route, an optional query or fixture, an optional
+// action).
 import { expect, test, type Page } from '@playwright/test';
+import { onTab, playQuickFlow, TABS, walkTab } from './helpers/details.ts';
 import { expectNoScroll } from './helpers/noScroll.ts';
 
 export interface NoScrollState {
@@ -23,8 +25,6 @@ const SIZES = [
   { name: '1440×900', width: 1440, height: 900, mobile: false },
 ] as const;
 
-const TABS = ['results', 'settings', 'data', 'device', 'about'] as const;
-
 const sheet = (page: Page) => page.evaluate(() => (window.__eek!.sheet as () => { open: boolean; tab: string | null; pages: number })());
 
 async function openDetails(page: Page): Promise<void> {
@@ -35,6 +35,24 @@ async function openDetails(page: Page): Promise<void> {
 async function openDeleteConfirmation(page: Page): Promise<void> {
   await page.locator('dialog.sheet .sheet__delete').click();
   await expect(page.getByRole('alertdialog')).toBeVisible();
+}
+
+/**
+ * The tool pages' panel never runs into the top bar or the actions (on a phone held sideways it
+ * is centred in its row, where growing past it overflows nothing): its fit guard drops text first.
+ */
+async function expectPanelClear(page: Page): Promise<void> {
+  await page.evaluate(() => document.fonts.ready);
+  // Let the fit guard settle after the fonts.
+  await page.waitForTimeout(100);
+  const overlaps = await page.evaluate(() => {
+    const panel = document.querySelector('.app .panel')!.getBoundingClientRect();
+    return ['.app .topbar', '.app .actions', '.app .stage']
+      .map((sel) => [sel, document.querySelector(sel)!.getBoundingClientRect()] as const)
+      .filter(([, r]) => panel.left < r.right - 0.5 && panel.right > r.left + 0.5 && panel.top < r.bottom - 0.5 && panel.bottom > r.top + 0.5)
+      .map(([sel]) => sel);
+  });
+  expect(overlaps, 'the panel overlaps').toEqual([]);
 }
 
 export const STATES: NoScrollState[] = [
@@ -55,12 +73,33 @@ export const STATES: NoScrollState[] = [
   { name: 'Free look', route: '#/look' },
   { name: 'Challenge', route: '#/challenge' },
   { name: 'Page not found', route: '#/no-such-page' },
-  ...TABS.map((tab) => ({ name: `Details, ${tab}`, route: `#/details/${tab}` })),
-  ...TABS.map((tab) => ({ name: `Details, ${tab}, paged`, route: `#/details/${tab}`, fixture: 'sheet-pages' })),
+  ...TABS.map((tab) => ({ name: `Details, ${tab}, every page`, route: `#/details/${tab}`, action: async (page: Page) => {
+      await walkTab(page, tab, `${tab} without a result`);
+    } })),
   { name: 'Details over Get ready', route: '#/ready', action: openDetails },
   { name: 'Details over Warm-up complete', route: '#/complete', action: openDetails },
   { name: 'Details over Free look', route: '#/look', action: openDetails },
   { name: 'Delete confirmation', route: '#/details/about', action: openDeleteConfirmation },
+  // The pages opened from Details → Device (prompt 017).
+  { name: 'Screen size', route: '#/screen?from=details', action: expectPanelClear },
+  {
+    name: 'Screen size, diagonal',
+    route: '#/screen?from=details',
+    action: async (page) => {
+      await page.getByRole('button', { name: 'Enter the diagonal instead' }).click();
+      await expectPanelClear(page);
+    },
+  },
+  { name: 'Viewing distance', route: '#/distance?from=details', action: expectPanelClear },
+  { name: 'Diagnostics', route: '#/lab?from=details', action: expectPanelClear },
+  {
+    name: 'Diagnostics, last card',
+    route: '#/lab?from=details',
+    action: async (page) => {
+      await page.getByLabel('Section').selectOption('messages');
+      await expectPanelClear(page);
+    },
+  },
 ];
 
 function address(state: NoScrollState): string {
@@ -81,11 +120,7 @@ for (const size of SIZES) {
         });
         await page.goto(address(state));
         await expect(page.getByRole('heading', { level: 1 }).first()).toBeAttached();
-        if (state.route.startsWith('#/details/')) {
-          const tab = state.route.slice('#/details/'.length);
-          await expect.poll(async () => (await sheet(page)).tab).toBe(tab);
-          if (state.fixture === 'sheet-pages') expect((await sheet(page)).pages).toBe(3);
-        }
+        if (state.route.startsWith('#/details/')) await onTab(page, state.route.slice('#/details/'.length).split('?')[0]!);
         if (state.action) await state.action(page);
         await expectNoScroll(page, `${state.name} at ${size.name}`);
         expect(problems).toEqual([]);
@@ -93,3 +128,28 @@ for (const size of SIZES) {
     }
   });
 }
+
+// With a result: the v1 Quick flow gives a fit and a scored Test round, then every page of every
+// tab is checked at each size in the same session (the results live in memory).
+test.describe('No scrolling in Details with a result', () => {
+  test.describe.configure({ timeout: 600_000 });
+
+  test('every page of every tab, at the five sizes', async ({ page }) => {
+    const problems: string[] = [];
+    page.on('pageerror', (error) => problems.push(error.message));
+    page.on('console', (message) => {
+      if (message.type() === 'error') problems.push(message.text());
+    });
+    await playQuickFlow(page);
+    await page.evaluate(() => (location.hash = '#/details/results'));
+    await onTab(page, 'results');
+    for (const size of SIZES) {
+      await page.setViewportSize({ width: size.width, height: size.height });
+      for (const tab of TABS) {
+        const seen = await walkTab(page, tab, `with a result at ${size.name}`);
+        if (tab === 'results') expect(seen).toContain('estimator-combined');
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+});

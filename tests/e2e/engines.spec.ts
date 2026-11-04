@@ -190,7 +190,8 @@ test.describe('BlazeGaze engine (WP6)', () => {
   }
 
   async function finish(page: Page, seen: ReturnType<typeof watch>) {
-    // The lab shows the strip the encoder receives.
+    // The lab shows the strip the encoder receives, on its engine-crops card.
+    await page.getByLabel('Section').selectOption('engineCrops');
     await expect(page.locator('canvas[aria-label^="Eye strip, 512 × 128"]').first()).toBeVisible({ timeout: 15_000 });
     const snap = (await snapshot(page))!;
     const origin = new URL(page.url()).origin;

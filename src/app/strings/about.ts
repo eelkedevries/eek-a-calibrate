@@ -68,7 +68,7 @@ export const strings: Readonly<Record<string, string>> = {
   'about.limits.6': 'The thresholds of the camera checks, the verdicts, the areas-of-interest advice and the device check are heuristic.',
   'about.privacy.title': 'Privacy',
   'about.privacy.1': 'Everything runs on your device; nothing is uploaded; no images are stored. The page’s security policy allows connections to this website only, and the app sends nothing there.',
-  'about.privacy.2': 'On this device the browser can keep screen and distance measurements, up to eight calibrations (numbers describing the mapping, never pictures) and session summaries. Per-frame features are stored only if you choose to. “Delete all my data” removes all of it.',
+  'about.privacy.2': 'On this device the browser can keep your settings, best scores, screen and distance measurements, up to eight calibrations (numbers describing the mapping, never pictures) and session summaries. Per-frame features are stored only if you choose to. “Delete all my data” removes all of it.',
   'about.privacy.3': 'An export is a file you download; what happens to it then is up to you.',
   'about.refs.title': 'References',
   'about.ref.1': 'Bogdan, P. C. et al. (2024). Investigating the suitability of online eye tracking for psychological research. Behavior Research Methods 56, 2213–2226.',

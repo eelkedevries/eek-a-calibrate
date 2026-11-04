@@ -1,5 +1,5 @@
-// The Details sheet frame (design §2.17, §4.7): header, tabs, pager and footer. The tabs'
-// contents arrive with prompt 017 (strings/details-*.ts).
+// The Details sheet frame (design §2.17, §4.7): header, tabs, pager and footer, and the words the
+// tabs share. Each tab's own copy is in strings/details-<tab>.ts.
 
 export const strings: Readonly<Record<string, string>> = {
   'details.title': 'Details',
@@ -14,15 +14,25 @@ export const strings: Readonly<Record<string, string>> = {
   'details.page.prev': 'Previous page',
   'details.page.next': 'Next page',
   'details.page.position': '{page} of {pages}',
-  'details.placeholder': 'This section is not built yet.',
-  'details.placeholder.results': 'Open the current results page',
-  'details.placeholder.data': 'Open the current data page',
-  'details.placeholder.device': 'Open diagnostics',
-  'details.placeholder.about': 'Open the current About page',
+  'details.loading': 'Loading…',
+  'details.failed': 'This section could not be loaded. Close Details and open it again.',
+  'details.none': '–',
+  'details.yes': 'Yes',
+  'details.no': 'No',
+  'details.stars': '{n} of {of} stars',
+  'details.measure': 'Measure screen and distance',
+  // The advised distances of design §3.2, shown in Device and About only (§17.4.6).
+  'details.advised.portrait': 'Phone, upright',
+  'details.advised.portrait.value': '30–40 cm',
+  'details.advised.landscape': 'Phone, sideways',
+  'details.advised.landscape.value': '40–50 cm',
+  'details.advised.webcam': 'Webcam',
+  'details.advised.webcam.value': 'An arm’s length, 50–70 cm',
+  'details.advised.note': 'Rules of thumb (heuristic), not tested limits.',
   'details.version': 'Version {version} · {commit}',
   'details.delete': 'Delete all my data',
   'details.delete.title': 'Delete all your data?',
-  'details.delete.body': 'This removes every warm-up, profile and session that eek-a-calibrate has stored on this device.',
+  'details.delete.body': 'This removes every warm-up, session, best score, measurement and setting that eek-a-calibrate has stored on this device.',
   'details.delete.confirm': 'Delete',
   'details.delete.cancel': 'Cancel',
   'details.deleted': 'All data that eek-a-calibrate stored on this device has been deleted.',

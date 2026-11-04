@@ -6,12 +6,10 @@
 // calibration changes the degrees and nothing else (§14.1.3).
 import { ESTIMATOR_NAMES } from '../../core/calibration/select.ts';
 import { viewportDiagonalPx } from '../../core/geometry/screen.ts';
-import { sumFunnels } from '../../core/metrics/funnel.ts';
-import { ESTIMATOR_ORDER } from '../../core/metrics/validation.ts';
-import { ENGINE_IDS } from '../../core/types.ts';
-import type { EngineId, EstimatorId, FitResult, Funnel, Recording, ValidationReport } from '../../core/types.ts';
+import type { EstimatorId, FitResult, ValidationReport } from '../../core/types.ts';
 import { scoreRecording, type ScoredRecording } from '../../fit/fitClient.ts';
 import { metricTable, type MetricRow } from '../components/metricTable.ts';
+import { bestCandidates, cvApproximate, estimatorRows, FUNNEL_STAGES, reportFunnel } from '../details/results.ts';
 import { targetPlot } from '../components/targetPlot.ts';
 import { h } from '../dom.ts';
 import type { Screen, ScreenContext } from '../router.ts';
@@ -54,25 +52,6 @@ const CSS = `
 `;
 
 let hintDismissed = false;
-
-function median(values: readonly number[]): number {
-  const s = values.filter(Number.isFinite).sort((a, b) => a - b);
-  if (s.length === 0) return Number.NaN;
-  const m = s.length >> 1;
-  return s.length % 2 ? (s[m] as number) : ((s[m - 1] as number) + (s[m] as number)) / 2;
-}
-
-/** The engines this session ran for the user: the run set, or the settings' engines. */
-function sessionEngines(fit: FitResult): EngineId[] {
-  const { runSet, settings } = getState();
-  const wanted = runSet ?? (settings.engines === 'auto' ? [...ENGINE_IDS] : [...settings.engines]);
-  return ENGINE_IDS.filter((e) => wanted.includes(e) || fit.fits[e] !== undefined);
-}
-
-/** Median per-frame engine time over the validation frames where the engine returned ok. */
-function computeMsP50(rec: Recording, engine: EngineId): number {
-  return median(rec.frames.flatMap((f) => (f.engines[engine]?.status === 'ok' ? [f.engines[engine]!.computeMs] : [])));
-}
 
 class Results {
   private readonly root: HTMLElement;
@@ -123,37 +102,7 @@ class Results {
   }
 
   private rows(): MetricRow[] {
-    const fit = this.fit;
-    const status = activeCapture()?.status ?? [];
-    const engines = sessionEngines(fit);
-    const ids = ESTIMATOR_ORDER.filter((id) => id === 'combined' || engines.includes(id as EngineId));
-    return ids.map((id): MetricRow => {
-      if (id === 'combined') {
-        const members = fit.combined?.members ?? [];
-        return {
-          estimator: id,
-          name: ESTIMATOR_NAMES.combined,
-          missing: fit.combined ? null : t('results.noCombined'),
-          backend: null,
-          cv: fit.combined?.cv ?? null,
-          report: this.report('combined'),
-          computeMsP50: members.length > 0 ? members.reduce((s, e) => s + computeMsP50(this.run.recording, e), 0) : Number.NaN,
-          selected: fit.selection.estimator === 'combined',
-        };
-      }
-      const s = status.find((x) => x.id === id);
-      const fitted = fit.fits[id];
-      return {
-        estimator: id,
-        name: ESTIMATOR_NAMES[id],
-        missing: fitted ? null : s && !s.ok ? t('results.unavailable', { reason: s.reason ?? '—' }) : t('results.notFitted'),
-        backend: s?.backend ?? null,
-        cv: fitted?.cv ?? null,
-        report: this.report(id),
-        computeMsP50: computeMsP50(this.run.recording, id),
-        selected: fit.selection.estimator === id,
-      };
-    });
+    return estimatorRows(this.fit, this.reports(), this.run.recording, activeCapture()?.status ?? []);
   }
 
   private use(id: EstimatorId): void {
@@ -285,11 +234,9 @@ class Results {
   }
 
   private funnelSection(inUse: EstimatorId): HTMLElement {
-    const r = this.report(inUse);
-    const f: Funnel | null = r ? sumFunnels(r.targets.map((x) => x.funnel)) : null;
-    const stages: (keyof Funnel)[] = ['expected', 'delivered', 'processed', 'face', 'open', 'inRange', 'valid'];
+    const f = reportFunnel(this.report(inUse));
     const rows = f
-      ? stages.map((k) => {
+      ? FUNNEL_STAGES.map((k) => {
           const frac = f.expected > 0 ? f[k] / f.expected : 0;
           return h(
             'tr',
@@ -319,37 +266,24 @@ class Results {
 
   /** CV errors are degrees under the geometry of the fit, so they stay approximate if that was assumed, whatever was measured later. */
   private cvApproximate(): boolean {
-    return this.fit.fitGeometry?.degreesApproximate ?? this.scored.geometry.degreesApproximate;
+    return cvApproximate(this.fit, this.scored.geometry);
   }
 
   private cvSection(): HTMLElement {
     const approximate = this.cvApproximate();
     const deg = (v: number) => (Number.isFinite(v) ? `${approximate ? '≈' : ''}${v.toFixed(2)}°` : t('results.none.value'));
-    const rows: HTMLTableRowElement[] = [];
-    for (const engine of ENGINE_IDS) {
-      const f = this.fit.fits[engine];
-      if (!f) continue;
-      const best = new Map<string, (typeof f.candidates)[number]>();
-      for (const c of f.candidates) {
-        const b = best.get(c.mapper);
-        if (!b || c.cv.meanDeg < b.cv.meanDeg) best.set(c.mapper, c);
-      }
-      for (const c of best.values()) {
-        const chosen = c.mapper === f.chosen.mapper;
-        rows.push(
-          h(
-            'tr',
-            { class: chosen ? 'in-use' : null },
-            h('td', null, ESTIMATOR_NAMES[engine]),
-            h('td', null, c.mapper, chosen ? ` (${t('results.cv.chosen')})` : ''),
-            h('td', null, `${deg(c.cv.meanDeg)} ± ${Number.isFinite(c.cv.seDeg) ? c.cv.seDeg.toFixed(2) : '—'}`),
-            h('td', null, String(chosen ? f.chosen.lambdaRel : c.lambdaRel)),
-            h('td', null, String(c.cv.nRows)),
-            h('td', null, `${(100 * c.cv.coverage).toFixed(0)} %`),
-          ),
-        );
-      }
-    }
+    const rows = bestCandidates(this.fit).map(({ engine, candidate: c, chosen, lambdaRel }) =>
+      h(
+        'tr',
+        { class: chosen ? 'in-use' : null },
+        h('td', null, ESTIMATOR_NAMES[engine]),
+        h('td', null, c.mapper, chosen ? ` (${t('results.cv.chosen')})` : ''),
+        h('td', null, `${deg(c.cv.meanDeg)} ± ${Number.isFinite(c.cv.seDeg) ? c.cv.seDeg.toFixed(2) : '—'}`),
+        h('td', null, String(lambdaRel)),
+        h('td', null, String(c.cv.nRows)),
+        h('td', null, `${(100 * c.cv.coverage).toFixed(0)} %`),
+      ),
+    );
     const headCells = ['engine', 'mapper', 'error', 'lambda', 'rows', 'coverage'].map((k) => h('th', { scope: 'col' }, t(`results.cv.${k}`)));
     return h(
       'section',

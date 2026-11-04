@@ -351,6 +351,38 @@ wins and the gap is work still to be done.
   `title-skip`, `title-blocked`, `title-unsupported`, `ready-<loading|searching|adjust|holding|
   ready|anyway>`, `guard-overlay`, `guard-overlay-late`.
 
+## The Details sheet (after prompt 017)
+
+- **Tabs:** `src/app/details/{results,settings,data,device,about}.ts` register their pages with
+  `registerDetailsTab`; `shell/detailsSheet.ts` loads each tab's module the first time it is shown.
+  A page is a `section.sheet-page` whose children are blocks (`details/page.ts`); a page taller
+  than the panel is cut between blocks (`splitBlocks` in `shell/pager.ts`; a plain-text paragraph
+  is first cut between words), its title repeated, pieces named `<id>~2`. `__eek.sheet()` reports
+  `pageIds` and `overflow`. `openDetails({ tab, page })`, `openHowWeJudge()` (page `judge`) and
+  `#/details/<tab>?page=<id>` open a page; `ctx.whileShown`/`ctx.every` run live parts (Device
+  readings) only while their page is shown.
+- **Extracted code:** the export (`buildSessionExport`, `storeSessionSummary`) lives in
+  `details/data.ts`, the Results computations (`estimatorRows`, `bestCandidates`, …) in
+  `details/results.ts`, the engine sizes in `details/settings.ts`, Methods' sections in
+  `screens/methods.ts`; the v1 Results, Data, About and Welcome screens call them until 018.
+- **Preferences:** `state.prefs` (`Prefs`: warm-up length, engines, glasses, sound, speech,
+  Limited head movement, theme, camera, Expert mode, set-up choice) via `setPrefs`, stored in
+  IndexedDB v2 `prefs` (storage.ts registers the store with `setPrefsStore`); `main.ts` loads them
+  before the router starts (a late answer still applies unless a setting changed meanwhile). The
+  warm-up length, engines, sound, speech and set-up choice are mirrored into `Settings` (`preset`,
+  `engines`, `sound`, `speech`, `setup`, which 014's screens read); the address wins for each it
+  names, and for `theme`. The Title's set-up chooser stores its choice, and its map and meta line
+  follow the warm-up length. A camera chosen in Settings is used from the camera's next start
+  (`preferStoredCamera` makes it Play's choice once listed); a running camera is never taken from
+  the screen beneath. Delete all resets them. `state.challenge` takes the challenge's per-zone
+  statistics (016).
+- **Storage v2:** `prefs` and `scores` stores (`upgradePlan` adds what is missing); best scores per
+  zone set with `recordScore`/`bestScore`/`listScores` (`scoreKey(cols, rows)`).
+- **Tool pages:** `#/screen`, `#/distance` and `#/lab` are framed game routes (`toolFrame` in
+  `screens/screen.ts`, `pages.css`); `from=details` returns to the screen Details was opened over
+  (`detailsReturnHash`). The card match lies at true size in the stage (across, upright, or upright
+  and cut, matching the card's width). The lab's cards page in the stage (`Section` select).
+
 ## In progress
 
 v1 (prompts 001–011) is complete, with the final-review fixes of specification §16.2. Next:

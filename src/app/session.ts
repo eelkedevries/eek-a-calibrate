@@ -14,7 +14,7 @@ import type { Home } from '../core/position/home.ts';
 import { defaultSetup, type GuardClass, type Setup } from '../core/position/thresholds.ts';
 import { setTiltLookup } from '../core/protocol/labelling.ts';
 import { ENGINE_SPECS } from '../engines/specs.ts';
-import { openCamera, type CameraSession } from '../platform/camera.ts';
+import { listCameras, openCamera, type CameraSession } from '../platform/camera.ts';
 import { detectDeviceClass } from '../platform/capabilities.ts';
 import { unlockAudio } from '../platform/feedback.ts';
 import { FrameClock } from '../platform/frameClock.ts';
@@ -137,12 +137,40 @@ let capture: RunningCapture | null = null;
 /** The camera chosen in the camera screen's picker; the browser's default when null. */
 let preferredDeviceId: string | null = null;
 
-/** Chooses the camera for the next start; a running capture on another camera is stopped. */
-export function setPreferredCamera(deviceId: string | null): void {
+/**
+ * Chooses the camera for the next start; a running capture on another camera is stopped, unless
+ * `stopRunning` is false (Details → Settings, which must not take the camera from the screen beneath).
+ */
+export function setPreferredCamera(deviceId: string | null, opts: { stopRunning?: boolean } = {}): void {
   if (deviceId === preferredDeviceId) return;
   preferredDeviceId = deviceId;
-  stopCapture();
+  if (opts.stopRunning ?? true) stopCapture();
 }
+/**
+ * The camera chosen in Details → Settings, if this browser still lists it: by id, or by name
+ * where the browser changed the id. Before permission the list has no ids, and the default is used.
+ */
+async function storedCamera(): Promise<string | null> {
+  const wanted = getState().prefs.camera;
+  if (!wanted) return null;
+  try {
+    const cameras = await listCameras();
+    return (cameras.find((c) => c.deviceId === wanted.deviceId) ?? cameras.find((c) => wanted.label !== '' && c.label === wanted.label))?.deviceId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Makes the camera stored in Settings the preferred one when this browser still lists it, so that
+ * Play, which must ask for the camera inside its tap without waiting, opens it (main.ts calls this
+ * once the preferences are loaded). A choice made meanwhile is kept.
+ */
+export async function preferStoredCamera(): Promise<void> {
+  const id = await storedCamera();
+  if (id && preferredDeviceId === null) preferredDeviceId = id;
+}
+
 /** Where the running host's asset progress (engine downloads) goes: the latest caller's listener. */
 let assetListener: CaptureListeners['onAsset'] | null = null;
 let starting: Promise<RunningCapture> | null = null;
@@ -474,7 +502,8 @@ export async function ensureCapture(engines: readonly EngineId[], listeners: Cap
         const adopted = pendingCamera;
         pendingCamera = null;
         openedCamera = null;
-        const camera = adopted ? await adopted : await openCamera(preferredDeviceId ? { deviceId: preferredDeviceId } : {});
+        const deviceId = adopted ? null : (preferredDeviceId ?? (await storedCamera()));
+        const camera = adopted ? await adopted : await openCamera(deviceId ? { deviceId } : {});
         let host: ManagedVisionHost | null = null;
         try {
           onStatus('vision');

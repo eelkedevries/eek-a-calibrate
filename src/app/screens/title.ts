@@ -16,7 +16,7 @@ import { contentFits, fitGuard } from '../shell/fitGuard.ts';
 import { icon } from '../shell/icons.ts';
 import { topBar } from '../shell/topBar.ts';
 import { currentSetup, onLoad, prestartVision, setWarmupMode, startPlay } from '../session.ts';
-import { getState, setState } from '../state.ts';
+import { getState, setPrefs, subscribe } from '../state.ts';
 import { t } from '../strings.en-GB.ts';
 import { registerFixture } from '../testHooks.ts';
 
@@ -53,20 +53,35 @@ const screen: Screen = {
     const play = h('button', { type: 'button', class: 'btn btn--primary title-play' }, icon('play'), h('span', null, t('title.play')));
     const skip = h('button', { type: 'button', class: 'btn btn--secondary title-skip', hidden: true }, t('title.skip'));
     const actions = h('div', { class: 'actions title-buttons' }, skip, play);
+    const length = h('span', null, t(`title.meta.${settings.preset}`));
     const meta = h(
       'p',
       { class: 'title-meta' },
-      h('span', { class: 'title-meta__item' }, icon('clock', 16), h('span', null, t(`title.meta.${settings.preset}`))),
+      h('span', { class: 'title-meta__item' }, icon('clock', 16), length),
       h('span', { class: 'title-meta__item' }, icon('lock', 16), h('span', null, t('title.meta.local'))),
     );
     const chooser = setupChooser({
       value: currentSetup(),
-      onChange: (setup: Setup) => setState({ settings: { ...getState().settings, setup } }),
+      // Kept on the device with the other preferences (spec §17.10.3).
+      onChange: (setup: Setup) => void setPrefs({ setup }),
     });
     const notice = h('div', { class: 'title-notice', role: 'alert', hidden: true });
     const bar = h('span', { class: 'hero__bar' });
     const progress = h('div', { class: 'hero__progress', role: 'progressbar', 'aria-label': t('title.progress'), 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': '0', hidden: true }, bar);
-    const hero = h('section', { class: 'stage hero', 'aria-label': t('title.hero') }, heroEmblem(), levelMap(settings.preset), progress);
+    let map = levelMap(settings.preset);
+    const hero = h('section', { class: 'stage hero', 'aria-label': t('title.hero') }, heroEmblem(), map, progress);
+    // Details → Settings may change the warm-up length over the Title: the map and meta line follow.
+    let shown = settings.preset;
+    addCleanup(
+      subscribe((s) => {
+        if (s.settings.preset === shown) return;
+        shown = s.settings.preset;
+        length.textContent = t(`title.meta.${shown}`);
+        const next = levelMap(shown);
+        map.replaceWith(next);
+        map = next;
+      }),
+    );
     const side = h(
       'div',
       { class: 'side title-side' },

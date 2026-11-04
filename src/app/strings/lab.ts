@@ -1,8 +1,9 @@
-// Diagnostics (#/lab).
+// Diagnostics (#/lab), opened from Details → Device. Some keys serve the v1 camera screen too.
 
 export const strings: Readonly<Record<string, string>> = {
   // Diagnostics, #/lab (WP4; spec §7 screen 10)
-  'lab.lead': 'What the camera and the vision pipeline are doing on this device: which host and delegate run, how long each stage takes, and what each engine receives. Nothing is recorded, stored or uploaded.',
+  'lab.lead': 'What the camera and the vision pipeline do on this device, stage by stage. Nothing is recorded, stored or uploaded.',
+  'lab.section': 'Section',
   'lab.start': 'Start camera and vision',
   'lab.stop': 'Stop',
   'lab.starting': 'Starting the camera…',
@@ -23,8 +24,11 @@ export const strings: Readonly<Record<string, string>> = {
   'lab.section.frames': 'Frames',
   'lab.section.timings': 'Timings',
   'lab.section.face': 'Face',
+  'lab.section.quality': 'Face size and light',
+  'lab.section.select': 'Engines to run',
+  'lab.section.engineCrops': 'Engine crops',
   'lab.section.engines': 'Engines',
-  'lab.section.crops': 'Live crops',
+  'lab.section.crops': 'Face crop',
   'lab.section.run': 'Engine run',
   'lab.section.messages': 'Messages',
   'lab.cropsNote': 'Crops show the frame as the engines receive it, unmirrored; the preview is mirrored. They refresh a few times a second.',
@@ -36,7 +40,7 @@ export const strings: Readonly<Record<string, string>> = {
   'lab.eyepixel.left': 'Left eye, 10 × 6',
   'lab.eyepixel.right': 'Right eye, 10 × 6',
   'lab.notStarted': 'Not started',
-  'lab.none': '—',
+  'lab.none': '–',
   'lab.yes': 'yes',
   'lab.no': 'no',
   'lab.host.kind': 'Host',
@@ -68,6 +72,7 @@ export const strings: Readonly<Record<string, string>> = {
   'lab.timing.landmarker': 'Face landmarker',
   'lab.timing.worker': 'Whole frame in the host',
   'lab.timing.latency': 'Capture to result',
+  'lab.timing.lastMedian': 'last {last} · median {median}',
   'lab.face.found': 'Face found',
   'lab.face.pose': 'Head pose (yaw, pitch, roll)',
   'lab.face.open': 'Eyes open',
@@ -97,6 +102,8 @@ export const strings: Readonly<Record<string, string>> = {
   'lab.run.landmarker': 'Face landmarker',
   'lab.run.prep': 'Frame preparation',
   'lab.run.total': 'Whole frame',
+  'lab.run.frames': '{ok} of {n} frames ok',
+  'lab.run.times': 'median {p50} · 90th percentile {p90}',
   'lab.unit.ms': '{value} ms',
   'lab.unit.px': '{value} px',
   'lab.unit.hz': '{value} Hz',

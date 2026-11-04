@@ -58,18 +58,19 @@ export const ROUTES: readonly Route[] = [
   { id: 'challenge', path: '/challenge', layout: 'game', mode: 'stimulus', load: () => import('./screens/challenge.ts') },
   { id: 'details', path: '/details', layout: 'game', mode: 'framed', screen: 'title', load: loadTitle },
   { id: 'methods', path: '/methods', layout: 'document', mode: 'document', load: () => import('./screens/methods.ts') },
+  // Opened from Details → Device, in the game's shell (§17.2).
+  { id: 'screen', path: '/screen', layout: 'game', mode: 'framed', load: () => import('./screens/screen.ts') },
+  { id: 'distance', path: '/distance', layout: 'game', mode: 'framed', load: () => import('./screens/distance.ts') },
+  { id: 'lab', path: '/lab', layout: 'game', mode: 'framed', load: () => import('./screens/lab.ts') },
   // The v1 screens, until 018 redirects them (§17.2.2).
   { id: 'welcome', path: '/welcome', layout: 'legacy', load: () => import('./screens/welcome.ts') },
   { id: 'camera', path: '/camera', layout: 'legacy', load: () => import('./screens/camera.ts') },
-  { id: 'screen', path: '/screen', layout: 'legacy', load: () => import('./screens/screen.ts') },
-  { id: 'distance', path: '/distance', layout: 'legacy', load: () => import('./screens/distance.ts') },
   { id: 'calibrate', path: '/calibrate', layout: 'legacy', immersive: true, load: () => import('./screens/calibrate.ts') },
   { id: 'validate', path: '/validate', layout: 'legacy', immersive: true, load: () => import('./screens/validate.ts') },
   { id: 'results', path: '/results', layout: 'legacy', load: () => import('./screens/results.ts') },
   { id: 'live', path: '/live', layout: 'legacy', load: () => import('./screens/live.ts') },
   { id: 'data', path: '/data', layout: 'legacy', load: () => import('./screens/data.ts') },
   { id: 'about', path: '/about', layout: 'legacy', load: () => import('./screens/about.ts') },
-  { id: 'lab', path: '/lab', layout: 'legacy', load: () => import('./screens/lab.ts') },
 ];
 
 /** The default flow of v1 (spec §14.1.1): screen size and viewing distance are an optional detour, not steps. */
@@ -148,10 +149,11 @@ function setCurrent(id: RouteId | 'not-found'): void {
   else document.title = `${t(`route.${id}`)} · ${t('app.name')}`;
 }
 
-/** The sheet opened by `#/details/<tab>` leaves the Title at `#/` when it closes. */
-function openDeepLinkedSheet(tab: DetailsTabId): void {
+/** The sheet opened by `#/details/<tab>` (`?page=<id>` names a page) leaves the Title at `#/` when it closes. */
+function openDeepLinkedSheet(tab: DetailsTabId, page: string | null): void {
   openDetails({
     tab,
+    page: page ?? 0,
     onClose: () => {
       if (!parseHash(location.hash).path.startsWith('/details')) return;
       history.replaceState(history.state, '', '#/');
@@ -176,7 +178,7 @@ async function render(): Promise<void> {
   // The Title and its deep link are one screen: moving between them only opens or closes the sheet.
   if (route && screenId === 'title' && mountedScreen === 'title' && (currentId === 'title' || currentId === 'details')) {
     setCurrent(route.id);
-    if (resolved.kind === 'route' && resolved.tab) openDeepLinkedSheet(resolved.tab);
+    if (resolved.kind === 'route' && resolved.tab) openDeepLinkedSheet(resolved.tab, params.get('page'));
     else closeDetails();
     return;
   }
@@ -227,7 +229,7 @@ async function render(): Promise<void> {
     console.error('Screen failed to load', error);
     outlet.append(h('p', { role: 'alert' }, t(layout === 'legacy' ? 'route.loadError' : 'shell.loadError', { message })));
   }
-  if (resolved.kind === 'route' && resolved.tab) openDeepLinkedSheet(resolved.tab);
+  if (resolved.kind === 'route' && resolved.tab) openDeepLinkedSheet(resolved.tab, params.get('page'));
   else focusHeading(outlet);
   announce(document.title);
 }

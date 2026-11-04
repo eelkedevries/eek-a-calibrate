@@ -1,26 +1,37 @@
-// Persistence (specification §4.15): IndexedDB `eek-a-calibrate`, version 1, with three object
-// stores. `geometry` holds the card or diagonal scale per screen (`screen W×H@dpr`) and the
+// Persistence (specification §4.15, §17.10.3): IndexedDB `eek-a-calibrate`, version 2, with five
+// object stores. `geometry` holds the card or diagonal scale per screen (`screen W×H@dpr`) and the
 // blind-spot focal length per camera; `profiles` holds fitted mappings (FitResult) under the
 // profile key, at most eight, least recently used out first; `sessions` holds session summaries
-// and validation reports, with per-frame features only when the user opts in. No image or video
+// and validation reports, with per-frame features only when the user opts in; `prefs` holds the
+// settings of Details → Settings (one record); `scores` holds the best challenge score per zone
+// set. Version 2 upgrades version 1 in place: its stores and records are kept. No image or video
 // is ever stored.
 //
 // Where IndexedDB is missing, refuses to open, or a write fails (quota), the data is kept in
 // memory for this page instead and a warning is published, so nothing fails silently.
-// "Delete all my data" (the footer and the Data screen) is registered here.
+// "Delete all my data" (the Details sheet, and the footer and Data screen of v1) is registered here.
 import type { FitResult, Preset, SessionGeometry, ValidationReport } from '../core/types.ts';
-import { setDeleteAllHandler } from '../app/state.ts';
+import { setDeleteAllHandler, setPrefsStore } from '../app/state.ts';
 
 export const DB_NAME = 'eek-a-calibrate';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 export const MAX_PROFILES = 8;
 /** Some private modes never answer indexedDB.open; after this long the data stays in memory. */
 const OPEN_TIMEOUT_MS = 5000;
 const DELETE_TIMEOUT_MS = 3000;
 
-type StoreName = 'geometry' | 'profiles' | 'sessions';
-const STORES: readonly StoreName[] = ['geometry', 'profiles', 'sessions'];
-const KEY_PATH: Readonly<Record<StoreName, string>> = { geometry: 'key', profiles: 'key', sessions: 'id' };
+export type StoreName = 'geometry' | 'profiles' | 'sessions' | 'prefs' | 'scores';
+export const STORES: readonly StoreName[] = ['geometry', 'profiles', 'sessions', 'prefs', 'scores'];
+const KEY_PATH: Readonly<Record<StoreName, string>> = { geometry: 'key', profiles: 'key', sessions: 'id', prefs: 'key', scores: 'key' };
+
+/**
+ * The stores an upgrade from `oldVersion` creates: every store the database lacks. Existing
+ * stores and their records are never touched, so version 1 becomes version 2 in place.
+ */
+export function upgradePlan(oldVersion: number, existing: readonly string[]): StoreName[] {
+  const have = new Set(oldVersion > 0 ? existing : []);
+  return STORES.filter((name) => !have.has(name));
+}
 
 // ----- Records ----------------------------------------------------------------------------
 
@@ -108,6 +119,40 @@ export interface SessionRecord {
   dataset?: unknown;
 }
 
+/** The one record of `prefs`: the settings as the app wrote them (app/state.ts checks them on reading). */
+export interface PrefsRecord {
+  key: typeof PREFS_KEY;
+  savedAt: number;
+  prefs: Record<string, unknown>;
+}
+
+export const PREFS_KEY = 'prefs';
+
+/** The best challenge score of one zone set (§17.9.5): a 1 × 2 board is never compared with a 3 × 2 board. */
+export interface ScoreRecord {
+  /** `zones|<cols>x<rows>`, with `|<variant>` when the caller keeps scores apart further. */
+  key: string;
+  cols: number;
+  rows: number;
+  variant: string | null;
+  score: number;
+  stars: number;
+  /** The round the best score was made in, as the caller names it. */
+  round: string | null;
+  savedAt: number;
+}
+
+export function scoreKey(cols: number, rows: number, variant: string | null = null): string {
+  if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 1 || rows < 1) throw new RangeError(`scoreKey: a zone set needs whole columns and rows of at least 1 (got ${cols} × ${rows})`);
+  return variant ? `zones|${cols}x${rows}|${variant}` : `zones|${cols}x${rows}`;
+}
+
+/** A score replaces the stored best only when it is strictly higher (a tie keeps the earlier one). */
+export function beatsBest(best: Pick<ScoreRecord, 'score'> | null, score: number): boolean {
+  if (!Number.isFinite(score) || score < 0) return false;
+  return best === null || !Number.isFinite(best.score) || score > best.score;
+}
+
 // ----- Status -----------------------------------------------------------------------------
 
 export interface StorageStatus {
@@ -161,7 +206,7 @@ function fallBack(reason: string): void {
 // ----- IndexedDB plumbing -----------------------------------------------------------------
 
 /** Writes that IndexedDB refused (or every write, without it), read back over the database. */
-const memory: Record<StoreName, Map<string, unknown>> = { geometry: new Map(), profiles: new Map(), sessions: new Map() };
+const memory: Record<StoreName, Map<string, unknown>> = { geometry: new Map(), profiles: new Map(), sessions: new Map(), prefs: new Map(), scores: new Map() };
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 
 function request<T>(r: IDBRequest<T>): Promise<T> {
@@ -214,9 +259,9 @@ function openDb(): Promise<IDBDatabase | null> {
       finish(null, `the browser storage is blocked (${errorText(error)})`);
       return;
     }
-    open.onupgradeneeded = () => {
+    open.onupgradeneeded = (event) => {
       const db = open.result;
-      for (const name of STORES) if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: KEY_PATH[name] });
+      for (const name of upgradePlan(event.oldVersion, [...db.objectStoreNames])) db.createObjectStore(name, { keyPath: KEY_PATH[name] });
     };
     open.onsuccess = () => finish(open.result);
     open.onerror = () => finish(null, `the browser storage could not be opened (${errorText(open.error)})`);
@@ -375,6 +420,54 @@ export function deleteSession(id: string): Promise<void> {
   return remove('sessions', id);
 }
 
+// ----- Preferences ------------------------------------------------------------------------
+
+/** The stored settings, or null when none are stored (reading never creates the database). */
+export async function loadPrefs(): Promise<Record<string, unknown> | null> {
+  const r = await getOne<PrefsRecord>('prefs', PREFS_KEY);
+  return r && typeof r.prefs === 'object' && r.prefs !== null ? r.prefs : null;
+}
+
+export function savePrefs(prefs: Record<string, unknown>, nowMs = Date.now()): Promise<void> {
+  return put('prefs', { key: PREFS_KEY, savedAt: nowMs, prefs: structuredClone(prefs) } satisfies PrefsRecord);
+}
+
+// ----- Best scores ------------------------------------------------------------------------
+
+function validScore(r: unknown): r is ScoreRecord {
+  const s = r as ScoreRecord | null;
+  return Boolean(s) && typeof s!.key === 'string' && Number.isFinite(s!.score) && Number.isInteger(s!.cols) && Number.isInteger(s!.rows);
+}
+
+/** Every stored best score, highest first. */
+export async function listScores(): Promise<ScoreRecord[]> {
+  return (await getAll<ScoreRecord>('scores')).filter(validScore).sort((a, b) => b.score - a.score || a.key.localeCompare(b.key));
+}
+
+export async function bestScore(cols: number, rows: number, variant: string | null = null): Promise<ScoreRecord | null> {
+  const r = await getOne<ScoreRecord>('scores', scoreKey(cols, rows, variant));
+  return validScore(r) ? r : null;
+}
+
+export interface ScoreEntry {
+  cols: number;
+  rows: number;
+  variant?: string | null;
+  score: number;
+  stars: number;
+  round?: string | null;
+}
+
+/** Keeps `entry` when it beats the zone set's best; returns the best after it and whether it is new. */
+export async function recordScore(entry: ScoreEntry, nowMs = Date.now()): Promise<{ best: ScoreRecord | null; isNew: boolean }> {
+  const variant = entry.variant ?? null;
+  const previous = await bestScore(entry.cols, entry.rows, variant);
+  if (!beatsBest(previous, entry.score)) return { best: previous, isNew: false };
+  const best: ScoreRecord = { key: scoreKey(entry.cols, entry.rows, variant), cols: entry.cols, rows: entry.rows, variant, score: entry.score, stars: entry.stars, round: entry.round ?? null, savedAt: nowMs };
+  await put('scores', best);
+  return { best, isNew: true };
+}
+
 // ----- Delete all -------------------------------------------------------------------------
 
 function deleteDatabase(): Promise<void> {
@@ -436,3 +529,4 @@ export async function deleteAllStoredData(): Promise<void> {
 }
 
 setDeleteAllHandler(deleteAllStoredData);
+setPrefsStore({ load: loadPrefs, save: (prefs) => savePrefs(prefs) });

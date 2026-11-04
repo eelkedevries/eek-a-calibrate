@@ -1,0 +1,474 @@
+/* Methods (the long read) and the pages opened from Details → Device: Screen size, Viewing
+   distance and Diagnostics (prompt 017). The tool pages use the framed shell of style.css; their
+   stage holds the card outline, the blind-spot picture or the diagnostics cards, which page
+   rather than scroll. Colour only through the role tokens. */
+
+/* ---------------------------------------------------------------- Methods */
+
+.doc__head {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.doc,
+.doc__main,
+.methods section,
+.methods .engine {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.doc__back {
+  margin-inline-end: -12px;
+}
+
+.methods {
+  line-height: var(--line-height-normal);
+}
+
+.methods section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-block-start: var(--space-lg);
+}
+
+.methods h2 {
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: var(--line-height-tight);
+}
+
+.methods h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.methods p,
+.methods ul,
+.methods ol,
+.methods dl {
+  margin: 0;
+}
+
+.methods ul,
+.methods ol {
+  padding-inline-start: 1.25rem;
+}
+
+.methods li + li {
+  margin-block-start: 4px;
+}
+
+.methods dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+}
+
+.methods dt {
+  margin-block-start: var(--space-sm);
+  font-weight: 500;
+}
+
+.methods dd {
+  margin: 0;
+  color: var(--color-muted-text);
+  overflow-wrap: anywhere;
+}
+
+.methods a {
+  color: var(--color-link);
+  overflow-wrap: anywhere;
+}
+
+.methods .formula {
+  margin: 0;
+  padding: 12px var(--space-md);
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+.methods .engine {
+  padding: 12px var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.methods .refs li {
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- Tool pages */
+
+.app[data-screen='screen'] .stage,
+.app[data-screen='distance'] .stage,
+.app[data-screen='lab'] .stage {
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar .tool-back {
+  min-block-size: var(--tap);
+  padding: 0 12px;
+  font-size: 1rem;
+}
+
+.app .panel .tool-status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--color-text);
+}
+
+.tool-status:empty {
+  display: none;
+}
+
+.tool-status .state-badge {
+  margin-block-start: 2px;
+}
+
+.tool-note {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--color-muted-text);
+}
+
+.tool-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.tool-inline .btn {
+  min-block-size: var(--tap);
+}
+
+.tool-inline .btn--ghost {
+  margin-inline-start: -12px;
+  padding: 0 12px;
+}
+
+/* The secondary shrinks to its label; the primary takes the rest (design §4.1 rule 7). */
+.app .actions .btn--secondary,
+.app .actions .btn--ghost {
+  flex: 0 1 auto;
+}
+
+/* ---------------------------------------------------------------- Card match */
+
+.card-stage {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: center;
+  align-items: center;
+  min-block-size: 0;
+  overflow: hidden;
+}
+
+.card-stage[data-orientation='upright-partial'] {
+  align-items: flex-start;
+  padding-block-start: var(--space-md);
+}
+
+.card-outline {
+  flex: none;
+  box-sizing: border-box;
+  border: 2px solid var(--color-text);
+  border-radius: 3.2% / 5%;
+  background: var(--node-done);
+}
+
+.card-stage[data-orientation='upright-partial'] .card-outline {
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
+}
+
+.card-readout {
+  position: absolute;
+  inset-inline-start: 12px;
+  inset-block-end: 8px;
+  margin: 0;
+  /* On the stage's colour, so that an outline running to the stage's foot never crosses the text. */
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--color-surface);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--color-muted-text);
+}
+
+.card-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.card-controls input[type='range'] {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  min-block-size: var(--tap);
+  margin: 0;
+  accent-color: var(--color-text);
+}
+
+.card-controls .icon-btn {
+  flex: none;
+  border: 1.5px solid var(--control-boundary);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.screen-diagonal {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.screen-diagonal input {
+  min-block-size: var(--tap);
+  padding: 0 12px;
+  border: 1.5px solid var(--control-boundary);
+  border-radius: var(--radius-control);
+  background: var(--color-background);
+  color: var(--color-text);
+  font: inherit;
+}
+
+/* ---------------------------------------------------------------- Blind-spot picture */
+
+.bs-picture {
+  display: block;
+  flex: 1 1 auto;
+  inline-size: 100%;
+  min-block-size: 0;
+}
+
+.bs-picture .bs-screen {
+  fill: var(--color-text);
+}
+
+.bs-picture .bs-square {
+  fill: var(--color-background);
+}
+
+.bs-picture .bs-dot {
+  fill: var(--state-lost);
+}
+
+.bs-picture .bs-path {
+  fill: none;
+  stroke: var(--color-background);
+  stroke-width: 2;
+  stroke-dasharray: 4 5;
+  stroke-linecap: round;
+}
+
+.bs-caption {
+  margin: 0;
+  padding: 0 var(--space-md) 12px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--color-muted-text);
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------- Diagnostics */
+
+.lab-deck {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-block-size: 0;
+  padding: 12px var(--space-md) var(--space-sm);
+}
+
+.lab-deck__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex: none;
+}
+
+.lab-deck__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: var(--line-height-tight);
+}
+
+.lab-deck__body {
+  flex: 1 1 auto;
+  min-block-size: 0;
+  overflow: hidden;
+}
+
+.lab-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lab-card[hidden] {
+  display: none;
+}
+
+.lab-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 40%) minmax(0, 1fr);
+  gap: 2px var(--space-sm);
+  align-items: baseline;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.lab-row__k {
+  color: var(--color-muted-text);
+}
+
+.lab-row__v {
+  min-inline-size: 0;
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+@container (min-width: 700px) {
+  .lab-card--rows {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-xl);
+    align-content: start;
+  }
+}
+
+.lab-deck__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex: none;
+}
+
+.lab-deck__nav select {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  max-inline-size: 16rem;
+  min-block-size: var(--tap);
+  padding: 0 12px;
+  border: 1.5px solid var(--control-boundary);
+  border-radius: var(--radius-control);
+  background: var(--color-background);
+  color: var(--color-text);
+  font: inherit;
+  text-overflow: ellipsis;
+}
+
+.lab-deck__nav .pager__label {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--color-faint);
+}
+
+.lab-crops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-md);
+  align-items: flex-start;
+}
+
+.lab-crops figure {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  min-inline-size: 0;
+}
+
+.lab-crops figcaption {
+  font-size: 0.875rem;
+  line-height: 1.3;
+  color: var(--color-muted-text);
+}
+
+.lab-crops canvas,
+.lab-crops video {
+  display: block;
+  max-inline-size: 100%;
+  max-block-size: 30cqh;
+  inline-size: auto;
+  border-radius: 6px;
+  background: var(--preview-dark);
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+
+.lab-crops video {
+  inline-size: min(240px, 100%);
+}
+
+.lab-engine-crops {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.lab-engine-crops > figure > figcaption {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.lab-crop-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.lab-messages {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.lab-engine-boxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-md);
+}
+
+.lab-camera-select {
+  min-block-size: var(--tap);
+  max-inline-size: 100%;
+  padding: 0 12px;
+  border: 1.5px solid var(--control-boundary);
+  border-radius: var(--radius-control);
+  background: var(--color-background);
+  color: var(--color-text);
+  font: inherit;
+  text-overflow: ellipsis;
+}
+
+/* The panel's fit guard (screen.ts `guardPanel`): notes go first, then the body. */
+.panel:is([data-fit='1'], [data-fit='2']) .tool-note,
+.panel[data-fit='2'] .panel__body {
+  display: none;
+}
+
+.app .actions--wrap,
+.app:is([data-screen='screen'], [data-screen='distance']) .actions {
+  flex-wrap: wrap;
+}

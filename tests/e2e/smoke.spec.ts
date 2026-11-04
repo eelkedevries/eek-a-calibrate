@@ -178,26 +178,30 @@ test('the deep link opens the sheet over the Title, which stays when it closes',
 
 test('the pager shows one page at a time; delete all sits behind a confirmation', async ({ page }) => {
   const problems = watch(page);
-  await page.goto('./?e2e=1&fixture=sheet-pages#/details/results');
-  // The fixture is applied once the route's module has loaded, which may follow the load event.
-  await expect.poll(() => page.evaluate(() => (window.__eek!.fixture as () => unknown)())).toEqual({ name: 'sheet-pages', applied: true });
-  await expect.poll(() => sheet(page)).toMatchObject({ open: true, tab: 'results', page: 0, pages: 3 });
+  await page.goto('./?e2e=1#/details/about');
+  await expect.poll(async () => {
+    const s = await sheet(page);
+    return s.open && s.tab === 'about' && s.pages >= 3;
+  }).toBe(true);
+  const { pages } = await sheet(page);
+  expect((await sheet(page)).page).toBe(0);
   const pager = page.getByRole('navigation', { name: 'Pages' });
-  await expect(pager).toContainText('1 of 3');
+  await expect(pager).toContainText(`1 of ${pages}`);
   const next = pager.getByRole('button', { name: 'Next page' });
   await next.click();
-  await expect(pager).toContainText('2 of 3');
-  await next.click();
-  await expect(pager).toContainText('3 of 3');
+  await expect(pager).toContainText(`2 of ${pages}`);
+  for (let i = 2; i < pages; i++) await next.click();
+  await expect(pager).toContainText(`${pages} of ${pages}`);
   // At the last page the button stays focused and does nothing.
   await expect(next).toHaveAttribute('aria-disabled', 'true');
   await expect(next).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(pager).toContainText('3 of 3');
-  expect((await sheet(page)).page).toBe(2);
+  await expect(pager).toContainText(`${pages} of ${pages}`);
+  expect((await sheet(page)).page).toBe(pages - 1);
   // A new tab starts on its first page.
   await page.getByRole('tab', { name: 'Device' }).click();
-  await expect(pager).toContainText('1 of 3');
+  await expect(pager).toContainText(/^.*1 of \d+.*$/);
+  expect((await sheet(page)).page).toBe(0);
 
   await page.getByRole('button', { name: 'Delete all my data' }).click();
   const confirm = page.getByRole('alertdialog', { name: 'Delete all your data?' });

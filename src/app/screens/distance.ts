@@ -1,9 +1,11 @@
-// #/distance (specification §7 screen 3, §4.4, §14.1): the optional viewing-distance measurement.
-// The blind-spot test (5 trials; D_bs = d / tan 13.5°, accepted for 300–1200 mm with an SD of at
-// most 15 %, repeated once otherwise), then 2 s with both eyes open for the median iris diameter
-// p̄, giving f_px = D_bs · p̄ / 11.7. The focal length is remembered per camera and frame size.
-// Skip keeps the assumed field of view. Measured after calibration, it changes only the degree
-// values (§14.1.3): D_ref is rescaled with the focal length, the fit is untouched.
+// #/distance (specification §7 screen 3, §4.4, §14.1, §17.2): the optional viewing-distance
+// measurement, opened from Details → Device after the screen size. The blind-spot test (5 trials;
+// D_bs = d / tan 13.5°, accepted for 300–1200 mm with an SD of at most 15 %, repeated once
+// otherwise) with its large "It disappeared" button, then 2 s with both eyes open for the median
+// iris diameter p̄, giving f_px = D_bs · p̄ / 11.7. The focal length is remembered per camera and
+// frame size. Skip keeps the assumed field of view. Measured after calibration, it changes only
+// the degree values (§14.1.3): D_ref is rescaled with the focal length, the fit is untouched.
+import './pages.css';
 import { ASSUMED_PX_PER_MM, BLIND_SPOT, DISTANCE, SETUP } from '../../core/constants.ts';
 import { assessBlindSpot, blindSpotDistanceMm, blindSpotSquarePx, type BlindSpotAssessment } from '../../core/geometry/blindSpot.ts';
 import { focalFromIrisSamples } from '../../core/geometry/distance.ts';
@@ -12,15 +14,13 @@ import type { DistanceModel, FrameResult } from '../../core/types.ts';
 import { detectDeviceClass } from '../../platform/capabilities.ts';
 import { holdWakeLock, type WakeLockHold } from '../../platform/presentation.ts';
 import { focalKey, loadFocal, saveGeometry, storageStatus, type FocalRecord } from '../../platform/storage.ts';
-import { BANNER_CSS, banner } from '../components/banner.ts';
-import { BLIND_SPOT_CSS, runBlindSpot } from '../components/blindSpot.ts';
-import { announce, h } from '../dom.ts';
-import type { RouteId, Screen, ScreenContext } from '../router.ts';
+import { runBlindSpot } from '../components/blindSpot.ts';
+import { announce, h, svg } from '../dom.ts';
+import type { Screen, ScreenContext } from '../router.ts';
 import { activeCapture, ensureCapture, requestedEngines, type Capture } from '../session.ts';
 import { getState, setState } from '../state.ts';
 import { t } from '../strings.en-GB.ts';
-import { provisionalGeometry, rescoreValidation, returnRoute } from './screen.ts';
-import { SETUP_CSS } from './welcome.ts';
+import { fromQuery, guardPanel, provisionalGeometry, rescoreValidation, returnHash, setStatus, toolFrame, type ToolFrame } from './screen.ts';
 
 /** The iris capture after the blind-spot test (§4.4). */
 const IRIS_MS = 2000;
@@ -47,66 +47,57 @@ export function applyDistance(model: DistanceModel): void {
   rescoreValidation();
 }
 
-/** Where to go when the measurement is finished or skipped. */
-function finalRoute(from: RouteId | null): RouteId {
-  if (from) return from;
-  return getState().fit ? 'results' : 'camera';
+/** The picture of the test in the stage: the white screen, the black square, the red dot moving left. */
+function testPicture(): SVGSVGElement {
+  return svg(
+    'svg',
+    { class: 'bs-picture', viewBox: '0 0 320 180', preserveAspectRatio: 'xMidYMid meet', 'aria-hidden': 'true' },
+    svg('rect', { class: 'bs-screen', x: 16, y: 20, width: 288, height: 140, rx: 12 }),
+    svg('rect', { class: 'bs-square', x: 249, y: 83, width: 14, height: 14 }),
+    svg('path', { class: 'bs-path', d: 'M236 90H96' }),
+    svg('path', { class: 'bs-path', d: 'M104 82l-9 8 9 8' }),
+    svg('circle', { class: 'bs-dot', cx: 150, cy: 90, r: 6 }),
+  );
 }
 
 class Distance {
-  private readonly ctx: ScreenContext;
-  private readonly from: RouteId | null;
-  private readonly status = h('div', { 'aria-live': 'polite' });
-  private readonly result = h('div');
+  private readonly params: URLSearchParams;
+  private readonly frame: ToolFrame;
   private readonly startButton: HTMLButtonElement;
-  private readonly stored = h('div');
-  private readonly narrow = h('div');
+  private readonly skipButton: HTMLButtonElement;
   private readonly onResize = (): void => this.checkWidth();
   private attempts = 0;
+  private measured = false;
+  private stored: FocalRecord | null = null;
   private mounted = true;
+  private narrow = false;
   private cancelTest: (() => void) | null = null;
   private wake: WakeLockHold | null = null;
   private stopIris: (() => void) | null = null;
   private readonly mobile = detectDeviceClass().mobile;
 
   constructor(root: HTMLElement, ctx: ScreenContext) {
-    this.ctx = ctx;
-    this.from = returnRoute(ctx.params);
+    this.params = ctx.params;
+    this.frame = toolFrame(root, { title: t('route.distance'), body: t('distance.body'), back: returnHash(ctx.params) });
+    this.frame.stage.append(testPicture(), h('p', { class: 'bs-caption' }, t('distance.caption')));
+    this.startButton = h('button', { type: 'button', class: 'btn btn--primary', onclick: () => (this.measured ? this.finish() : void this.runTest()) }, t('distance.start'));
+    this.skipButton = h('button', { type: 'button', class: 'btn btn--secondary', onclick: () => (this.stored ? this.useStored(this.stored) : this.finish()) }, t('distance.skip'));
+    this.frame.actions.append(this.skipButton, this.startButton);
     const g = getState().geometry;
     const scaleAssumed = !g || g.screen.pxPerMmSource === 'assumed';
-    this.startButton = h('button', { type: 'button', onclick: () => void this.runTest() }, t('distance.start'));
-    root.append(
-      h('style', null, SETUP_CSS + BANNER_CSS + BLIND_SPOT_CSS),
-      h(
-        'div',
-        { class: 'setup' },
-        h('h1', null, t('route.distance')),
-        h('p', { class: 'lead' }, t('distance.lead')),
-        h('p', null, t('screen.optional')),
-        scaleAssumed ? banner('warn', [t('distance.scaleAssumed'), ' ', h('a', { href: this.from ? `#/screen?from=${this.from}` : '#/screen' }, t('distance.measureScreen'))]) : null,
-        this.stored,
-        this.narrow,
-        h(
-          'section',
-          null,
-          h('h2', null, t('distance.howTitle')),
-          h('ol', null, h('li', null, t('distance.step1')), h('li', null, t('distance.step2')), h('li', null, t('distance.step3')), h('li', null, t('distance.step4'))),
-          h('p', { class: 'note' }, t(this.mobile ? 'distance.bandMobile' : 'distance.band')),
-          h('p', { class: 'note' }, t('distance.source')),
-        ),
-        this.status,
-        this.result,
-        h(
-          'div',
-          { class: 'actions' },
-          this.startButton,
-          h('button', { type: 'button', class: 'secondary', onclick: () => ctx.navigate(finalRoute(this.from)) }, t('distance.skip')),
-        ),
-      ),
+    this.frame.extra.append(
+      h('p', { class: 'tool-note' }, t(this.mobile ? 'distance.bandMobile' : 'distance.band'), ' ', t('distance.sourceShort')),
+      scaleAssumed ? h('div', { class: 'tool-inline' }, h('a', { class: 'btn btn--ghost', href: `#/screen${fromQuery(ctx.params)}` }, t('distance.measureScreen'))) : '',
     );
+    if (scaleAssumed) setStatus(this.frame.status, 'adjust', t('distance.scaleAssumed'));
+    guardPanel(root);
     void this.offerStored();
     this.checkWidth();
     window.addEventListener('resize', this.onResize);
+  }
+
+  private finish(): void {
+    location.hash = returnHash(this.params);
   }
 
   /**
@@ -116,7 +107,9 @@ class Distance {
   private checkWidth(): void {
     const reachMm = blindSpotDistanceMm(blindSpotSquarePx(window.innerWidth, window.innerHeight)[0] / this.pxPerMm());
     const tooNarrow = reachMm < BLIND_SPOT.minMm || (this.mobile && window.innerHeight > window.innerWidth);
-    this.narrow.replaceChildren(...(tooNarrow ? [banner('warn', t('distance.narrow'))] : []));
+    if (tooNarrow) setStatus(this.frame.status, 'adjust', t('distance.narrow'));
+    else if (this.narrow) setStatus(this.frame.status, null);
+    this.narrow = tooNarrow;
   }
 
   private async offerStored(): Promise<void> {
@@ -125,19 +118,15 @@ class Distance {
     const s = c.camera.settings;
     const rec = await loadFocal(c.camera.info.deviceIdHash, s.width, s.height).catch(() => null);
     if (!rec || !this.mounted) return;
-    this.stored.replaceChildren(
-      banner('ok', [
-        t('distance.stored', { cm: (rec.blindSpotMm / 10).toFixed(0), date: new Date(rec.savedAt).toLocaleDateString('en-GB') }),
-        ' ',
-        h('button', { type: 'button', class: 'secondary', onclick: () => this.useStored(rec) }, t('distance.useStored')),
-      ]),
-    );
+    setStatus(this.frame.status, 'good', t('distance.stored', { cm: (rec.blindSpotMm / 10).toFixed(0), date: new Date(rec.savedAt).toLocaleDateString('en-GB') }));
+    this.stored = rec;
+    this.skipButton.textContent = t('distance.useStored');
   }
 
   private useStored(rec: FocalRecord): void {
     applyDistance({ focalPx: rec.focalPx, focalSource: 'blind-spot', blindSpotMm: rec.blindSpotMm, blindSpotSdMm: rec.blindSpotSdMm, irisMm: DISTANCE.irisMm });
     announce(t('distance.applied'));
-    this.ctx.navigate(finalRoute(this.from));
+    this.finish();
   }
 
   private pxPerMm(): number {
@@ -147,7 +136,6 @@ class Distance {
 
   private async runTest(): Promise<void> {
     this.startButton.disabled = true;
-    this.result.replaceChildren();
     this.wake ??= holdWakeLock();
     const run = runBlindSpot(document.body, { pxPerMm: this.pxPerMm(), trials: BLIND_SPOT.trials });
     this.cancelTest = run.cancel;
@@ -157,18 +145,18 @@ class Distance {
     this.startButton.disabled = false;
     this.startButton.focus();
     if (outcome.kind === 'cancelled') {
-      this.status.replaceChildren(banner('info', t('distance.cancelled')));
+      setStatus(this.frame.status, 'info', t('distance.cancelled'));
       return;
     }
     if (outcome.kind === 'missed') {
-      this.status.replaceChildren(banner('warn', t('distance.missed')));
+      setStatus(this.frame.status, 'adjust', t('distance.missed'));
       return;
     }
     const a = assessBlindSpot(outcome.offsetsPx, this.pxPerMm());
     this.attempts++;
     if (!a.accepted) {
       const again = this.attempts < 2;
-      this.status.replaceChildren(banner(again ? 'warn' : 'error', [t(`distance.reject.${a.reason}`, { cm: Number.isFinite(a.distanceMm) ? (a.distanceMm / 10).toFixed(0) : '—', sd: Number.isFinite(a.relSd) ? (100 * a.relSd).toFixed(0) : '—' }), ' ', t(again ? 'distance.again' : 'distance.giveUp')]));
+      setStatus(this.frame.status, again ? 'adjust' : 'lost', t(`distance.reject.${a.reason}`, { cm: Number.isFinite(a.distanceMm) ? (a.distanceMm / 10).toFixed(0) : '–', sd: Number.isFinite(a.relSd) ? (100 * a.relSd).toFixed(0) : '–' }), ' ', t(again ? 'distance.again' : 'distance.giveUp'));
       this.startButton.textContent = t('distance.restart');
       return;
     }
@@ -177,19 +165,19 @@ class Distance {
 
   private async measureIris(a: BlindSpotAssessment): Promise<void> {
     this.startButton.disabled = true;
-    this.status.replaceChildren(banner('info', t('distance.bsResult', { cm: (a.distanceMm / 10).toFixed(1), sd: (a.sdMm / 10).toFixed(1) })));
-    this.result.replaceChildren(h('p', { role: 'status' }, t('distance.iris.camera')));
+    setStatus(this.frame.status, 'info', t('distance.bsResult', { cm: (a.distanceMm / 10).toFixed(1), sd: (a.sdMm / 10).toFixed(1) }), ' ', t('distance.iris.camera'));
     let c: Capture;
     try {
-      c = await ensureCapture(requestedEngines(), { onStatus: (key) => this.result.replaceChildren(h('p', { role: 'status' }, t(`calibrate.status.${key}`))) });
+      c = await ensureCapture(requestedEngines(), { onStatus: (key) => setStatus(this.frame.status, 'info', t(`calibrate.status.${key}`)) });
     } catch (error) {
       if (!this.mounted) return;
-      this.result.replaceChildren(banner('error', t('distance.iris.noCamera', { message: error instanceof Error ? error.message : String(error) })));
+      setStatus(this.frame.status, 'lost', t('distance.iris.noCamera', { message: error instanceof Error ? error.message : String(error) }));
       this.startButton.disabled = false;
       return;
     }
     if (!this.mounted) return;
-    this.result.replaceChildren(h('p', { role: 'status', class: 'lead' }, t('distance.iris.look')));
+    setStatus(this.frame.status, 'info', t('distance.iris.look'));
+    announce(t('distance.iris.look'));
     const samples: number[] = [];
     let startMs: number | null = null;
     const done = new Promise<void>((resolve) => {
@@ -214,7 +202,7 @@ class Distance {
     if (!this.mounted) return;
     this.startButton.disabled = false;
     if (samples.length < MIN_IRIS_FRAMES) {
-      this.result.replaceChildren(banner('error', t('distance.iris.tooFew', { n: samples.length })));
+      setStatus(this.frame.status, 'lost', t('distance.iris.tooFew', { n: samples.length }));
       return;
     }
     const focalPx = focalFromIrisSamples(a.distanceMm, samples);
@@ -230,15 +218,11 @@ class Distance {
     }
     if (!this.mounted) return;
     const inBand = a.distanceMm >= SETUP.distMinMm && a.distanceMm <= SETUP.distMaxMm;
-    this.result.replaceChildren(
-      banner(this.mobile || inBand ? 'ok' : 'warn', [
-        t('distance.done', { cm: (a.distanceMm / 10).toFixed(0) }),
-        ' ',
-        this.mobile ? '' : t(inBand ? 'distance.inBand' : a.distanceMm < SETUP.distMinMm ? 'distance.tooClose' : 'distance.tooFar'),
-      ]),
-      storageStatus().mode === 'memory' ? banner('warn', t('storage.memory')) : '',
-      h('div', { class: 'actions' }, h('button', { type: 'button', onclick: () => this.ctx.navigate(finalRoute(this.from)) }, t('distance.continue'))),
-    );
+    const advice = this.mobile ? '' : t(inBand ? 'distance.inBand' : a.distanceMm < SETUP.distMinMm ? 'distance.tooClose' : 'distance.tooFar');
+    setStatus(this.frame.status, this.mobile || inBand ? 'good' : 'adjust', t('distance.done', { cm: (a.distanceMm / 10).toFixed(0) }), advice ? ` ${advice}` : '', storageStatus().mode === 'memory' ? ` ${t('storage.memory')}` : '');
+    this.measured = true;
+    this.startButton.textContent = t('distance.continue');
+    this.skipButton.hidden = true;
     announce(t('distance.done', { cm: (a.distanceMm / 10).toFixed(0) }));
   }
 

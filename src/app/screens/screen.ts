@@ -1,22 +1,28 @@
-// #/screen (specification §7 screen 2, §4.4, §14.1): the optional screen-size measurement. Match an
-// outline to a bank card, or enter the diagonal in inches, or skip (96 CSS px per inch assumed,
-// degrees approximate). A measurement is remembered per screen (`screen W×H@dpr`, long side
-// first). Measuring after calibration changes only the degree values: the fit keeps its own
-// geometry and the stored validation is scored again (§14.1.3).
+// #/screen (specification §7 screen 2, §4.4, §14.1, §17.2): the optional screen-size measurement,
+// opened from Details → Device. Match an outline to a bank card, or enter the diagonal in inches,
+// or skip (96 CSS px per inch assumed, degrees approximate). A measurement is remembered per
+// screen (`screen W×H@dpr`, long side first). Measuring after calibration changes only the degree
+// values: the fit keeps its own geometry and the stored validation is scored again (§14.1.3).
+// The page fits one screen: the outline lies in the stage, the slider and actions beside it.
+import './pages.css';
 import { ASSUMED_PX_PER_MM, DISTANCE } from '../../core/constants.ts';
 import { focalFromAssumedFov } from '../../core/geometry/distance.ts';
 import { isDegreesApproximate, pxPerMmFromCard, pxPerMmFromDiagonal, screenKey } from '../../core/geometry/screen.ts';
 import type { ScreenGeometry, SessionGeometry } from '../../core/types.ts';
 import { scoreRecording } from '../../fit/fitClient.ts';
 import { loadScreenScale, saveGeometry, screenScaleKey, storageStatus } from '../../platform/storage.ts';
-import { BANNER_CSS, banner } from '../components/banner.ts';
-import { CARD_CSS, cardMatch } from '../components/cardMatch.ts';
-import { announce, h } from '../dom.ts';
+import { cardMatch } from '../components/cardMatch.ts';
+import { stateBadge, type BadgeState } from '../details/page.ts';
+import { announce, h, type Child } from '../dom.ts';
 import type { RouteId, Screen, ScreenContext } from '../router.ts';
 import { currentValidationRun } from '../session.ts';
+import { addCleanup } from '../shell/appShell.ts';
+import { detailsReturnHash } from '../shell/detailsSheet.ts';
+import { contentFits, pickTier } from '../shell/fitGuard.ts';
+import { icon } from '../shell/icons.ts';
+import { topBar } from '../shell/topBar.ts';
 import { getState, setState } from '../state.ts';
 import { t } from '../strings.en-GB.ts';
-import { SETUP_CSS } from './welcome.ts';
 
 /** The CSS-px screen size and pixel ratio the measurement is stored under. */
 export function currentScreen(): Pick<ScreenGeometry, 'screenWpx' | 'screenHpx' | 'dpr'> {
@@ -44,12 +50,29 @@ export function provisionalGeometry(scale: { pxPerMm: number; pxPerMmSource: Scr
   return { screen: screenGeometry, distance: { ...d }, refDistanceMm: null, degreesApproximate: isDegreesApproximate(screenGeometry, d) };
 }
 
-/** Where the optional measurement returns to (`?from=`): the screen it was started from. */
+/** Where the optional measurement returns to (`?from=`): the v1 screen it was started from. */
 const RETURN_ROUTES: readonly RouteId[] = ['welcome', 'camera', 'results', 'live', 'data'];
 
 export function returnRoute(params: URLSearchParams): RouteId | null {
   const from = params.get('from');
   return from !== null && (RETURN_ROUTES as readonly string[]).includes(from) ? (from as RouteId) : null;
+}
+
+/**
+ * Where the measurement goes when it is finished or skipped: back to the screen Details was
+ * opened over (`from=details`), to the v1 screen named, or, without one, to the v1 flow.
+ */
+export function returnHash(params: URLSearchParams): string {
+  if (params.get('from') === 'details') return detailsReturnHash('device');
+  const from = returnRoute(params);
+  if (from) return `#/${from}`;
+  return getState().fit ? '#/results' : '#/camera';
+}
+
+/** The `from` parameter to pass on to the next page of the measurement. */
+export function fromQuery(params: URLSearchParams): string {
+  const from = params.get('from');
+  return from === 'details' || returnRoute(params) ? `?from=${from}` : '';
 }
 
 /**
@@ -81,47 +104,143 @@ export function applyScale(pxPerMm: number, source: ScreenGeometry['pxPerMmSourc
   rescoreValidation();
 }
 
+// ----- The tool pages' frame (Screen size, Viewing distance, Diagnostics) --------------------
+
+export interface ToolFrame {
+  stage: HTMLElement;
+  body: HTMLParagraphElement;
+  /** A status line (good, adjust, lost or plain), announced politely. */
+  status: HTMLElement;
+  /** Controls between the body and the status (the slider, a field). */
+  extra: HTMLElement;
+  actions: HTMLElement;
+}
+
+/**
+ * The framed page of design §4.3–§4.5 for a page opened from Details: the top bar with Back and
+ * Details, the stage, a panel with the title, one body line, extras and a status, and the
+ * actions. A fit guard drops the panel's notes, then its body, before anything could overflow.
+ */
+export function toolFrame(root: HTMLElement, opts: { title: string; body: string; back: string }): ToolFrame {
+  const bar = topBar({ variant: 'title', detailsTab: 'device' });
+  const back = h('a', { class: 'btn btn--ghost tool-back', href: opts.back }, icon('back'), h('span', null, t('tool.back')));
+  bar.querySelector('.topbar__end')?.prepend(back);
+  const stage = h('section', { class: 'stage' });
+  const body = h('p', { class: 'panel__body' }, opts.body);
+  const extra = h('div', { class: 'tool-extra' });
+  const status = h('p', { class: 'tool-status', role: 'status', 'aria-live': 'polite' });
+  const panel = h('div', { class: 'panel' }, h('h1', { class: 'panel__title' }, opts.title), body, extra, status);
+  const actions = h('div', { class: 'actions' });
+  root.append(bar, h('main', { class: 'app__main' }, stage, h('div', { class: 'side' }, panel, actions)));
+  return { stage, body, status, extra, actions };
+}
+
+/** Writes a status line: a state badge (glyph and colour) and the words, or clears it. */
+export function setStatus(el: HTMLElement, kind: BadgeState | 'info' | null, ...content: Child[]): void {
+  if (kind === null) {
+    el.replaceChildren();
+    return;
+  }
+  el.replaceChildren(...(kind === 'info' ? [] : [stateBadge(kind)]), h('span', null, ...content));
+}
+
+/** Keeps a stage-sized element laid out for its box: `onSize` runs on every resize. */
+export function watchSize(el: HTMLElement, onSize: (width: number, height: number) => void): void {
+  const observer = new ResizeObserver(() => onSize(el.clientWidth, el.clientHeight));
+  observer.observe(el);
+  addCleanup(() => observer.disconnect());
+}
+
+/**
+ * The panel's fit guard (design §4.1 rule 11): drops its notes (tier 1), then its body (tier 2),
+ * when the side column overflows or the stage would be left under `minStagePx` tall.
+ */
+export function guardPanel(root: HTMLElement, minStagePx = 140): void {
+  queueMicrotask(() => {
+    const panel = root.querySelector<HTMLElement>('.panel');
+    const side = root.querySelector<HTMLElement>('.side');
+    const stage = root.querySelector<HTMLElement>('.stage');
+    if (!panel?.isConnected || !side || !stage) return;
+    const bar = root.querySelector<HTMLElement>('.topbar');
+    const actions = root.querySelector<HTMLElement>('.actions');
+    // In a phone held sideways the panel is centred in its row and can grow over the bar or the
+    // actions without overflowing anything, so overlap counts as not fitting.
+    const clear = (a: HTMLElement | null) => {
+      if (!a) return true;
+      const p = panel.getBoundingClientRect();
+      const r = a.getBoundingClientRect();
+      const sideBySide = p.right <= r.left + 0.5 || p.left >= r.right - 0.5;
+      return sideBySide || p.bottom <= r.top + 0.5 || p.top >= r.bottom - 0.5;
+    };
+    const fits = () => contentFits(panel) && contentFits(side) && stage.clientHeight >= minStagePx && clear(bar) && clear(actions);
+    const check = () => {
+      if (!panel.isConnected) return;
+      const tier = pickTier(2, (candidate) => {
+        panel.dataset.fit = String(candidate);
+        return fits();
+      });
+      panel.dataset.fit = String(tier);
+    };
+    const observer = new ResizeObserver(check);
+    observer.observe(stage);
+    observer.observe(side);
+    observer.observe(panel);
+    observer.observe(root);
+    void document.fonts?.ready.then(check);
+    addCleanup(() => observer.disconnect());
+    check();
+  });
+}
+
 class ScreenSize {
-  private readonly status = h('div', { 'aria-live': 'polite' });
+  private readonly frame: ToolFrame;
+  private readonly params: URLSearchParams;
+  private readonly card;
   private readonly diagonal = h('input', { id: 'screen-diagonal', type: 'number', inputmode: 'decimal', min: 3, max: 120, step: 0.1 });
+  private mode: 'card' | 'diagonal' = 'card';
+  private stored = false;
   private mounted = true;
-  private readonly from: RouteId | null;
 
   constructor(root: HTMLElement, ctx: ScreenContext) {
+    this.params = ctx.params;
     const g = getState().geometry;
-    this.from = returnRoute(ctx.params);
     const initial = g && g.screen.pxPerMmSource !== 'assumed' ? g.screen.pxPerMm : ASSUMED_PX_PER_MM;
-    const card = cardMatch(initial * 85.6);
-    const useCard = h('button', { type: 'button', onclick: () => void this.save('card', card.longSidePx()) }, t('screen.card.use'));
-    const useDiagonal = h('button', { type: 'button', onclick: () => this.fromDiagonal() }, t('screen.diagonal.use'));
-    root.append(
-      h('style', null, SETUP_CSS + BANNER_CSS + CARD_CSS),
-      h(
-        'div',
-        { class: 'setup' },
-        h('h1', null, t('route.screen')),
-        h('p', { class: 'lead' }, t('screen.lead')),
-        h('p', null, t('screen.optional')),
-        this.status,
-        h('section', null, h('h2', null, t('screen.card.title')), card.el, h('div', { class: 'actions' }, useCard)),
-        h(
-          'section',
-          null,
-          h('h2', null, t('screen.diagonal.title')),
-          h('p', null, t('screen.diagonal.body')),
-          h('div', { class: 'field' }, h('label', { for: 'screen-diagonal' }, t('screen.diagonal.label')), this.diagonal),
-          h('div', { class: 'actions' }, useDiagonal),
-        ),
-        h(
-          'section',
-          null,
-          h('h2', null, t('screen.skip.title')),
-          h('p', null, t('screen.skip.body')),
-          h('div', { class: 'actions' }, h('button', { type: 'button', class: 'secondary', onclick: () => this.skip() }, t('screen.skip.button'))),
-        ),
-      ),
-    );
+    this.card = cardMatch(initial * 85.6);
+    this.frame = toolFrame(root, { title: t('route.screen'), body: t('screen.body.across'), back: returnHash(ctx.params) });
+    this.frame.stage.append(this.card.stage);
+    watchSize(this.frame.stage, (w, hgt) => {
+      this.card.fit(w, hgt);
+      if (this.mode === 'card') this.frame.body.textContent = t(`screen.body.${this.card.orientation()}`);
+    });
+    guardPanel(root);
+    this.render();
     void this.showStored();
+  }
+
+  private render(): void {
+    const { extra, actions, body } = this.frame;
+    if (this.mode === 'card') {
+      body.textContent = t(`screen.body.${this.card.orientation()}`);
+      extra.replaceChildren(this.card.controls, h('div', { class: 'tool-inline' }, h('button', { type: 'button', class: 'btn btn--ghost', onclick: () => this.switchMode('diagonal') }, t('screen.toDiagonal'))));
+      actions.replaceChildren(
+        h('button', { type: 'button', class: 'btn btn--secondary', onclick: () => this.skip() }, t(this.stored ? 'screen.keep' : 'screen.skip')),
+        h('button', { type: 'button', class: 'btn btn--primary', onclick: () => void this.save('card', this.card.longSidePx()) }, t('screen.use')),
+      );
+    } else {
+      body.textContent = t('screen.diagonal.body');
+      extra.replaceChildren(h('div', { class: 'screen-diagonal' }, h('label', { class: 'field__label', for: 'screen-diagonal' }, t('screen.diagonal.label')), this.diagonal));
+      actions.replaceChildren(
+        h('button', { type: 'button', class: 'btn btn--secondary', onclick: () => this.switchMode('card') }, t('screen.toCard')),
+        h('button', { type: 'button', class: 'btn btn--primary', onclick: () => this.fromDiagonal() }, t('screen.diagonal.use')),
+      );
+    }
+  }
+
+  private switchMode(mode: 'card' | 'diagonal'): void {
+    this.mode = mode;
+    this.render();
+    if (mode === 'diagonal') this.diagonal.focus();
+    else this.card.controls.querySelector('input')?.focus();
   }
 
   private async showStored(): Promise<void> {
@@ -131,15 +250,11 @@ class ScreenSize {
     const g = getState().geometry;
     if (stored) {
       if (!g || g.screen.pxPerMmSource === 'assumed') applyScale(stored.pxPerMm, stored.source);
-      this.status.replaceChildren(
-        banner('ok', [
-          t('screen.stored', { scale: stored.pxPerMm.toFixed(3), source: t(`screen.source.${stored.source}`), date: new Date(stored.savedAt).toLocaleDateString('en-GB') }),
-          ' ',
-          h('button', { type: 'button', class: 'secondary', onclick: () => this.done() }, t('screen.keep')),
-        ]),
-      );
+      this.stored = true;
+      setStatus(this.frame.status, 'good', t('screen.stored', { scale: stored.pxPerMm.toFixed(3), source: t(`screen.source.${stored.source}`), date: new Date(stored.savedAt).toLocaleDateString('en-GB') }));
+      this.render();
     } else if (g && g.screen.pxPerMmSource !== 'assumed') {
-      this.status.replaceChildren(banner('ok', t('screen.current', { scale: g.screen.pxPerMm.toFixed(3), source: t(`screen.source.${g.screen.pxPerMmSource}`) })));
+      setStatus(this.frame.status, 'good', t('screen.current', { scale: g.screen.pxPerMm.toFixed(3), source: t(`screen.source.${g.screen.pxPerMmSource}`) }));
     }
   }
 
@@ -147,7 +262,7 @@ class ScreenSize {
     const inches = Number(this.diagonal.value);
     const s = currentScreen();
     if (!(inches >= 3 && inches <= 120 && s.screenWpx > 0 && s.screenHpx > 0)) {
-      this.status.replaceChildren(banner('error', t('screen.diagonal.invalid')));
+      setStatus(this.frame.status, 'lost', t('screen.diagonal.invalid'));
       this.diagonal.focus();
       return;
     }
@@ -165,9 +280,8 @@ class ScreenSize {
       console.warn('The screen scale could not be stored', error);
     }
     if (!this.mounted) return;
-    const memoryOnly = storageStatus().mode === 'memory';
     announce(t('screen.saved', { scale: pxPerMm.toFixed(3) }));
-    if (memoryOnly) this.status.replaceChildren(banner('warn', t('storage.memory')));
+    if (storageStatus().mode === 'memory') setStatus(this.frame.status, 'adjust', t('storage.memory'));
     this.done();
   }
 
@@ -179,7 +293,7 @@ class ScreenSize {
 
   /** On to the distance measurement, which then returns to where this started. */
   private done(): void {
-    location.hash = this.from ? `#/distance?from=${this.from}` : '#/distance';
+    location.hash = `#/distance${fromQuery(this.params)}`;
   }
 
   unmount(): void {

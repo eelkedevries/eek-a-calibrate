@@ -13,6 +13,11 @@ import { strings as complete } from './strings/complete.ts';
 import { strings as components } from './strings/components.ts';
 import { strings as data } from './strings/data.ts';
 import { strings as details } from './strings/details.ts';
+import { strings as detailsAbout } from './strings/details-about.ts';
+import { strings as detailsData } from './strings/details-data.ts';
+import { strings as detailsDevice } from './strings/details-device.ts';
+import { strings as detailsResults } from './strings/details-results.ts';
+import { strings as detailsSettings } from './strings/details-settings.ts';
 import { strings as distance } from './strings/distance.ts';
 import { strings as drift } from './strings/drift.ts';
 import { strings as guard } from './strings/guard.ts';
@@ -40,6 +45,11 @@ export const STRING_MODULES: Readonly<Record<string, StringTable>> = {
   shell,
   track,
   details,
+  'details-results': detailsResults,
+  'details-settings': detailsSettings,
+  'details-data': detailsData,
+  'details-device': detailsDevice,
+  'details-about': detailsAbout,
   title,
   ready,
   guard,

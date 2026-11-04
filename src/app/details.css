@@ -1,0 +1,538 @@
+/* The Details sheet's pages (design §2.17; spec-core): readings, switches, choices, metric cards,
+   the target plot, stars and state badges. Colour only through the role tokens of style.css; the
+   engine colours are the data-series roles of the target plot (Okabe–Ito). */
+
+:root {
+  --c-combined: var(--color-text);
+  --c-blazegaze: #56b4e9;
+  --c-peekr: #e69f00;
+  --c-geometric: #009e73;
+  --c-eyepixel: #cc79a7;
+  --c-target: #d55e00;
+}
+
+:root[data-theme='light'] {
+  --c-blazegaze: #0072b2;
+}
+
+/* ---------------------------------------------------------------- Pages */
+
+.sheet-page {
+  align-items: stretch;
+  gap: 12px;
+  min-inline-size: 0;
+}
+
+.sheet-page--fill {
+  block-size: 100%;
+}
+
+.sheet-page__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px var(--space-sm);
+  min-inline-size: 0;
+}
+
+.sheet-page__head .sheet-page__title {
+  margin-inline-end: auto;
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: var(--line-height-tight);
+}
+
+.sheet-page .sheet-page__body {
+  font-size: 1rem;
+  line-height: 1.45;
+  color: var(--color-text);
+}
+
+.sheet-note {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--color-muted-text);
+}
+
+.sheet-status {
+  min-block-size: 2.8em;
+}
+
+.sheet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.sheet-actions .btn {
+  min-block-size: 48px;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--tap);
+  color: var(--color-link);
+  overflow-wrap: anywhere;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 24px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-pill);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- Readings */
+
+.kv {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 38%) minmax(0, 1fr);
+  gap: 2px var(--space-sm);
+  align-items: baseline;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.kv__k {
+  color: var(--color-muted-text);
+}
+
+.kv__v {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  font-family: var(--font-mono);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.kv--text .kv__v {
+  font-family: var(--font-sans);
+}
+
+.kv--stack {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.kv__line--second {
+  color: var(--color-muted-text);
+}
+
+.kv--chosen .kv__k {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-sans);
+}
+
+.state-badge {
+  display: block;
+  flex: none;
+}
+
+.state-badge__glyph {
+  stroke: var(--badge-ink);
+}
+
+.state-badge--good .state-badge__disc {
+  fill: var(--state-good);
+}
+
+.state-badge--adjust .state-badge__disc {
+  fill: var(--state-adjust);
+}
+
+.state-badge--lost .state-badge__disc {
+  fill: var(--state-lost);
+}
+
+.funnel-bar {
+  display: block;
+  inline-size: 100%;
+  block-size: 6px;
+  margin-block: 7px 2px;
+  border-radius: 3px;
+  background: var(--color-border);
+}
+
+.funnel-bar__fill {
+  display: block;
+  block-size: 100%;
+  border-radius: inherit;
+  background: var(--color-secondary);
+}
+
+/* ---------------------------------------------------------------- Switches */
+
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-block-size: 48px;
+}
+
+.setting__text {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.setting__label {
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: var(--line-height-tight);
+}
+
+.setting__detail {
+  font-size: 0.875rem;
+  line-height: 1.35;
+  color: var(--color-muted-text);
+}
+
+.switch {
+  position: relative;
+  flex: none;
+  inline-size: 52px;
+  block-size: var(--tap);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  cursor: pointer;
+}
+
+.switch::before {
+  content: '';
+  position: absolute;
+  inset: 8px 0;
+  border: 1.5px solid var(--control-boundary);
+  border-radius: var(--radius-pill);
+  background: var(--color-background);
+  transition: background-color 0.2s ease-out, border-color 0.2s ease-out;
+}
+
+.switch__knob {
+  position: absolute;
+  inset-block-start: 13px;
+  inset-inline-start: 5px;
+  inline-size: 18px;
+  block-size: 18px;
+  border-radius: 50%;
+  background: var(--color-muted-text);
+  transition: transform 0.2s ease-out, background-color 0.2s ease-out;
+}
+
+.switch[aria-checked='true']::before {
+  border-color: var(--color-text);
+  background: var(--color-text);
+}
+
+.switch[aria-checked='true'] .switch__knob {
+  transform: translateX(24px);
+  background: var(--color-background);
+}
+
+.switch[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch::before,
+  .switch__knob {
+    transition: none;
+  }
+}
+
+/* ---------------------------------------------------------------- Choices and checkboxes */
+
+.segmented {
+  display: flex;
+  gap: 2px;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-background);
+}
+
+.segmented--grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-radius: var(--radius-card);
+}
+
+.segmented__option {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 0;
+  min-block-size: var(--tap);
+  padding: 4px var(--space-sm);
+  border-radius: var(--radius-pill);
+  color: var(--color-muted-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease-out, color 0.2s ease-out;
+}
+
+.segmented--grid .segmented__option {
+  border-radius: var(--radius-control);
+}
+
+.segmented__option:hover {
+  color: var(--color-text);
+}
+
+.segmented__input,
+.check__input {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.segmented__option:has(.segmented__input:checked) {
+  background: var(--color-text);
+  color: var(--color-background);
+}
+
+.segmented__option:has(.segmented__input:focus-visible),
+.check:has(.check__input:focus-visible) {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.check {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-block-size: 48px;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.check__box {
+  display: grid;
+  flex: none;
+  place-items: center;
+  inline-size: 22px;
+  block-size: 22px;
+  border: 1.5px solid var(--control-boundary);
+  border-radius: 6px;
+  color: transparent;
+}
+
+.check:has(.check__input:checked) .check__box {
+  border-color: var(--color-text);
+  background: var(--color-text);
+  color: var(--color-background);
+}
+
+.check:has(.check__input:disabled) {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.check__text {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.check__label {
+  font-size: 1rem;
+  line-height: var(--line-height-tight);
+}
+
+.check__detail {
+  font-size: 0.875rem;
+  line-height: 1.35;
+  color: var(--color-muted-text);
+}
+
+.swatch {
+  flex: none;
+  inline-size: 12px;
+  block-size: 12px;
+  border-radius: 50%;
+}
+
+.swatch--combined { background: var(--c-combined); }
+.swatch--blazegaze { background: var(--c-blazegaze); }
+.swatch--peekr { background: var(--c-peekr); }
+.swatch--geometric { background: var(--c-geometric); }
+.swatch--eyepixel { background: var(--c-eyepixel); }
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field__label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-muted-text);
+}
+
+.field__input {
+  min-inline-size: 0;
+  min-block-size: var(--tap);
+  padding: 0 12px;
+  border: 1.5px solid var(--control-boundary);
+  border-radius: var(--radius-control);
+  background: var(--color-background);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.field__input:disabled {
+  color: var(--color-muted-text);
+  border-color: var(--color-border);
+}
+
+/* ---------------------------------------------------------------- Metric cards */
+
+.metric-card {
+  padding: 12px var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-background);
+}
+
+.metric-card .sheet-page__head::before {
+  content: '';
+  flex: none;
+  inline-size: 12px;
+  block-size: 12px;
+  border-radius: 50%;
+  background: var(--swatch, var(--color-text));
+}
+
+.metric-card--combined { --swatch: var(--c-combined); }
+.metric-card--blazegaze { --swatch: var(--c-blazegaze); }
+.metric-card--peekr { --swatch: var(--c-peekr); }
+.metric-card--geometric { --swatch: var(--c-geometric); }
+.metric-card--eyepixel { --swatch: var(--c-eyepixel); }
+
+.metric-card__backend {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--color-faint);
+}
+
+/* ---------------------------------------------------------------- Stars, judging, plot */
+
+.stars {
+  display: block;
+  flex: none;
+}
+
+.star--on {
+  fill: var(--star-on);
+}
+
+.star--off {
+  fill: none;
+  stroke: var(--star-off);
+  stroke-width: 1.5;
+}
+
+.judge-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.judge-row .stars {
+  margin-block-start: 3px;
+}
+
+.plot-holder {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: center;
+  min-block-size: 80px;
+}
+
+.target-plot {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  border-radius: var(--radius-control);
+}
+
+.target-plot .plot-screen {
+  fill: var(--stage);
+}
+
+.target-plot .plot-target {
+  fill: none;
+  stroke: var(--c-target);
+}
+
+.target-plot .plot-sample {
+  fill: currentColor;
+  opacity: 0.45;
+}
+
+.target-plot .plot-centroid {
+  fill: currentColor;
+  stroke: var(--stage-ink);
+  stroke-width: 1;
+}
+
+.target-plot .plot-offset {
+  stroke: currentColor;
+}
+
+/* The footer's delete action and pager share one row wherever both fit (a 1280 px window
+   included), which leaves the page more room. */
+.sheet__nav {
+  column-gap: var(--space-sm);
+}
+
+/* A phone held sideways: tighter pages, so that each holds more. */
+@media (max-height: 479.98px) {
+  .sheet-page {
+    gap: var(--space-sm);
+  }
+
+  .sheet-page__head .sheet-page__title {
+    font-size: 1rem;
+  }
+
+  .metric-card {
+    padding: var(--space-sm) 12px;
+  }
+
+  .setting,
+  .check {
+    min-block-size: var(--tap);
+  }
+}

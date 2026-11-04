@@ -4,11 +4,10 @@
 // optional screen and distance measurement. The default flow goes on to the camera (§14.1.1).
 import { ENGINE_IDS } from '../../core/types.ts';
 import type { EngineId, Preset } from '../../core/types.ts';
-import { ENGINE_SPECS } from '../../engines/specs.ts';
-import type { EngineSpec } from '../../engines/types.ts';
 import { detectCapabilities, detectDeviceClass, type CapabilityReport } from '../../platform/capabilities.ts';
 import { listProfiles } from '../../platform/storage.ts';
 import { BANNER_CSS, banner } from '../components/banner.ts';
+import { engineSpecs, megabytes } from '../details/settings.ts';
 import { h } from '../dom.ts';
 import type { Screen, ScreenContext } from '../router.ts';
 import { getState, setState, type Settings } from '../state.ts';
@@ -45,14 +44,8 @@ const CAPABILITIES: readonly (keyof CapabilityReport)[] = ['secureContext', 'get
 const REQUIRED: ReadonlySet<keyof CapabilityReport> = new Set(['secureContext', 'getUserMedia']);
 const PRESETS: readonly Preset[] = ['quick', 'standard', 'thorough'];
 
-export function megabytes(bytes: number): string {
-  return bytes >= 100_000 ? `${(bytes / 1_000_000).toFixed(1)} MB` : bytes > 0 ? `${Math.round(bytes / 1000)} kB` : t('welcome.engines.noDownload');
-}
-
-/** Every engine's spec, from the static table (§16.2.4): no engine code is downloaded to show it. */
-export async function engineSpecs(): Promise<Partial<Record<EngineId, EngineSpec>>> {
-  return { ...ENGINE_SPECS };
-}
+// The engine sizes and specs moved to Details → Settings; this screen calls them there.
+export { engineSpecs, megabytes } from '../details/settings.ts';
 
 function updateSettings(patch: Partial<Settings>): void {
   setState({ settings: { ...getState().settings, ...patch } });

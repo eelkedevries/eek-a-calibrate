@@ -1,6 +1,9 @@
-// #/lab, the diagnostics screen (spec §7 screen 10): host, delegate, backends,
+// #/lab, the diagnostics screen (spec §7 screen 10, §17.2): host, delegate, backends,
 // per-stage timings, live crops and engine status, and "Run each engine on 10
-// frames" (the probe over every engine, used by engines.spec.ts).
+// frames" (the probe over every engine, used by engines.spec.ts). Opened from
+// Details → Device, in the game's framed shell: the readings are cards in the
+// stage, one at a time, and a card taller than the stage continues on the next
+// page (`splitBlocks`), so the page never scrolls.
 //
 // Crop renderers are pluggable. An engine adds `src/engines/<id>/lab.ts` whose
 // default export is a CropRenderer (the shape below; a type-only import or a
@@ -19,16 +22,24 @@ import type { EngineFrame, EngineId, FrameMeta, FrameResult } from '../../core/t
 import { CONTOUR_L, CONTOUR_R, EYE_L, EYE_R, lmX, lmY } from '../../core/face/landmarkSets.ts';
 import type { PixelBuffer } from '../../core/face/quality.ts';
 import { ENGINE_LOADERS } from '../../engines/registry.ts';
+import { ENGINE_SPECS } from '../../engines/specs.ts';
 import { CameraError, listCameras, openCamera, type CameraSession } from '../../platform/camera.ts';
 import { FrameClock } from '../../platform/frameClock.ts';
 import { roiRect } from '../../vision/frameImage.ts';
 import { crashWorkerHosts, createVisionHost, defaultVisionConfig, type HostError, type ManagedVisionHost } from '../../vision/host.ts';
 import type { ProbeResult } from '../../vision/protocol.ts';
+import './pages.css';
+import { checkRow } from '../details/page.ts';
 import { h } from '../dom.ts';
-import type { Screen } from '../router.ts';
+import type { Screen, ScreenContext } from '../router.ts';
+import { addCleanup } from '../shell/appShell.ts';
+import { detailsReturnHash } from '../shell/detailsSheet.ts';
+import { icon } from '../shell/icons.ts';
+import { splitBlocks } from '../shell/pager.ts';
 import { getState } from '../state.ts';
 import { t } from '../strings.en-GB.ts';
 import { registerTestHook } from '../testHooks.ts';
+import { guardPanel, returnHash, toolFrame } from './screen.ts';
 
 // ----- Crop renderer contract -------------------------------------------------
 
@@ -157,29 +168,132 @@ function base64(bytes: Uint8ClampedArray): string {
   return btoa(out);
 }
 
-const LAB_CSS = `
-.lab-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
-.lab-panel { min-width: 0; overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-3); }
-.lab-panel h2 { margin-top: 0; font-size: 1.1rem; }
-.lab-dl { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: var(--space-1) var(--space-3); margin: 0; }
-.lab-dl dt { color: var(--muted); }
-.lab-dl dd { margin: 0; font-family: var(--font-mono); overflow-wrap: anywhere; }
-.lab-table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
-.lab-table th, .lab-table td { text-align: left; padding: var(--space-1) var(--space-2); border-bottom: 1px solid var(--border); }
-.lab-controls { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: end; }
-.lab-controls > * { min-width: 0; max-width: 100%; }
-.lab-controls select { max-width: 100%; text-overflow: ellipsis; }
-.lab-controls fieldset { border: 1px solid var(--border); border-radius: var(--radius); }
-.lab-crops { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: flex-start; }
-.lab-crops figure { margin: 0; }
-.lab-crops-engines { margin-top: var(--space-4); }
-.lab-crops-engines > figure > figcaption { font-weight: 600; }
-.lab-crop-views { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.lab-crops canvas, .lab-crops video { display: block; max-width: 100%; background: #000; image-rendering: pixelated; }
-.lab-crops video { width: 320px; }
-.lab-messages { font-family: var(--font-mono); font-size: 0.9rem; max-height: 12rem; overflow: auto; }
-@media (max-width: 30rem) { .lab-dl { grid-template-columns: minmax(0, 1fr); } .lab-dl dd { margin-bottom: var(--space-2); } }
-`;
+// ----- The deck of cards ------------------------------------------------------------
+
+interface DeckCard {
+  id: string;
+  title: string;
+  el: HTMLElement;
+}
+
+/** One row of a card: a label and its value in mono. */
+interface LabRow {
+  el: HTMLElement;
+  k: HTMLElement;
+  v: HTMLElement;
+}
+
+function labRow(): LabRow {
+  const k = h('span', { class: 'lab-row__k' });
+  const v = h('span', { class: 'lab-row__v' });
+  return { el: h('div', { class: 'lab-row' }, k, v), k, v };
+}
+
+/**
+ * The cards in the stage, one page at a time. Each card's children are its blocks; a card taller
+ * than the body is cut into pages between blocks. `layout` measures again (a resize, a change in
+ * the number of rows); `showCard` jumps to a card's first page.
+ */
+class Deck {
+  readonly el: HTMLElement;
+  private readonly title = h('h2', { class: 'lab-deck__title', id: 'lab-card-title' });
+  private readonly count = h('span', { class: 'pager__label', 'aria-live': 'polite' });
+  private readonly body = h('div', { class: 'lab-deck__body', role: 'region', 'aria-labelledby': 'lab-card-title' });
+  private readonly select: HTMLSelectElement;
+  private readonly prev: HTMLButtonElement;
+  private readonly next: HTMLButtonElement;
+  private pages: { card: number; blocks: HTMLElement[] }[] = [];
+  private index = 0;
+  private readonly cards: DeckCard[];
+
+  constructor(cards: DeckCard[]) {
+    this.cards = cards;
+    this.select = h('select', { 'aria-label': t('lab.section') }, ...cards.map((c) => h('option', { value: c.id }, c.title)));
+    this.select.addEventListener('change', () => this.showCard(this.select.value));
+    this.prev = h('button', { type: 'button', class: 'icon-btn', 'aria-label': t('details.page.prev') }, icon('chevronLeft'));
+    this.next = h('button', { type: 'button', class: 'icon-btn', 'aria-label': t('details.page.next') }, icon('chevronRight'));
+    this.prev.addEventListener('click', () => this.step(-1));
+    this.next.addEventListener('click', () => this.step(1));
+    for (const c of cards) c.el.hidden = true;
+    this.body.append(...cards.map((c) => c.el));
+    this.el = h(
+      'div',
+      { class: 'lab-deck' },
+      h('div', { class: 'lab-deck__head' }, this.title, this.count),
+      this.body,
+      h('div', { class: 'lab-deck__nav' }, this.prev, this.select, this.next),
+    );
+  }
+
+  private step(delta: number): void {
+    const target = this.index + delta;
+    if (target < 0 || target >= this.pages.length) return;
+    this.show(target);
+  }
+
+  /** The blocks of a card that apply now (rows marked `data-off` do not). */
+  private blocks(card: DeckCard): HTMLElement[] {
+    return ([...card.el.children] as HTMLElement[]).filter((b) => !b.hasAttribute('data-off'));
+  }
+
+  layout(): void {
+    const available = this.body.clientHeight;
+    const currentCard = this.pages[this.index]?.card ?? 0;
+    const currentFirst = this.pages[this.index]?.blocks[0] ?? null;
+    this.pages = [];
+    this.cards.forEach((card, i) => {
+      const blocks = this.blocks(card);
+      card.el.hidden = false;
+      for (const b of blocks) b.hidden = false;
+      const heights = blocks.map((b) => b.getBoundingClientRect().height);
+      const gap = Number.parseFloat(getComputedStyle(card.el).rowGap) || 0;
+      card.el.hidden = true;
+      const split = available > 0 ? splitBlocks(heights, [], gap, available) : [blocks.map((_, n) => n)];
+      for (const piece of split) this.pages.push({ card: i, blocks: piece.map((n) => blocks[n]!) });
+    });
+    const keep = this.pages.findIndex((p) => p.card === currentCard && (currentFirst === null || p.blocks.includes(currentFirst)));
+    this.show(keep >= 0 ? keep : Math.max(0, this.pages.findIndex((p) => p.card === currentCard)));
+  }
+
+  show(index: number): void {
+    this.index = Math.min(Math.max(0, index), Math.max(0, this.pages.length - 1));
+    const page = this.pages[this.index];
+    this.cards.forEach((card, i) => {
+      card.el.hidden = !page || i !== page.card;
+      if (page && i === page.card) for (const b of this.blocks(card)) b.hidden = !page.blocks.includes(b);
+    });
+    const card = page ? this.cards[page.card]! : null;
+    this.title.textContent = card?.title ?? '';
+    this.select.value = card?.id ?? '';
+    this.count.textContent = t('details.page.position', { page: this.index + 1, pages: Math.max(1, this.pages.length) });
+    this.prev.setAttribute('aria-disabled', String(this.index <= 0));
+    this.next.setAttribute('aria-disabled', String(this.index >= this.pages.length - 1));
+  }
+
+  showCard(id: string): void {
+    const i = this.cards.findIndex((c) => c.id === id);
+    const page = this.pages.findIndex((p) => p.card === i);
+    if (page >= 0) this.show(page);
+  }
+
+  /**
+   * Lays the deck out again when a card's content grows past the body (the crops arrive as
+   * images); returns the function that stops watching.
+   */
+  watch(): () => void {
+    const observer = new ResizeObserver(() => {
+      if (this.body.scrollHeight > this.body.clientHeight + 1) this.layout();
+    });
+    for (const card of this.cards) observer.observe(card.el);
+    return () => observer.disconnect();
+  }
+
+  currentCard(): string | null {
+    const page = this.pages[this.index];
+    return page ? (this.cards[page.card]?.id ?? null) : null;
+  }
+}
+
 
 // ----- Session -------------------------------------------------------------------
 
@@ -231,16 +345,21 @@ class Lab {
   private cameraSelect!: HTMLSelectElement;
   private startButton!: HTMLButtonElement;
   private runButton!: HTMLButtonElement;
-  private cropBox!: HTMLElement;
+  private previewBox!: HTMLElement;
   private roiCanvas!: HTMLCanvasElement;
   private engineCanvases = new Map<EngineId, HTMLElement>();
+  private engineFigures = new Map<EngineId, HTMLElement>();
+  private rows: Record<string, LabRow[]> = {};
+  private cardEls: Record<string, HTMLElement> = {};
+  private deck!: Deck;
+  private shape = '';
   private root: HTMLElement | null = null;
 
-  mount(root: HTMLElement): () => void {
+  mount(root: HTMLElement, ctx: ScreenContext): () => void {
     this.root = root;
     const settings = getState().settings;
     if (Array.isArray(settings.engines)) for (const id of settings.engines) this.selected.add(id);
-    root.append(h('style', null, LAB_CSS), ...this.layout());
+    this.layout(root, ctx);
     void loadRenderers().then((r) => {
       this.renderers = r;
       this.buildCropSlots();
@@ -266,62 +385,70 @@ class Lab {
     return node;
   }
 
-  private panel(titleKey: string, ...children: (Node | string)[]): HTMLElement {
-    return h('section', { class: 'lab-panel', 'aria-labelledby': `lab-${titleKey}` }, h('h2', { id: `lab-${titleKey}` }, t(`lab.section.${titleKey}`)), ...children);
+  private card(id: string, ...blocks: (Node | null)[]): DeckCard {
+    const el = h('div', { class: `lab-card${blocks.length === 0 ? ' lab-card--rows' : ''}`, 'data-card': id }, ...blocks);
+    this.cardEls[id] = el;
+    return { id, title: t(`lab.section.${id}`), el };
   }
 
-  private layout(): Node[] {
-    this.startButton = h('button', { type: 'button', onclick: () => void this.toggle() }, t('lab.start'));
-    this.cameraSelect = h('select', { id: 'lab-camera', disabled: true, onchange: () => void this.switchCamera() });
-    this.runButton = h('button', { type: 'button', class: 'secondary', disabled: true, onclick: () => void this.runAll() }, t('lab.runAll'));
-    const engineBoxes = ENGINE_IDS.map((id) => {
-      const box = h('input', { type: 'checkbox', id: `lab-engine-${id}`, value: id, onchange: () => void this.applyEngines() });
-      box.checked = this.selected.has(id);
-      return h('label', { for: `lab-engine-${id}`, style: 'margin-right: var(--space-3)' }, box, ` ${id}`);
-    });
-    this.cropBox = h('div');
+  private layout(root: HTMLElement, ctx: ScreenContext): void {
+    // Diagnostics is opened from Details → Device: Back returns there unless the address names a v1 screen.
+    const back = ctx.params.get('from') && ctx.params.get('from') !== 'details' ? returnHash(ctx.params) : detailsReturnHash('device');
+    const frame = toolFrame(root, { title: t('route.lab'), body: t('lab.lead'), back });
+    this.startButton = h('button', { type: 'button', class: 'btn btn--primary', onclick: () => void this.toggle() }, t('lab.start'));
+    this.runButton = h('button', { type: 'button', class: 'btn btn--secondary', disabled: true, onclick: () => void this.runAll() }, t('lab.runAll'));
+    this.cameraSelect = h('select', { id: 'lab-camera', class: 'lab-camera-select', disabled: true, onchange: () => void this.switchCamera() });
+    const engineBoxes = ENGINE_IDS.map((id) =>
+      checkRow({ id: `lab-engine-${id}`, label: ENGINE_SPECS[id].displayName, checked: this.selected.has(id), onChange: () => void this.applyEngines() }),
+    );
+    this.previewBox = h('div', { class: 'lab-crops' });
     this.roiCanvas = h('canvas', { width: 240, height: 240, 'aria-label': t('lab.roi') });
-
-    return [
-      h('h1', null, t('route.lab')),
-      h('p', { class: 'lead' }, t('lab.lead')),
-      h(
-        'div',
-        { class: 'lab-controls' },
-        this.startButton,
-        h('div', null, h('label', { for: 'lab-camera' }, t('lab.cameraLabel')), h('br'), this.cameraSelect, h('p', { class: 'note' }, t('lab.cameraHint'))),
-        h('fieldset', null, h('legend', null, t('lab.enginesLegend')), ...engineBoxes),
-        this.runButton,
-      ),
-      this.el('status', 'p', { role: 'status', 'aria-live': 'polite' }),
-      this.el('alert', 'p', { role: 'alert', style: 'color: var(--danger)' }),
-      h(
-        'div',
-        { class: 'lab-grid' },
-        this.panel('host', this.el('host', 'dl', { class: 'lab-dl' })),
-        this.panel('camera', this.el('camera', 'dl', { class: 'lab-dl' })),
-        this.panel('frames', this.el('frames', 'dl', { class: 'lab-dl' })),
-        this.panel('timings', this.el('timings', 'table', { class: 'lab-table' })),
-        this.panel('face', this.el('face', 'dl', { class: 'lab-dl' })),
-        this.panel('engines', this.el('engines', 'table', { class: 'lab-table' })),
-        this.panel('crops', h('p', { class: 'note' }, t('lab.cropsNote')), this.cropBox),
-        this.panel('run', this.el('run', 'div')),
-        this.panel('messages', this.el('messages', 'div', { class: 'lab-messages' })),
-      ),
+    const cards = [
+      this.card('host'),
+      this.card('camera', h('div', { class: 'field' }, h('label', { class: 'field__label', for: 'lab-camera' }, t('lab.cameraLabel')), this.cameraSelect), h('p', { class: 'tool-note' }, t('lab.cameraHint'))),
+      this.card('frames'),
+      this.card('timings'),
+      this.card('face'),
+      this.card('quality'),
+      this.card('engines'),
+      this.card('select', h('p', { class: 'tool-note' }, t('lab.enginesLegend')), ...engineBoxes),
+      this.card('crops', h('p', { class: 'tool-note' }, t('lab.cropsNote')), this.previewBox),
+      this.card('engineCrops'),
+      this.card('run'),
+      this.card('messages'),
     ];
+    // Rows-only cards start empty; their rows arrive with the first render.
+    for (const id of ['host', 'camera', 'frames', 'timings', 'face', 'quality', 'engines', 'run']) this.cardEls[id]!.classList.add('lab-card--rows');
+    this.deck = new Deck(cards);
+    frame.stage.append(this.deck.el);
+    frame.extra.append(this.el('alert', 'p', { class: 'tool-status', role: 'alert' }));
+    frame.status.setAttribute('aria-live', 'polite');
+    this.els.status = frame.status;
+    frame.actions.classList.add('actions--wrap');
+    frame.actions.append(this.runButton, this.startButton);
+    guardPanel(root, 320);
+    const observer = new ResizeObserver(() => this.deck.layout());
+    observer.observe(frame.stage);
+    addCleanup(() => observer.disconnect());
+    addCleanup(this.deck.watch());
   }
 
   private buildCropSlots(): void {
     this.engineCanvases.clear();
+    this.engineFigures.clear();
     const frame: Node[] = [];
     if (this.session) frame.push(h('figure', null, this.session.preview, h('figcaption', null, t('lab.preview'))));
     frame.push(h('figure', null, this.roiCanvas, h('figcaption', null, t('lab.roi'))));
+    this.previewBox.replaceChildren(...frame);
     const engines = ENGINE_IDS.map((id) => {
-      const holder = h('div', { class: 'lab-crop-views', 'data-engine': id }, h('p', { class: 'note' }, t('lab.engine.notSelected')));
+      const holder = h('div', { class: 'lab-crop-views', 'data-engine': id }, h('p', { class: 'tool-note' }, t('lab.engine.notSelected')));
       this.engineCanvases.set(id, holder);
-      return h('figure', null, h('figcaption', null, this.displayNames[id] ?? id), holder);
+      const figure = h('figure', { class: 'lab-engine-crop' }, h('figcaption', null, this.displayNames[id] ?? id), holder);
+      this.engineFigures.set(id, figure);
+      return h('div', { class: 'lab-crops' }, figure);
     });
-    this.cropBox.replaceChildren(h('div', { class: 'lab-crops' }, ...frame), h('div', { class: 'lab-crops lab-crops-engines' }, ...engines));
+    this.cardEls.engineCrops?.replaceChildren(...engines);
+    if (this.deck) requestAnimationFrame(() => this.deck.layout());
   }
 
   // ----- Start and stop ------------------------------------------------------
@@ -455,6 +582,8 @@ class Lab {
       await this.applyEngines();
       this.probe = await s.host.probe(10);
       this.setStatus(t('lab.runDone', { frames: this.probe.frames }));
+      this.renderText();
+      this.deck.showCard('run');
       return this.probe;
     } catch (error) {
       this.probeError = error instanceof Error ? error.message : String(error);
@@ -632,19 +761,32 @@ class Lab {
     this.renderText();
   }
 
-  private dl(key: string, rows: [string, string][]): void {
-    const el = this.els[key];
-    if (!el) return;
-    el.replaceChildren(...rows.flatMap(([k, v]) => [h('dt', null, t(k)), h('dd', null, v)]));
+  /** Writes a card's rows (label, value); a change in their number lays the deck out again. */
+  private dl(key: string, rows: [string, string][], translate = true): void {
+    const card = this.cardEls[key];
+    if (!card) return;
+    const list = (this.rows[key] ??= []);
+    while (list.length < rows.length) {
+      const row = labRow();
+      list.push(row);
+      card.append(row.el);
+    }
+    list.forEach((row, i) => {
+      const r = rows[i];
+      if (r) {
+        row.el.removeAttribute('data-off');
+        row.k.textContent = translate ? t(r[0]) : r[0];
+        row.v.textContent = r[1];
+      } else {
+        row.el.setAttribute('data-off', '');
+        row.el.hidden = true;
+      }
+    });
   }
 
-  private table(key: string, head: string[], rows: string[][]): void {
-    const el = this.els[key];
-    if (!el) return;
-    el.replaceChildren(
-      h('thead', null, h('tr', null, ...head.map((c) => h('th', { scope: 'col' }, t(c))))),
-      h('tbody', null, ...rows.map((row) => h('tr', null, ...row.map((c, i) => (i === 0 ? h('th', { scope: 'row' }, c) : h('td', null, c)))))),
-    );
+  /** A table as rows: the first cell is the label, the others the value, joined. */
+  private table(key: string, rows: string[][]): void {
+    this.dl(key, rows.map((cells) => [cells[0] ?? '', cells.slice(1).join(' · ')] as [string, string]), false);
   }
 
   private renderText(): void {
@@ -702,7 +844,7 @@ class Lab {
       [t('lab.timing.worker'), ms(last?.workerMs), ms(median(recent.map((r) => r.workerMs)))],
       [t('lab.timing.latency'), ms(last ? last.receivedMs - last.meta.tCaptureMs : null), ms(median(latency))],
     ];
-    this.table('timings', ['lab.timing.stage', 'lab.timing.last', 'lab.timing.median'], timingRows);
+    this.table('timings', timingRows.map(([stage, last, med]) => [stage ?? '', t('lab.timing.lastMedian', { last: last ?? none, median: med ?? none })]));
 
     const f = last?.face ?? null;
     this.dl('face', [
@@ -713,6 +855,8 @@ class Lab {
       ['lab.face.blink', f ? `${fmt(f.eyes.blinkL, 2)}, ${fmt(f.eyes.blinkR, 2)}` : none],
       ['lab.face.ear', f ? `${fmt(f.eyes.earL, 3)}, ${fmt(f.eyes.earR, 3)}` : none],
       ['lab.face.iris', f ? px(f.eyes.irisDiamPx) : none],
+    ]);
+    this.dl('quality', [
       ['lab.face.interOcular', f ? px(f.eyes.interOcularPx) : none],
       ['lab.face.width', f ? pct(f.quality.faceWidthFrac) : none],
       ['lab.face.centring', f ? `${fmt(f.quality.centring[0], 3)}, ${fmt(f.quality.centring[1], 3)}` : none],
@@ -724,7 +868,6 @@ class Lab {
     const statuses = s?.host.engineStatus ?? [];
     this.table(
       'engines',
-      ['lab.engine.engine', 'lab.engine.status', 'lab.engine.backend', 'lab.engine.load', 'lab.engine.frame', 'lab.engine.median'],
       ENGINE_IDS.map((id) => {
         const st = statuses.find((x) => x.id === id);
         const frame = last?.engines[id];
@@ -739,35 +882,35 @@ class Lab {
       }),
     );
 
-    const run = this.els.run;
-    if (run) {
-      const p = this.probe;
-      if (!p) run.replaceChildren(h('p', { class: 'note' }, this.probeError ? t('lab.runFailed', { message: this.probeError }) : none));
-      else {
-        const table = h('table', { class: 'lab-table' });
-        this.els.runTable = table;
-        this.table('runTable', ['lab.run.stage', 'lab.run.okFrames', 'lab.run.p50', 'lab.run.p90'], [
-          [t('lab.run.landmarker'), String(p.frames), ms(p.landmarkerP50Ms), ms(p.landmarkerP90Ms)],
-          [t('lab.run.prep'), none, ms(p.prepP50Ms), none],
-          ...ENGINE_IDS.map((id) => {
-            const e = p.engines[id];
-            const st = statuses.find((x) => x.id === id);
-            const label = `${this.displayNames[id] ?? id}${st?.backend ? ` (${st.backend})` : st && !st.ok ? ` (${st.reason ?? none})` : ''}`;
-            return [label, e ? `${e.okFrames} / ${p.frames}` : none, ms(e?.p50Ms), ms(e?.p90Ms)];
-          }),
-          [t('lab.run.total'), none, ms(p.totalP50Ms), none],
-        ]);
-        run.replaceChildren(table);
-      }
+    const p = this.probe;
+    if (!p) {
+      this.dl('run', [[t('lab.run.stage'), this.probeError ? t('lab.runFailed', { message: this.probeError }) : none]], false);
+    } else {
+      this.table('run', [
+        [t('lab.run.landmarker'), t('lab.run.frames', { ok: p.frames, n: p.frames }), t('lab.run.times', { p50: ms(p.landmarkerP50Ms), p90: ms(p.landmarkerP90Ms) })],
+        [t('lab.run.prep'), t('lab.run.times', { p50: ms(p.prepP50Ms), p90: none })],
+        ...ENGINE_IDS.map((id) => {
+          const e = p.engines[id];
+          const st = statuses.find((x) => x.id === id);
+          const label = `${this.displayNames[id] ?? id}${st?.backend ? ` (${st.backend})` : st && !st.ok ? ` (${st.reason ?? none})` : ''}`;
+          return [label, e ? t('lab.run.frames', { ok: e.okFrames, n: p.frames }) : none, t('lab.run.times', { p50: ms(e?.p50Ms), p90: ms(e?.p90Ms) })];
+        }),
+        [t('lab.run.total'), t('lab.run.times', { p50: ms(p.totalP50Ms), p90: none })],
+      ]);
     }
 
-    const messages = this.els.messages;
+    const messages = this.cardEls.messages;
     if (messages) {
-      messages.replaceChildren(
-        ...(this.messages.length === 0
-          ? [h('p', { class: 'note' }, t('lab.noMessages'))]
-          : this.messages.map((m) => h('p', null, `${m.stage}${m.recoverable ? '' : t('lab.fatal')}: ${m.message}`))),
-      );
+      const lines = this.messages.length === 0 ? [t('lab.noMessages')] : this.messages.map((m) => `${m.stage}${m.recoverable ? '' : t('lab.fatal')}: ${m.message}`);
+      const now = [...messages.children].map((c) => c.textContent).join('\n');
+      if (now !== lines.join('\n')) messages.replaceChildren(...lines.map((line) => h('p', { class: 'lab-messages' }, line)));
+    }
+
+    // A change in the cards' rows (an engine added, a message) lays the deck out again.
+    const shape = Object.values(this.cardEls).map((c) => [...c.children].filter((b) => !b.hasAttribute('data-off')).length).join(',');
+    if (shape !== this.shape) {
+      this.shape = shape;
+      this.deck.layout();
     }
   }
 
@@ -828,8 +971,8 @@ registerTestHook('labCaptureFixture', () => current?.captureFixture() ?? Promise
 registerTestHook('crashWorker', () => crashWorkerHosts());
 
 const screen: Screen = {
-  mount(root) {
-    return new Lab().mount(root);
+  mount(root, ctx) {
+    return new Lab().mount(root, ctx);
   },
 };
 

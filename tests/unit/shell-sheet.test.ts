@@ -1,7 +1,7 @@
 // The Details sheet's geometry (design §2.17, §4.7) and its tab keys.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DETAILS_TABS, isDetailsTab, sheetPlacement, tabAfterKey } from '../../src/app/shell/detailsSheet.ts';
+import { DETAILS_TABS, isDetailsTab, JUDGE_PAGE, pageOfPiece, pieceId, sheetPlacement, tabAfterKey } from '../../src/app/shell/detailsSheet.ts';
 
 test('a bottom sheet under 600 px wide when at least 480 px tall, a side sheet otherwise', () => {
   assert.deepEqual(sheetPlacement(360, 640, 'left'), { form: 'bottom', from: 'bottom' });
@@ -31,4 +31,14 @@ test('the tabs and the arrow, Home and End keys of the segmented control', () =>
   assert.equal(tabAfterKey(2, 'End', 5), 4);
   assert.equal(tabAfterKey(2, 'Enter', 5), null);
   assert.equal(tabAfterKey(0, 'ArrowRight', 0), null);
+});
+
+test('the pieces of a page cut to fit are named after it', () => {
+  assert.equal(pieceId('judge', 0), 'judge');
+  assert.equal(pieceId('judge', 1), 'judge~2');
+  assert.equal(pageOfPiece('judge~2'), 'judge');
+  assert.equal(pageOfPiece('judge'), 'judge');
+  assert.equal(pageOfPiece('estimator-combined'), 'estimator-combined');
+  assert.equal(pageOfPiece('odd~name'), 'odd~name');
+  assert.equal(JUDGE_PAGE, 'judge');
 });
