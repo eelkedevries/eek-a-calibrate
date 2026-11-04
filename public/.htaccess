@@ -9,6 +9,7 @@
 AddType text/javascript .mjs
 AddType application/wasm .wasm
 AddType application/octet-stream .task .tflite .onnx .bin
+AddType font/woff2 .woff2
 
 # The host does not compress WebAssembly. scripts/precompress.mjs writes a gzip
 # copy next to each .wasm; the app asks for the .gz name, served here as

@@ -118,7 +118,7 @@ test.describe('Quick flow with every engine (desktop, injected geometry)', () =>
 
   test('calibration, validation and results complete; every available engine plus Combined is reported', async ({ page }) => {
     const seen = watch(page);
-    await page.goto('./?e2e=1&speed=4&preset=quick&engines=all&seed=4242#/');
+    await page.goto('./?e2e=1&speed=4&preset=quick&engines=all&seed=4242#/welcome');
     await expect(page.locator('main h1')).toBeVisible();
     // An injected, measured geometry (the test hook of §7): card scale and a blind-spot focal length.
     await page.evaluate(() => {

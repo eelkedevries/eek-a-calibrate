@@ -232,7 +232,7 @@ test.describe('A phone held upright (portrait camera, touch only)', () => {
     await instrument(page);
 
     // Welcome: the mobile instructions, and the screen and distance offered only as an option.
-    await page.goto('./?e2e=1&speed=4&preset=quick&engines=geometric,eyepixel&seed=2611#/');
+    await page.goto('./?e2e=1&speed=4&preset=quick&engines=geometric,eyepixel&seed=2611#/welcome');
     await expect(page.getByText(t('calibrate.steps.mobile')).first()).toBeVisible();
     await page.getByRole('button', { name: t('welcome.start') }).tap();
 
@@ -327,7 +327,7 @@ test.describe('A phone held upright (portrait camera, touch only)', () => {
     const routes = await page.evaluate(() => (window as unknown as { __routes: string[] }).__routes);
     expect(routes).not.toContain('#/screen');
     expect(routes).not.toContain('#/distance');
-    expect(routes).toEqual(expect.arrayContaining(['#/', '#/camera', '#/calibrate', '#/validate', '#/results', '#/live']));
+    expect(routes).toEqual(expect.arrayContaining(['#/welcome', '#/camera', '#/calibrate', '#/validate', '#/results', '#/live']));
     expect(await page.evaluate(() => (window as unknown as { __fullscreenRequests: number }).__fullscreenRequests)).toBe(0);
     sameOrigin(page, seen.requests);
     expect(seen.problems).toEqual([]);

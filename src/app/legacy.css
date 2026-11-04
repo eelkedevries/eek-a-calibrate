@@ -1,0 +1,273 @@
+/* The v1 styles that the legacy screens (#/welcome, #/camera, #/calibrate, #/validate, #/results,
+   #/live, #/data, #/about, #/lab, #/screen, #/distance) still need, moved out of style.css
+   unchanged. main.ts enables this sheet only while a legacy route is shown; prompt 018 deletes it. */
+
+/* Design tokens. Light and dark themes follow the system, and data-theme on
+   <html> overrides it. Engine colours are the Okabe–Ito palette, which stays
+   distinguishable with the common forms of colour blindness. */
+:root {
+  color-scheme: light dark;
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --bg: #f6f5f2;
+  --surface: #ffffff;
+  --fg: #1a1a1f;
+  --muted: #55555f;
+  --border: #d4d1ca;
+  --accent: #8a5a00;
+  --accent-fg: #ffffff;
+  --focus: #0058a3;
+  --danger: #a3261b;
+  --ok: #0b6e4f;
+  --warn: #8a5a00;
+
+  /* Calibration stimulus: mid-grey background (spec §4.7). */
+  --stimulus-bg: #808080;
+  --stimulus-fg: #000000;
+
+  /* Engines (Okabe–Ito). */
+  --c-blazegaze: #0072b2;
+  --c-peekr: #e69f00;
+  --c-geometric: #009e73;
+  --c-eyepixel: #cc79a7;
+  --c-combined: #1a1a1f;
+  --c-target: #d55e00;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2.5rem;
+  --radius: 0.5rem;
+  --measure: 46rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0a0a0f;
+    --surface: #15151c;
+    --fg: #eae7e1;
+    --muted: #a9a6a0;
+    --border: #2f2f3a;
+    --accent: #e8b43a;
+    --accent-fg: #0a0a0f;
+    --focus: #7cc4ff;
+    --danger: #ff8a7a;
+    --ok: #5fd4a8;
+    --warn: #e8b43a;
+    --c-blazegaze: #56b4e9;
+    --c-combined: #eae7e1;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #0a0a0f;
+  --surface: #15151c;
+  --fg: #eae7e1;
+  --muted: #a9a6a0;
+  --border: #2f2f3a;
+  --accent: #e8b43a;
+  --accent-fg: #0a0a0f;
+  --focus: #7cc4ff;
+  --danger: #ff8a7a;
+  --ok: #5fd4a8;
+  --warn: #e8b43a;
+  --c-blazegaze: #56b4e9;
+  --c-combined: #eae7e1;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* The hidden attribute always hides, whatever display a component's own CSS gives the element. */
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#app {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+a {
+  color: var(--accent);
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The router moves focus to each screen's heading for screen readers; it is not a control, so no ring. */
+main h1[tabindex='-1']:focus {
+  outline: none;
+}
+
+button,
+.button {
+  font: inherit;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+  cursor: pointer;
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--fg);
+  border-color: var(--border);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--space-3);
+  top: -3rem;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  color: var(--fg);
+  z-index: 10;
+}
+
+.skip-link:focus {
+  top: var(--space-2);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.site-header,
+.site-footer,
+main {
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--space-3);
+}
+
+.site-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  font-weight: 600;
+  font-size: 1.15rem;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.tagline {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.site-nav ul {
+  display: flex;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+main {
+  flex: 1;
+}
+
+main h1 {
+  margin-top: var(--space-3);
+}
+
+main p,
+main li {
+  max-width: var(--measure);
+}
+
+.lead {
+  font-size: 1.1rem;
+}
+
+.note {
+  color: var(--muted);
+}
+
+.site-footer {
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: center;
+}
+
+.site-footer ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Calibration and validation take the whole viewport. */
+body.immersive {
+  background: var(--stimulus-bg);
+}
+
+body.immersive .site-header,
+body.immersive .site-footer {
+  display: none;
+}
+
+body.immersive main {
+  max-width: none;
+  padding: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

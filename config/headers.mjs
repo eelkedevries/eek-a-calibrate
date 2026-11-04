@@ -27,6 +27,7 @@ export const MIME_TYPES = {
   '.tflite': 'application/octet-stream',
   '.onnx': 'application/octet-stream',
   '.bin': 'application/octet-stream',
+  '.woff2': 'font/woff2',
 };
 
 // Inherited from the eelkedevries.com document-root .htaccess.

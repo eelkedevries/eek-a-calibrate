@@ -36,9 +36,23 @@ export interface Capture {
 /**
  * Routes that keep the camera running; any other route stops it. The distance screen measures the
  * iris, and the screen-size step before it keeps a running camera, so that measuring from Results
- * or Live restarts nothing and the stored distance of this camera can be offered.
+ * or Live restarts nothing and the stored distance of this camera can be offered. The game's
+ * routes from Get ready to the challenge share one capture (spec §17.2.4).
  */
-const CAMERA_ROUTES = new Set(['/camera', '/screen', '/distance', '/calibrate', '/validate', '/results', '/live']);
+const CAMERA_ROUTES = new Set([
+  '/camera',
+  '/screen',
+  '/distance',
+  '/calibrate',
+  '/validate',
+  '/results',
+  '/live',
+  '/ready',
+  '/warmup',
+  '/complete',
+  '/look',
+  '/challenge',
+]);
 
 class RunningCapture implements Capture {
   readonly camera: CameraSession;

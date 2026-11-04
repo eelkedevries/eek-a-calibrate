@@ -1,0 +1,25 @@
+// The level track (design §2.3): node names, phase labels and the text a screen reader hears.
+
+export const strings: Readonly<Record<string, string>> = {
+  'track.label': 'Game progress',
+  'track.level.pop': 'Pop',
+  'track.level.follow': 'Follow',
+  'track.level.turn': 'Turn',
+  'track.level.lean': 'Lean in',
+  'track.level.test': 'Test',
+  'track.star': 'Challenge',
+  'track.phase.ready': 'Get ready',
+  'track.phase.complete': 'Warm-up complete',
+  'track.phase.look': 'Free look',
+  'track.phase.challenge': 'Challenge',
+  'track.levelOf': 'Level {level} of {levels}',
+  'track.sr.next': '{phase}. Next: level 1 of {levels}',
+  'track.sr.unlocked': '{phase}. Challenge unlocked',
+  'track.sr.locked': '{phase}. Challenge locked',
+  'track.sr.challenge': 'Challenge. Every warm-up level done',
+  'track.item.next': 'Level {level}, next: ',
+  'track.item.level': 'Level {level}: ',
+  'track.item.done': ', done',
+  'track.item.locked': ', locked',
+  'track.item.unlocked': ', unlocked',
+};

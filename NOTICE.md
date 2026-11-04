@@ -13,6 +13,14 @@ third-party software and models. No GPL, AGPL or non-commercial-only code is shi
 
 Because of these caveats, eek-a-calibrate is offered for non-commercial research use.
 
+## Fonts (`public/fonts/`)
+
+| Font | Licence | Notes |
+|---|---|---|
+| Spectral 600 (`spectral/`) | SIL Open Font License 1.1, © 2017 The Spectral Project Authors | Latin subset in WOFF2; `OFL.txt` and `PROVENANCE.md` in the folder |
+| Lexend 400 and 500 (`lexend/`) | SIL Open Font License 1.1, © 2018 The Lexend Project Authors | Latin subsets in WOFF2; `OFL.txt` and `PROVENANCE.md` in the folder |
+| JetBrains Mono 400 and 500 (`jetbrains-mono/`) | SIL Open Font License 1.1, © 2020 The JetBrains Mono Project Authors | Latin subsets in WOFF2; `OFL.txt` and `PROVENANCE.md` in the folder |
+
 ## Runtime libraries (npm, exact versions in `package.json`)
 
 | Package | Version | Licence | Use |

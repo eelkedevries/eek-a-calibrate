@@ -107,7 +107,7 @@ test.describe('Failure paths', () => {
       const denied = t('camera.error.denied');
 
       // The default flow: Welcome, then the camera screen, which asks for the camera.
-      await page.goto('./?e2e=1#/');
+      await page.goto('./?e2e=1#/welcome');
       await page.getByRole('button', { name: t('welcome.start') }).click();
       await expect.poll(() => route(page)).toBe('camera');
       const start = page.getByRole('button', { name: t('camera.start') });

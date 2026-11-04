@@ -1,0 +1,32 @@
+// Screen size (#/screen).
+
+export const strings: Readonly<Record<string, string>> = {
+  // Screen size (WP9; spec §7 screen 2, §4.4, §14.1)
+  'screen.lead': 'Measuring the screen lets the app express gaze positions exactly in degrees of visual angle.',
+  'screen.optional': 'This step is optional: calibration and live gaze work without it, with approximate degree values.',
+  'screen.card.title': 'Match a bank card',
+  'screen.card.instructions': 'Hold a bank card, or any card of that standard size (85.60 × 53.98 mm), flat against the screen, and resize the outline until it covers the card exactly.',
+  'screen.card.instructionsUpright': 'Hold a bank card, or any card of that standard size (85.60 × 53.98 mm), upright and flat against the screen, and resize the outline until it covers the card exactly.',
+  'screen.card.outline': 'Outline to match with a card',
+  'screen.card.slider': 'Outline size',
+  'screen.card.valueText': '{px} CSS pixels',
+  'screen.card.readout': 'Long side: {px} CSS px, which is {scale} CSS px per mm.',
+  'screen.card.smaller': 'Smaller',
+  'screen.card.larger': 'Larger',
+  'screen.card.use': 'Use this size',
+  'screen.diagonal.title': 'Or enter the screen diagonal',
+  'screen.diagonal.body': 'If you know it, enter the diagonal of this screen in inches, for example from the device’s specifications. It is less exact than the card when the browser does not report the whole screen.',
+  'screen.diagonal.label': 'Diagonal (inches)',
+  'screen.diagonal.use': 'Use this diagonal',
+  'screen.diagonal.invalid': 'Enter a diagonal between 3 and 120 inches.',
+  'screen.skip.title': 'Or skip',
+  'screen.skip.body': 'Without a measurement, 96 CSS px per inch is assumed and degree values are approximate.',
+  'screen.skip.button': 'Skip',
+  'screen.stored': 'A measurement of this screen is stored: {scale} CSS px per mm ({source}, {date}). It is used unless you measure again.',
+  'screen.current': 'This session uses {scale} CSS px per mm ({source}).',
+  'screen.keep': 'Keep it and continue',
+  'screen.source.card': 'card match',
+  'screen.source.diagonal': 'diagonal',
+  'screen.source.assumed': 'assumed',
+  'screen.saved': 'Screen measured: {scale} CSS px per mm.',
+};

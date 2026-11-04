@@ -1,0 +1,51 @@
+// The v1 site shell (header, footer, page titles and the WP1 placeholders) of the legacy routes.
+
+export const strings: Readonly<Record<string, string>> = {
+  // Shell
+  'app.name': 'eek-a-calibrate',
+  'app.tagline': 'Webcam eye-tracking calibration, validation and live gaze, in your browser.',
+  'app.privacy': 'Everything runs on your device; nothing is uploaded; no images are stored.',
+  'app.skip': 'Skip to content',
+  'app.version': 'Version {version} ({commit}, built {date})',
+  'nav.label': 'Main',
+  'nav.start': 'Start',
+  'nav.about': 'About',
+  'nav.data': 'Your data',
+  'nav.lab': 'Diagnostics',
+  'footer.deleteAll': 'Delete all my data',
+  'footer.deleteConfirm': 'Delete every calibration, profile and session that eek-a-calibrate has stored on this device?',
+  'footer.deleted': 'All data that eek-a-calibrate stored on this device has been deleted.',
+  'footer.site': 'eelkedevries.com',
+
+  // Routes: page titles (spec §7)
+  'route.welcome': 'Welcome',
+  'route.camera': 'Camera',
+  'route.screen': 'Screen size',
+  'route.distance': 'Viewing distance',
+  'route.calibrate': 'Calibration',
+  'route.validate': 'Validation',
+  'route.results': 'Results',
+  'route.live': 'Live gaze',
+  'route.data': 'Your data',
+  'route.about': 'About',
+  'route.lab': 'Diagnostics',
+  'route.notFound': 'Page not found',
+  'route.notFoundBody': 'There is no page at this address.',
+  'route.home': 'Go to the start',
+  'route.loadError': 'This page could not be loaded: {message}',
+
+  // Placeholders, shown until the owning work package replaces a screen
+  'placeholder.notBuilt': 'This screen is not built yet. It arrives with work package {wp}.',
+  'placeholder.continue': 'Continue to {next}',
+  'placeholder.welcome': 'eek-a-calibrate calibrates and validates webcam eye tracking. Four gaze engines process the same camera frames, and the results show how accurate and precise each one is for you, on this device.',
+  'placeholder.camera': 'Camera permission, the camera picker and a mirrored preview with live quality meters, followed by a short device check.',
+  'placeholder.screen': 'Matching an outline to a bank card, or entering the screen diagonal, so that positions can be expressed in degrees of visual angle.',
+  'placeholder.distance': 'The blind-spot test, which estimates how far you sit from the screen.',
+  'placeholder.calibrate': 'Fullscreen calibration: fixation targets, a smooth-pursuit path and guided head movement.',
+  'placeholder.validate': 'Fullscreen validation on targets that were not used for calibration.',
+  'placeholder.results': 'Accuracy, precision and data loss for every engine and for the combined estimator.',
+  'placeholder.live': 'Live gaze, drift checks and recording.',
+  'placeholder.data': 'Exporting your session, and managing or deleting stored calibrations.',
+  'placeholder.about': 'Methods, metric formulae, engines with their licences and citations, limitations and privacy.',
+  'placeholder.lab': 'Diagnostics: host, delegate, backends, per-stage timings and live engine crops.',
+};

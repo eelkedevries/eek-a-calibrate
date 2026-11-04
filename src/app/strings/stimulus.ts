@@ -1,0 +1,31 @@
+// The v1 stimulus stage and its protocol cards.
+
+export const strings: Readonly<Record<string, string>> = {
+  // Stimulus stage and protocol cards (WP8, src/app/components/stimulusCanvas.ts; spec §4.7)
+  'stimulus.label': 'Calibration targets',
+  'stimulus.progress': 'Progress',
+  'stimulus.pause': 'Pause',
+  'stimulus.resume': 'Resume',
+  'stimulus.abort': 'Abort',
+  'stimulus.continue': 'Continue',
+  'stimulus.continueHint': 'Tap anywhere on this card, or press Space, to continue. During the targets, P pauses and Esc aborts; on a touch screen use the buttons in the top corners.',
+  'stimulus.paused.manual.title': 'Paused',
+  'stimulus.paused.manual.body': 'The target you were looking at will be shown again from the start when you resume.',
+  'stimulus.paused.face.title': 'Your face is not visible',
+  'stimulus.paused.face.body': 'The camera has not seen your face for a moment. Face the screen in good light; this continues by itself once your face is visible again.',
+  'stimulus.paused.hidden.title': 'Paused while the page was hidden',
+  'stimulus.paused.hidden.body': 'Nothing was recorded while the page was in the background. Resume when you are ready.',
+  'stimulus.head.look': 'Keep looking at the dot.',
+  'stimulus.head.yaw': 'Keep looking at the dot and slowly turn your head left and right.',
+  'stimulus.head.pitch': 'Keep looking at the dot and slowly nod your head up and down.',
+  'protocol.instr.fixation.title': 'Look at each dot',
+  'protocol.instr.fixation.body': 'A dot appears with a shrinking ring around it. Look at the centre of the dot and keep looking at it until it moves on. Keep your head still and your eyes open.',
+  'protocol.instr.pursuit.title': 'Follow the moving dot',
+  'protocol.instr.pursuit.body': 'The dot waits for a second, then moves smoothly around the screen for about 16 seconds. Follow its centre with your eyes, keeping your head still.',
+  'protocol.instr.head.title': 'Keep looking while you move your head',
+  'protocol.instr.head.body': 'A dot appears in five places. At each one, keep looking at the dot while you slowly turn your head left and right, then nod it up and down. The ring around the dot fills as you cover each direction.',
+  'protocol.instr.closer.title': 'Lean a little closer',
+  'protocol.instr.closer.body': 'Lean about 10 cm closer to the screen (heuristic) and stay there. The first set of dots is shown again.',
+  'protocol.instr.validation.title': 'Validation: look at each dot',
+  'protocol.instr.validation.body': 'A new set of dots measures how accurate the calibration is. Look at the centre of each dot until it moves on. These dots are never used for calibration.',
+};
