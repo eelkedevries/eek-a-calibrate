@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Phone · Title screen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;700&family=Spectral:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#7fb4ec}a:hover{color:#a9cdf3}
+
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  color-scheme:dark;
+  /* eek-a-style roles: dark identity default (data/visual/tokens.css) */
+  --color-text:#f4f2ec;
+  --color-muted-text:#9a9aa4;
+  --color-faint:#787884;
+  --color-background:#08080b;
+  --color-surface:#17181e;
+  --color-border:#2a2a35;
+  --color-accent:#e8b43a;
+  --color-accent-ink:#1a1400;
+  --color-secondary:#6ba6e4;
+  --color-secondary-muted:#69707d;
+  --color-link:#7fb4ec;
+  --color-success:#3ad08a;
+  --color-warning:#f0b429;
+  --color-error:#ff6f61;
+  --color-info:#6ba6e4;
+  --color-focus:#6ba6e4;
+  --color-reference:#000000;
+  --space-xs:4px;--space-sm:8px;--space-md:16px;--space-lg:24px;--space-xl:40px;
+  --radius-control:12px;--radius-card:14px;--radius-sheet:22px;--radius-pill:999px;
+  --font-serif:Spectral,'Iowan Old Style',Georgia,serif;
+  --font-sans:Lexend,Inter,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono',SFMono-Regular,Consolas,monospace;
+  --font-size-sm:14px;--font-size-md:16px;--font-size-lg:20px;--font-size-xl:28px;
+  --font-weight-regular:400;--font-weight-medium:500;--font-weight-bold:700;
+  --line-height-tight:1.25;--line-height-normal:1.55;
+  /* eek-a-calibrate app roles (theme-independent: the stage is always grey) */
+  --stage:#808080;
+  --stage-ink:#000000;
+  --stage-veil:rgb(128 128 128 / 0.86);
+  --stage-line:rgb(0 0 0 / 0.28);
+  --stage-lit:rgb(255 255 255 / 0.18);
+  --stage-scrim:rgb(0 0 0 / 0.55);
+  --stage-chip:rgb(23 24 30 / 0.92);
+  --stage-chip-raise:rgb(255 255 255 / 0.08);
+  --stage-chip-text:#f4f2ec;
+  --stage-chip-muted:#9a9aa4;
+  --stage-focus:#ffffff;
+  --state-good:#3ad08a;
+  --state-adjust:#f0b429;
+  --state-lost:#ff6f61;
+  --halo:rgb(0 0 0 / 0.6);
+  --preview-bg:#1c1d23;
+  --preview-figure:#34363f;
+  --preview-edge:#4a4d58;
+  --preview-bright:#a9aab2;
+  --preview-dark:#141519;
+  --badge-ink:#17181e;
+  --gaze:#6ba6e4;
+  --gaze-soft:rgb(107 166 228 / 0.42);
+  --gaze-outline:#000000;
+  /* v2 game roles: one bubble everywhere (warm-up, re-aim, challenge) */
+  --bubble-fill:rgb(255 255 255 / 0.30);
+  --bubble-edge:#000000;
+  --bubble-shine:#ffffff;
+  --bubble-core:#000000;
+  --bubble-ghost:rgb(0 0 0 / 0.30);
+  --firefly-light:rgb(255 255 255 / 0.45);
+  --firefly-trail:rgb(255 255 255 / 0.40);
+  --decoy:#24242a;
+  --pip-on:#000000;
+  --pip-off:rgb(0 0 0 / 0.22);
+  --arc-on:#000000;
+  --arc-off:rgb(0 0 0 / 0.60);
+  --node-done:rgb(255 255 255 / 0.12);
+  --node-line:rgb(255 255 255 / 0.35);
+  --star-on:var(--color-text);
+  --star-off:var(--color-faint);
+  --control-boundary:var(--color-faint);
+  --tap:44px;
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --color-text:#1a1a1a;--color-muted-text:#5a5a5a;--color-faint:#70707a;
+  --color-background:#ffffff;--color-surface:#f5f5f5;--color-border:#d9d9d9;
+  --color-accent:#8a6d00;--color-accent-ink:#ffffff;
+  --color-secondary:#1a6cb0;--color-secondary-muted:#6b7280;--color-link:#0061a8;
+  --color-success:#1b7a4b;--color-warning:#8a5a00;--color-error:#b3261e;
+  --color-info:#1a6cb0;--color-focus:#1a6cb0;
+}
+body{background:var(--color-background);color:var(--color-text);font-family:var(--font-sans);font-size:var(--font-size-md);line-height:var(--line-height-normal);-webkit-font-smoothing:antialiased}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}
+.on-stage :focus-visible{outline-color:var(--stage-focus)}
+@keyframes ek-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.ek-live{animation:ek-pulse 1.8s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.ek-live{animation:none}}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-sm);min-block-size:var(--tap);padding:0 20px;border:1px solid transparent;border-radius:var(--radius-control);font-family:var(--font-sans);font-size:var(--font-size-md);font-weight:var(--font-weight-medium);line-height:var(--line-height-tight);white-space:nowrap;text-decoration:none;cursor:pointer;transition:background-color .2s ease-out,border-color .2s ease-out,box-shadow .2s ease-out}
+.btn--primary,a.btn--primary,a.btn--primary:hover{background:var(--color-accent);color:var(--color-accent-ink)}
+.btn--primary:hover{box-shadow:inset 0 0 0 999px rgb(255 255 255 / 0.10)}
+.btn--secondary,a.btn--secondary,a.btn--secondary:hover{background:var(--color-surface);color:var(--color-text);border-color:var(--control-boundary)}
+.btn--secondary:hover{border-color:var(--color-accent)}
+.btn--ghost,a.btn--ghost,a.btn--ghost:hover{background:transparent;color:var(--color-text)}
+.btn--ghost:hover{background:var(--color-surface)}
+.btn:disabled,.btn[aria-disabled="true"]{background:var(--color-surface);color:var(--color-muted-text);border-color:var(--color-border);box-shadow:none;cursor:not-allowed}
+.icon-btn{display:inline-grid;place-items:center;inline-size:var(--tap);block-size:var(--tap);padding:0;border:0;border-radius:var(--radius-pill);background:transparent;color:inherit;cursor:pointer;text-decoration:none}
+.icon-btn:hover{background:var(--stage-chip-raise)}
+.btn--chip,a.btn--chip,a.btn--chip:hover{background:var(--stage-chip-raise);color:var(--stage-chip-text);border-color:rgb(255 255 255 / 0.28)}
+.btn--chip:hover{border-color:var(--color-accent)}
+.choice{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative;min-block-size:72px;padding:8px 4px;border:1.5px solid var(--control-boundary);border-radius:var(--radius-control);background:var(--color-surface);color:var(--color-muted-text);font-family:var(--font-sans);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);line-height:var(--line-height-tight);white-space:nowrap;cursor:pointer;transition:border-color .2s ease-out,color .2s ease-out,background-color .2s ease-out}
+.choice:hover{border-color:var(--color-muted-text)}
+.choice[aria-checked="true"]{border-color:var(--color-text);color:var(--color-text);background:var(--node-done)}
+.chip{display:inline-flex;align-items:center;gap:6px;min-block-size:32px;padding:0 12px;border-radius:var(--radius-pill);background:var(--color-surface);color:var(--color-text);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);line-height:var(--line-height-tight);white-space:nowrap}
+.ex{display:inline-flex;align-items:center;min-block-size:24px;padding:0 8px;border:1px dashed var(--color-muted-text);border-radius:var(--radius-pill);color:var(--color-muted-text);font-size:var(--font-size-sm);font-weight:var(--font-weight-regular);line-height:1;white-space:nowrap}
+.sr-only{position:absolute;inline-size:1px;block-size:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; box-sizing: border-box; background: var(--color-background); color: var(--color-text); font-family: var(--font-sans); display: flex; flex-direction: column; gap: 24px; padding: 24px 16px">
+
+  <header style="display: flex; align-items: center; justify-content: space-between; gap: 16px; block-size: 48px; flex: 0 0 auto">
+    <div style="display: flex; align-items: center; gap: 8px; color: var(--color-text)">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12c2.6-4.2 6-6.3 10-6.3s7.4 2.1 10 6.3c-2.6 4.2-6 6.3-10 6.3S4.6 16.2 2 12z"/><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/></svg>
+      <span style="font-family: var(--font-serif); font-weight: 600; font-size: 20px; line-height: 1.25; white-space: nowrap">eek-a-calibrate</span>
+    </div>
+    <button type="button" class="icon-btn" aria-label="Details" style="color: var(--color-text)">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
+    </button>
+  </header>
+
+  <main style="display: flex; flex-direction: column; gap: 24px; flex: 1 1 auto; min-block-size: 0">
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; flex: 0 0 auto">
+      <h1 style="margin: 0; font-family: var(--font-serif); font-weight: 600; font-size: 36px; line-height: 1.25; white-space: nowrap; color: var(--color-text)">Pop with your eyes</h1>
+      <p style="margin: 0; max-inline-size: 300px; font-size: 16px; line-height: 1.55; color: var(--color-muted-text); text-wrap: balance">Warm up the tracker, then pop bubbles just by looking.</p>
+    </div>
+
+    <section aria-label="How the game goes" style="flex: 1 1 auto; min-block-size: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 16px; background: var(--color-surface); border-radius: var(--radius-card)">
+
+      <svg width="326" height="168" viewBox="0 0 358 184" aria-hidden="true" style="display: block; inline-size: 100%; max-inline-size: 326px; block-size: 168px; flex: 0 1 168px; min-block-size: 0">
+        <circle cx="130" cy="104" r="64" fill="var(--node-done)" stroke="var(--color-text)" stroke-width="2"/>
+        <path d="M92.4 79.6A44.8 44.8 0 0 1 115.4 61.6" fill="none" stroke="var(--color-text)" stroke-width="3" stroke-linecap="round"/>
+        <g transform="translate(130 104) scale(1.5)">
+          <circle r="12" fill="var(--color-text)"/>
+          <path d="M-12-1.5h24v3h-24zM-1.5-12h3v24h-3z" fill="var(--color-surface)"/>
+          <path d="M-12-1.5h24v3h-24zM-1.5-12h3v24h-3z" fill="var(--node-done)"/>
+          <circle r="4" fill="var(--color-text)"/>
+        </g>
+        <circle cx="232" cy="62" r="30" fill="var(--node-done)" stroke="var(--color-text)" stroke-width="2"/>
+        <path d="M214.4 50.6A21 21 0 0 1 225.2 42.1" fill="none" stroke="var(--color-text)" stroke-width="3" stroke-linecap="round"/>
+        <g transform="translate(232 62) scale(.75)">
+          <circle r="12" fill="var(--color-text)"/>
+          <path d="M-12-1.5h24v3h-24zM-1.5-12h3v24h-3z" fill="var(--color-surface)"/>
+          <path d="M-12-1.5h24v3h-24zM-1.5-12h3v24h-3z" fill="var(--node-done)"/>
+          <circle r="4" fill="var(--color-text)"/>
+        </g>
+        <circle cx="252" cy="150" r="14" fill="none" stroke="var(--node-line)" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <path d="M252 136L252 126M264.1 143L272.8 138M264.1 157L272.8 162M252 164L252 174M239.9 157L231.2 162M239.9 143L231.2 138" fill="none" stroke="var(--color-text)" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; inline-size: 100%; max-inline-size: 326px; flex: 0 0 auto">
+        <svg width="326" height="48" viewBox="0 0 326 48" aria-hidden="true" style="display: block; inline-size: 100%; block-size: 48px">
+          <path d="M32.6 24H293.4" fill="none" stroke="var(--node-line)" stroke-width="1.5" stroke-dasharray="2 4"/>
+          <g fill="var(--color-surface)" stroke-width="1.5">
+            <circle cx="32.6" cy="24" r="23.25" stroke="var(--color-text)"/>
+            <circle cx="97.8" cy="24" r="23.25" stroke="var(--color-text)"/>
+            <circle cx="163" cy="24" r="23.25" stroke="var(--color-text)"/>
+            <circle cx="228.2" cy="24" r="23.25" stroke="var(--color-text)"/>
+            <circle cx="293.4" cy="24" r="23.25" stroke="var(--node-line)"/>
+          </g>
+          <g transform="translate(18.6 10) scale(1.1667)" fill="none" stroke="var(--color-text)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="8"/>
+            <circle cx="12" cy="12" r="2.2" fill="var(--color-text)" stroke="none"/>
+            <path d="M7.6 9.2a5.2 5.2 0 0 1 2.6-2.4"/>
+          </g>
+          <g transform="translate(83.8 10) scale(1.1667)" fill="none" stroke="var(--color-text)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 18c3-1 4-7 8-7s5 4 8-1" stroke-dasharray="1.5 2.5"/>
+            <circle cx="19.5" cy="9.5" r="2.5" fill="var(--color-text)" stroke="none"/>
+          </g>
+          <g transform="translate(149 10) scale(1.1667)" fill="none" stroke="var(--color-text)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="2.2" fill="var(--color-text)" stroke="none"/>
+            <path d="M5.1 16A8 8 0 0 1 5.1 8M18.9 8A8 8 0 0 1 18.9 16M8 5.1A8 8 0 0 1 16 5.1M16 18.9A8 8 0 0 1 8 18.9"/>
+          </g>
+          <g transform="translate(214.2 10) scale(1.1667)" fill="none" stroke="var(--color-text)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="7"/>
+            <circle cx="11" cy="11" r="2" fill="var(--color-text)" stroke="none"/>
+            <path d="M15.5 18.5l2 2 4-4.5"/>
+          </g>
+          <g transform="translate(279.4 10) scale(1.1667)" fill="none" stroke="var(--color-muted-text)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3.6L14.3 9.6L20.7 10L15.7 14L17.4 20.2L12 16.7L6.6 20.2L8.3 14L3.3 10L9.7 9.6Z"/>
+          </g>
+        </svg>
+        <ol aria-label="The game" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); inline-size: 100%; margin: 0; padding: 0; list-style: none; font-size: 14px; line-height: 1.25; color: var(--color-muted-text); text-align: center; white-space: nowrap">
+          <li>Pop</li>
+          <li>Follow</li>
+          <li>Turn</li>
+          <li>Test</li>
+          <li>Challenge<span class="sr-only"> (locked)</span></li>
+        </ol>
+      </div>
+    </section>
+
+    <div style="display: flex; flex-direction: column; gap: 8px; flex: 0 0 auto">
+      <p id="setup" style="margin: 0; font-size: 14px; font-weight: 500; line-height: 20px; color: var(--color-muted-text)">How are you playing?</p>
+      <div role="radiogroup" aria-labelledby="setup" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+        <button type="button" class="choice" role="radio" aria-checked="true" aria-label="Phone propped up" tabindex="0">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="3" width="8" height="14" rx="1.5"/><path d="M6 21l6-4 6 4"/></svg>
+          <span>Propped</span>
+        </button>
+        <button type="button" class="choice" role="radio" aria-checked="false" aria-label="Phone in hand" tabindex="-1">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="7" height="12" rx="1.5"/><path d="M6 12v3.5a5 5 0 0 0 5 5h2.5a4 4 0 0 0 4-4V14"/></svg>
+          <span>In hand</span>
+        </button>
+        <button type="button" class="choice" role="radio" aria-checked="false" aria-label="Computer webcam" tabindex="-1">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/><circle cx="12" cy="7.2" r="0.9" fill="currentColor" stroke="none"/></svg>
+          <span>Webcam</span>
+        </button>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 16px; flex: 0 0 auto">
+      <a class="btn btn--primary" href="phone-ready.dc.html" style="display: flex; inline-size: 100%; min-block-size: 56px">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" stroke="none"/></svg>
+        <span>Play</span>
+      </a>
+      <p style="margin: 0; display: flex; align-items: center; justify-content: center; gap: 16px; font-size: 14px; line-height: 21px; color: var(--color-muted-text); white-space: nowrap">
+        <span style="display: inline-flex; align-items: center; gap: 6px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          <span>About 3 minutes</span>
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 6px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+          <span>Nothing is uploaded</span>
+        </span>
+      </p>
+    </div>
+
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

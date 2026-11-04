@@ -1,0 +1,51 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-04T07:30:59Z" },
+  "title": "eek-a-calibrate interface",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 390, "h": 844, "title": "Phone · Title screen", "is_interactive": true },
+    "phone-ready.dc.html": { "x": 1520, "y": 0, "w": 390, "h": 844, "title": "Phone · Get ready", "is_interactive": true },
+    "phone-level1-pop.dc.html": { "x": 3040, "y": 0, "w": 390, "h": 844, "title": "Phone · Level 1 Pop the dots", "is_interactive": true },
+    "phone-level2-follow.dc.html": { "x": 4560, "y": 0, "w": 390, "h": 844, "title": "Phone · Level 2 Follow the firefly", "is_interactive": true },
+    "phone-level-complete.dc.html": { "x": 6080, "y": 0, "w": 390, "h": 844, "title": "Phone · Warm-up complete", "is_interactive": true },
+    "phone-free-look.dc.html": { "x": 7600, "y": 0, "w": 390, "h": 844, "title": "Phone · Free look", "is_interactive": true },
+    "phone-challenge.dc.html": { "x": 9120, "y": 0, "w": 390, "h": 844, "title": "Phone · Challenge", "is_interactive": true },
+    "desktop-title.dc.html": { "x": 0, "y": 1264, "w": 1440, "h": 900, "title": "Webcam · Title screen", "is_interactive": true },
+    "desktop-ready.dc.html": { "x": 1520, "y": 1264, "w": 1440, "h": 900, "title": "Webcam · Get ready", "is_interactive": true },
+    "desktop-level1-pop.dc.html": { "x": 3040, "y": 1264, "w": 1440, "h": 900, "title": "Webcam · Level 1 Pop the dots", "is_interactive": true },
+    "desktop-level3-turn.dc.html": { "x": 4560, "y": 1264, "w": 1440, "h": 900, "title": "Webcam · Level 3 Turn your head", "is_interactive": true },
+    "desktop-level-complete.dc.html": { "x": 6080, "y": 1264, "w": 1440, "h": 900, "title": "Webcam · Warm-up complete", "is_interactive": true },
+    "desktop-free-look.dc.html": { "x": 7600, "y": 1264, "w": 1440, "h": 900, "title": "Webcam · Free look", "is_interactive": true },
+    "desktop-challenge.dc.html": { "x": 9120, "y": 1264, "w": 1440, "h": 900, "title": "Webcam · Challenge", "is_interactive": true },
+    "position-signals.dc.html": { "x": 0, "y": 2584, "w": 1440, "h": 900, "title": "Position guard: every state" },
+    "phone-landscape-level1.dc.html": { "x": 1520, "y": 2584, "w": 844, "h": 390, "title": "Phone landscape · Level 1", "is_interactive": true },
+    "phone-landscape-challenge.dc.html": { "x": 2444, "y": 2584, "w": 844, "h": 390, "title": "Phone landscape · Challenge", "is_interactive": true }
+  },
+  "order": [
+    "Main.dc.html",
+    "phone-ready.dc.html",
+    "phone-level1-pop.dc.html",
+    "phone-level2-follow.dc.html",
+    "phone-level-complete.dc.html",
+    "phone-free-look.dc.html",
+    "phone-challenge.dc.html",
+    "desktop-title.dc.html",
+    "desktop-ready.dc.html",
+    "desktop-level1-pop.dc.html",
+    "desktop-level3-turn.dc.html",
+    "desktop-level-complete.dc.html",
+    "desktop-free-look.dc.html",
+    "desktop-challenge.dc.html",
+    "position-signals.dc.html",
+    "phone-landscape-level1.dc.html",
+    "phone-landscape-challenge.dc.html"
+  ],
+  "notes": {
+    "rowPhone": { "x": 0, "y": -300, "text": "Smartphone camera · portrait", "kind": "title1", "maxW": 9510 },
+    "rowWebcam": { "x": 0, "y": 964, "text": "Webcam · landscape", "kind": "title1", "maxW": 10560 },
+    "rowSystem": { "x": 0, "y": 2284, "text": "Position guard and phone landscape", "kind": "title1", "maxW": 3288 }
+  },
+  "designSystems": []
+}

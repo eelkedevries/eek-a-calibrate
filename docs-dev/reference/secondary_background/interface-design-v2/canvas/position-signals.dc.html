@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Position guard: every state</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;700&family=Spectral:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#7fb4ec}a:hover{color:#a9cdf3}
+
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  color-scheme:dark;
+  /* eek-a-style roles: dark identity default (data/visual/tokens.css) */
+  --color-text:#f4f2ec;
+  --color-muted-text:#9a9aa4;
+  --color-faint:#787884;
+  --color-background:#08080b;
+  --color-surface:#17181e;
+  --color-border:#2a2a35;
+  --color-accent:#e8b43a;
+  --color-accent-ink:#1a1400;
+  --color-secondary:#6ba6e4;
+  --color-secondary-muted:#69707d;
+  --color-link:#7fb4ec;
+  --color-success:#3ad08a;
+  --color-warning:#f0b429;
+  --color-error:#ff6f61;
+  --color-info:#6ba6e4;
+  --color-focus:#6ba6e4;
+  --color-reference:#000000;
+  --space-xs:4px;--space-sm:8px;--space-md:16px;--space-lg:24px;--space-xl:40px;
+  --radius-control:12px;--radius-card:14px;--radius-sheet:22px;--radius-pill:999px;
+  --font-serif:Spectral,'Iowan Old Style',Georgia,serif;
+  --font-sans:Lexend,Inter,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono',SFMono-Regular,Consolas,monospace;
+  --font-size-sm:14px;--font-size-md:16px;--font-size-lg:20px;--font-size-xl:28px;
+  --font-weight-regular:400;--font-weight-medium:500;--font-weight-bold:700;
+  --line-height-tight:1.25;--line-height-normal:1.55;
+  /* eek-a-calibrate app roles (theme-independent: the stage is always grey) */
+  --stage:#808080;
+  --stage-ink:#000000;
+  --stage-veil:rgb(128 128 128 / 0.86);
+  --stage-line:rgb(0 0 0 / 0.28);
+  --stage-lit:rgb(255 255 255 / 0.18);
+  --stage-scrim:rgb(0 0 0 / 0.55);
+  --stage-chip:rgb(23 24 30 / 0.92);
+  --stage-chip-raise:rgb(255 255 255 / 0.08);
+  --stage-chip-text:#f4f2ec;
+  --stage-chip-muted:#9a9aa4;
+  --stage-focus:#ffffff;
+  --state-good:#3ad08a;
+  --state-adjust:#f0b429;
+  --state-lost:#ff6f61;
+  --halo:rgb(0 0 0 / 0.6);
+  --preview-bg:#1c1d23;
+  --preview-figure:#34363f;
+  --preview-edge:#4a4d58;
+  --preview-bright:#a9aab2;
+  --preview-dark:#141519;
+  --badge-ink:#17181e;
+  --gaze:#6ba6e4;
+  --gaze-soft:rgb(107 166 228 / 0.42);
+  --gaze-outline:#000000;
+  /* v2 game roles: one bubble everywhere (warm-up, re-aim, challenge) */
+  --bubble-fill:rgb(255 255 255 / 0.30);
+  --bubble-edge:#000000;
+  --bubble-shine:#ffffff;
+  --bubble-core:#000000;
+  --bubble-ghost:rgb(0 0 0 / 0.30);
+  --firefly-light:rgb(255 255 255 / 0.45);
+  --firefly-trail:rgb(255 255 255 / 0.40);
+  --decoy:#24242a;
+  --pip-on:#000000;
+  --pip-off:rgb(0 0 0 / 0.22);
+  --arc-on:#000000;
+  --arc-off:rgb(0 0 0 / 0.60);
+  --node-done:rgb(255 255 255 / 0.12);
+  --node-line:rgb(255 255 255 / 0.35);
+  --star-on:var(--color-text);
+  --star-off:var(--color-faint);
+  --control-boundary:var(--color-faint);
+  --tap:44px;
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --color-text:#1a1a1a;--color-muted-text:#5a5a5a;--color-faint:#70707a;
+  --color-background:#ffffff;--color-surface:#f5f5f5;--color-border:#d9d9d9;
+  --color-accent:#8a6d00;--color-accent-ink:#ffffff;
+  --color-secondary:#1a6cb0;--color-secondary-muted:#6b7280;--color-link:#0061a8;
+  --color-success:#1b7a4b;--color-warning:#8a5a00;--color-error:#b3261e;
+  --color-info:#1a6cb0;--color-focus:#1a6cb0;
+}
+body{background:var(--color-background);color:var(--color-text);font-family:var(--font-sans);font-size:var(--font-size-md);line-height:var(--line-height-normal);-webkit-font-smoothing:antialiased}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}
+.on-stage :focus-visible{outline-color:var(--stage-focus)}
+@keyframes ek-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.ek-live{animation:ek-pulse 1.8s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.ek-live{animation:none}}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-sm);min-block-size:var(--tap);padding:0 20px;border:1px solid transparent;border-radius:var(--radius-control);font-family:var(--font-sans);font-size:var(--font-size-md);font-weight:var(--font-weight-medium);line-height:var(--line-height-tight);white-space:nowrap;text-decoration:none;cursor:pointer;transition:background-color .2s ease-out,border-color .2s ease-out,box-shadow .2s ease-out}
+.btn--primary,a.btn--primary,a.btn--primary:hover{background:var(--color-accent);color:var(--color-accent-ink)}
+.btn--primary:hover{box-shadow:inset 0 0 0 999px rgb(255 255 255 / 0.10)}
+.btn--secondary,a.btn--secondary,a.btn--secondary:hover{background:var(--color-surface);color:var(--color-text);border-color:var(--control-boundary)}
+.btn--secondary:hover{border-color:var(--color-accent)}
+.btn--ghost,a.btn--ghost,a.btn--ghost:hover{background:transparent;color:var(--color-text)}
+.btn--ghost:hover{background:var(--color-surface)}
+.btn:disabled,.btn[aria-disabled="true"]{background:var(--color-surface);color:var(--color-muted-text);border-color:var(--color-border);box-shadow:none;cursor:not-allowed}
+.icon-btn{display:inline-grid;place-items:center;inline-size:var(--tap);block-size:var(--tap);padding:0;border:0;border-radius:var(--radius-pill);background:transparent;color:inherit;cursor:pointer;text-decoration:none}
+.icon-btn:hover{background:var(--stage-chip-raise)}
+.btn--chip,a.btn--chip,a.btn--chip:hover{background:var(--stage-chip-raise);color:var(--stage-chip-text);border-color:rgb(255 255 255 / 0.28)}
+.btn--chip:hover{border-color:var(--color-accent)}
+.choice{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative;min-block-size:72px;padding:8px 4px;border:1.5px solid var(--control-boundary);border-radius:var(--radius-control);background:var(--color-surface);color:var(--color-muted-text);font-family:var(--font-sans);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);line-height:var(--line-height-tight);white-space:nowrap;cursor:pointer;transition:border-color .2s ease-out,color .2s ease-out,background-color .2s ease-out}
+.choice:hover{border-color:var(--color-muted-text)}
+.choice[aria-checked="true"]{border-color:var(--color-text);color:var(--color-text);background:var(--node-done)}
+.chip{display:inline-flex;align-items:center;gap:6px;min-block-size:32px;padding:0 12px;border-radius:var(--radius-pill);background:var(--color-surface);color:var(--color-text);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);line-height:var(--line-height-tight);white-space:nowrap}
+.ex{display:inline-flex;align-items:center;min-block-size:24px;padding:0 8px;border:1px dashed var(--color-muted-text);border-radius:var(--radius-pill);color:var(--color-muted-text);font-size:var(--font-size-sm);font-weight:var(--font-weight-regular);line-height:1;white-space:nowrap}
+.sr-only{position:absolute;inline-size:1px;block-size:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+</style>
+</helmet>
+<div style="position: relative; width: 1440px; height: 900px; overflow: hidden; box-sizing: border-box; padding: 32px 40px; background: var(--color-background); color: var(--color-text); font-family: var(--font-sans); display: flex; flex-direction: column">
+
+  <header style="flex: none; display: flex; align-items: center; justify-content: space-between; block-size: 56px">
+    <h1 style="margin: 0; font-family: var(--font-serif); font-size: 28px; font-weight: 600; line-height: 1.25; color: var(--color-text); white-space: nowrap">Position guard: every state</h1>
+    <ul aria-label="State key" style="display: flex; align-items: center; gap: 24px; margin: 0; padding: 0; list-style: none">
+      <li style="display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; line-height: 1.25; color: var(--color-text); white-space: nowrap">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="flex: none"><circle cx="12" cy="12" r="12" fill="var(--state-good)"/><path d="M6.5 12.5l3.5 3.5 6.5-7" fill="none" stroke="var(--badge-ink)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Good</span>
+      </li>
+      <li style="display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; line-height: 1.25; color: var(--color-text); white-space: nowrap">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="flex: none"><circle cx="12" cy="12" r="12" fill="var(--state-adjust)"/><path d="M12 6.5v7" fill="none" stroke="var(--badge-ink)" stroke-width="2.5" stroke-linecap="round"/><circle cx="12" cy="17.5" r="1.6" fill="var(--badge-ink)"/></svg>
+        <span>Adjust</span>
+      </li>
+      <li style="display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; line-height: 1.25; color: var(--color-text); white-space: nowrap">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="flex: none"><circle cx="12" cy="12" r="12" fill="var(--state-lost)"/><path d="M7.5 7.5l9 9M16.5 7.5l-9 9" fill="none" stroke="var(--badge-ink)" stroke-width="2.5" stroke-linecap="round"/></svg>
+        <span>Lost</span>
+      </li>
+    </ul>
+  </header>
+
+  <div style="flex: none; display: grid; grid-template-columns: 540px 780px; column-gap: 40px; margin-top: 16px; block-size: 764px">
+
+    <!-- Column 1 -->
+    <div style="display: flex; flex-direction: column; min-inline-size: 0">
+
+      <section aria-labelledby="ps-phone" style="flex: none; block-size: 353px; display: flex; flex-direction: column">
+        <h2 id="ps-phone" style="margin: 0; block-size: 20px; font-size: 14px; font-weight: 500; line-height: 20px; color: var(--color-muted-text); white-space: nowrap">Get ready · phone</h2>
+        <div style="margin-top: 8px; display: grid; grid-template-columns: repeat(4, 117px); column-gap: 24px; align-items: start">
+
+          <figure style="margin: 0; display: flex; flex-direction: column; gap: 8px; inline-size: 117px">
+            <div style="inline-size: 117px; block-size: 253px; border-radius: 14px; overflow: hidden; background: var(--preview-bg)">
+              <svg viewBox="0 0 390 844" width="117" height="253" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style="display: block">
+                <path fill-rule="evenodd" fill="var(--stage-veil)" d="M0 0H390V844H0ZM56 397A139 181 0 1 0 334 397A139 181 0 1 0 56 397Z"/>
+                <ellipse cx="195" cy="397" rx="139" ry="181" fill="none" stroke="var(--halo)" stroke-width="13.3" stroke-dasharray="26.7 20"/>
+                <ellipse cx="195" cy="397" rx="139" ry="181" fill="none" stroke="var(--color-text)" stroke-opacity="0.5" stroke-width="6.7" stroke-dasharray="26.7 20"/>
+              </svg>
+            </div>
+            <figcaption style="display: flex; flex-direction: column; gap: 2px; font-size: 14px; line-height: 1.25">
+              <span style="font-weight: 500; color: var(--color-text)">Searching</span>
+              <span style="color: var(--color-muted-text)">Point the camera at your face</span>
+            </figcaption>
+          </figure>
+
+          <figure style="margin: 0; display: flex; flex-direction: column; gap: 8px; inline-size: 117px">
+            <div style="inline-size: 117px; block-size: 253px; border-radius: 14px; overflow: hidden; background: var(--preview-bg)">
+              <svg viewBox="0 0 390 844" width="117" height="253" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style="display: block">
+                <path d="M76 844V688C82 560 140 530 195 530S308 560 314 688V844Z" fill="var(--preview-figure)"/>
+                <ellipse cx="195" cy="402" rx="80" ry="104" fill="var(--preview-figure)" stroke="var(--preview-edge)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <path fill-rule="evenodd" fill="var(--stage-veil)" d="M0 0H390V844H0ZM56 397A139 181 0 1 0 334 397A139 181 0 1 0 56 397Z"/>
+                <ellipse cx="195" cy="397" rx="139" ry="181" fill="none" stroke="var(--halo)" stroke-width="4" vector-effect="non-scaling-stroke"/>
+                <ellipse cx="195" cy="397" rx="139" ry="181" fill="none" stroke="var(--state-adjust)" stroke-width="2" vector-effect="non-scaling-stroke"/>
+                <ellipse cx="195" cy="400" rx="78" ry="102" fill="none" stroke="var(--halo)" stroke-width="3.5" vector-effect="non-scaling-stroke"/>
+                <ellipse cx="195" cy="400" rx="78" ry="102" fill="none" stroke="var(--color-text)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+                <circle cx="165" cy="382" r="12" fill="var(--gaze)" stroke="var(--gaze-outline)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <circle cx="225" cy="382" r="12" fill="var(--gaze)" stroke="var(--gaze-outline)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <path d="M101 376l-21 21 21 21M289 376l21 21-21 21M174 273l21-21 21 21M174 521l21 21 21-21" fill="none" stroke="var(--halo)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+                <path d="M101 376l-21 21 21 21M289 376l21 21-21 21M174 273l21-21 21 21M174 521l21 21 21-21" fill="none" stroke="var(--state-adjust)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+              </svg>
+            </div>
+            <figcaption style="display: flex; flex-direction: column; gap: 2px; font-size: 14px; line-height: 1.25">
+              <span style="font-weight: 500; color: var(--color-text)">Adjust</span>
+              <span style="color: var(--color-muted-text)">Move a little closer</span>
+            </figcaption>
+          </figure>
+
+          <figure style="margin: 0; display: flex; flex-direction: column; gap: 8px; inline-size: 117px">
+            <div style="inline-size: 117px; block-size: 253px; border-radius: 14px; overflow: hidden; background: var(--preview-bg)">
+              <svg viewBox="0 0 390 844" width="117" height="253" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style="display: block">
+                <path d="M10 844C20 650 110 600 195 600S370 650 380 844Z" fill="var(--preview-figure)"/>
+                <ellipse cx="195" cy="402" rx="124" ry="162" fill="var(--preview-figure)" stroke="var(--preview-edge)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <path fill-rule="evenodd" fill="var(--stage-veil)" d="M0 0H390V844H0ZM56 397A139 181 0 1 0 334 397A139 181 0 1 0 56 397Z"/>
+                <ellipse cx="195" cy="397" rx="139" ry="181" fill="none" stroke="var(--halo)" stroke-width="4" vector-effect="non-scaling-stroke"/>
+                <ellipse cx="195" cy="397" rx="139" ry="181" fill="none" stroke="var(--state-good)" stroke-width="2" vector-effect="non-scaling-stroke"/>
+                <path d="M195 216A139 181 0 1 1 194.9 216" pathLength="100" fill="none" stroke="var(--halo)" stroke-width="20" stroke-dasharray="60 100" stroke-linecap="round"/>
+                <path d="M195 216A139 181 0 1 1 194.9 216" pathLength="100" fill="none" stroke="var(--state-good)" stroke-width="13.3" stroke-dasharray="60 100" stroke-linecap="round"/>
+                <ellipse cx="195" cy="400" rx="122" ry="160" fill="none" stroke="var(--halo)" stroke-width="3.5" vector-effect="non-scaling-stroke"/>
+                <ellipse cx="195" cy="400" rx="122" ry="160" fill="none" stroke="var(--color-text)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+                <circle cx="148" cy="372" r="12" fill="var(--gaze)" stroke="var(--gaze-outline)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <circle cx="242" cy="372" r="12" fill="var(--gaze)" stroke="var(--gaze-outline)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+              </svg>
+            </div>
+            <figcaption style="display: flex; flex-direction: column; gap: 2px; font-size: 14px; line-height: 1.25">
+              <span style="font-weight: 500; color: var(--color-text)">Holding</span>
+              <span style="color: var(--color-muted-text)">Perfect, hold still</span>
+            </figcaption>
+          </figure>
+
+          <figure style="margin: 0; display: flex; flex-direction: column; gap: 8px; inline-size: 117px">
+            <div style="inline-size: 117px; block-size: 253px; border-radius: 14px; overflow: hidden; background: var(--preview-bg)">
+              <svg viewBox="0 0 390 844" width="117" height="253" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style="display: block">
+                <path d="M10 844C20 650 110 600 195 600S370 650 380 844Z" fill="var(--preview-figure)"/>
+                <ellipse cx="195" cy="402" rx="124" ry="162" fill="var(--preview-figure)" stroke="var(--preview-edge)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <path fill-rule="evenodd" fill="var(--stage-veil)" d="M0 0H390V844H0ZM56 397A139 181 0 1 0 334 397A139 181 0 1 0 56 397Z"/>
+                <ellipse cx="195" cy="397" rx="139" ry="181" fill="none" stroke="var(--halo)" stroke-width="6" vector-effect="non-scaling-stroke"/>
+                <ellipse cx="195" cy="397" rx="139" ry="181" fill="none" stroke="var(--state-good)" stroke-width="4" vector-effect="non-scaling-stroke"/>
+                <ellipse cx="195" cy="400" rx="122" ry="160" fill="none" stroke="var(--halo)" stroke-width="3.5" vector-effect="non-scaling-stroke"/>
+                <ellipse cx="195" cy="400" rx="122" ry="160" fill="none" stroke="var(--color-text)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+                <circle cx="148" cy="372" r="12" fill="var(--gaze)" stroke="var(--gaze-outline)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <circle cx="242" cy="372" r="12" fill="var(--gaze)" stroke="var(--gaze-outline)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <g transform="translate(195 216) scale(2.25)">
+                  <circle r="12" fill="var(--state-good)" stroke="var(--stage-ink)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+                  <path d="M-5.5 0.5l3.5 3.5 6.5-7" fill="none" stroke="var(--badge-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+                </g>
+              </svg>
+            </div>
+            <figcaption style="display: flex; flex-direction: column; gap: 2px; font-size: 14px; line-height: 1.25">
+              <span style="font-weight: 500; color: var(--color-text)">Ready</span>
+              <span style="color: var(--color-muted-text)">Stay like this while you play</span>
+            </figcaption>
+          </figure>
+
+        </div>
+      </section>
+
+      <section aria-labelledby="ps-webcam" style="flex: none; block-size: 261px; display: flex; flex-direction: column">
+        <h2 id="ps-webcam" style="margin: 0; block-size: 20px; font-size: 14px; font-weight: 500; line-height: 20px; color: var(--color-muted-text); white-space: nowrap">Get ready · webcam</h2>
+        <div style="margin-top: 8px; display: grid; grid-template-columns: repeat(2, 258px); column-gap: 24px; align-items: start">
+
+          <figure style="margin: 0; display: flex; flex-direction: column; gap: 8px; inline-size: 258px">
+            <div style="inline-size: 258px; block-size: 161px; border-radius: 14px; overflow: hidden; background: var(--preview-bg)">
+              <svg viewBox="0 0 1440 900" width="258" height="161" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style="display: block">
+                <path d="M330 900V800C350 620 520 580 720 580S1090 620 1110 800V900Z" fill="var(--preview-figure)"/>
+                <ellipse cx="720" cy="332" rx="152" ry="198" fill="var(--preview-figure)" stroke="var(--preview-edge)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <path fill-rule="evenodd" fill="var(--stage-veil)" d="M0 0H1440V900H0ZM552 423A168 218 0 1 0 888 423A168 218 0 1 0 552 423Z"/>
+                <ellipse cx="720" cy="423" rx="168" ry="218" fill="none" stroke="var(--halo)" stroke-width="4" vector-effect="non-scaling-stroke"/>
+                <ellipse cx="720" cy="423" rx="168" ry="218" fill="none" stroke="var(--state-adjust)" stroke-width="2" vector-effect="non-scaling-stroke"/>
+                <ellipse cx="720" cy="328" rx="148" ry="194" fill="none" stroke="var(--halo)" stroke-width="3.5" vector-effect="non-scaling-stroke"/>
+                <ellipse cx="720" cy="328" rx="148" ry="194" fill="none" stroke="var(--color-text)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+                <circle cx="663" cy="298" r="12" fill="var(--gaze)" stroke="var(--gaze-outline)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <circle cx="777" cy="298" r="12" fill="var(--gaze)" stroke="var(--gaze-outline)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <path d="M680 550l40 40 40-40" fill="none" stroke="var(--halo)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+                <path d="M680 550l40 40 40-40" fill="none" stroke="var(--state-adjust)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+              </svg>
+            </div>
+            <figcaption style="display: flex; flex-direction: column; gap: 2px; font-size: 14px; line-height: 1.25">
+              <span style="font-weight: 500; color: var(--color-text)">Adjust</span>
+              <span style="color: var(--color-muted-text)">Tilt the screen back a little</span>
+            </figcaption>
+          </figure>
+
+          <figure style="margin: 0; display: flex; flex-direction: column; gap: 8px; inline-size: 258px">
+            <div style="inline-size: 258px; block-size: 161px; border-radius: 14px; overflow: hidden; background: var(--preview-bg)">
+              <svg viewBox="0 0 1440 900" width="258" height="161" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style="display: block">
+                <path d="M330 900C350 720 520 680 720 680S1090 720 1110 900Z" fill="var(--preview-figure)"/>
+                <ellipse cx="720" cy="432" rx="152" ry="198" fill="var(--preview-figure)" stroke="var(--preview-edge)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <path fill-rule="evenodd" fill="var(--stage-veil)" d="M0 0H1440V900H0ZM552 423A168 218 0 1 0 888 423A168 218 0 1 0 552 423Z"/>
+                <ellipse cx="720" cy="423" rx="168" ry="218" fill="none" stroke="var(--halo)" stroke-width="6" vector-effect="non-scaling-stroke"/>
+                <ellipse cx="720" cy="423" rx="168" ry="218" fill="none" stroke="var(--state-good)" stroke-width="4" vector-effect="non-scaling-stroke"/>
+                <ellipse cx="720" cy="428" rx="148" ry="194" fill="none" stroke="var(--halo)" stroke-width="3.5" vector-effect="non-scaling-stroke"/>
+                <ellipse cx="720" cy="428" rx="148" ry="194" fill="none" stroke="var(--color-text)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+                <circle cx="663" cy="398" r="12" fill="var(--gaze)" stroke="var(--gaze-outline)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <circle cx="777" cy="398" r="12" fill="var(--gaze)" stroke="var(--gaze-outline)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <g transform="translate(720 205) scale(3.75)">
+                  <circle r="12" fill="var(--state-good)" stroke="var(--stage-ink)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+                  <path d="M-5.5 0.5l3.5 3.5 6.5-7" fill="none" stroke="var(--badge-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+                </g>
+              </svg>
+            </div>
+            <figcaption style="display: flex; flex-direction: column; gap: 2px; font-size: 14px; line-height: 1.25">
+              <span style="font-weight: 500; color: var(--color-text)">Ready</span>
+              <span style="color: var(--color-muted-text)">Stay like this while you play</span>
+            </figcaption>
+          </figure>
+
+        </div>
+      </section>
+
+      <section aria-labelledby="ps-row" style="flex: none; display: flex; flex-direction: column; align-items: flex-start">
+        <h2 id="ps-row" style="margin: 0; block-size: 20px; font-size: 14px; font-weight: 500; line-height: 20px; color: var(--color-muted-text); white-space: nowrap">Status row and phone tilt</h2>
+        <div role="group" aria-label="Status row" style="margin-top: 8px; display: flex; align-items: center; gap: 24px; padding: 12px 16px; border-radius: 14px; background: var(--stage-chip)">
+          <span role="img" aria-label="Distance: good" style="display: inline-flex; align-items: center; gap: 8px; min-block-size: 24px; font-size: 14px; font-weight: 500; line-height: 1.25; color: var(--stage-chip-text); white-space: nowrap">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="flex: none"><circle cx="12" cy="12" r="12" fill="var(--state-good)"/><path d="M6.5 12.5l3.5 3.5 6.5-7" fill="none" stroke="var(--badge-ink)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Distance</span>
+          </span>
+          <span role="img" aria-label="Position: needs a small change" style="display: inline-flex; align-items: center; gap: 8px; min-block-size: 24px; font-size: 14px; font-weight: 500; line-height: 1.25; color: var(--stage-chip-text); white-space: nowrap">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="flex: none"><circle cx="12" cy="12" r="12" fill="var(--state-adjust)"/><path d="M12 6.5v7" fill="none" stroke="var(--badge-ink)" stroke-width="2.5" stroke-linecap="round"/><circle cx="12" cy="17.5" r="1.6" fill="var(--badge-ink)"/></svg>
+            <span>Position</span>
+          </span>
+          <span role="img" aria-label="Light: good" style="display: inline-flex; align-items: center; gap: 8px; min-block-size: 24px; font-size: 14px; font-weight: 500; line-height: 1.25; color: var(--stage-chip-text); white-space: nowrap">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="flex: none"><circle cx="12" cy="12" r="12" fill="var(--state-good)"/><path d="M6.5 12.5l3.5 3.5 6.5-7" fill="none" stroke="var(--badge-ink)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Light</span>
+          </span>
+        </div>
+        <div role="status" style="margin-top: 12px; display: inline-flex; align-items: center; gap: 8px; block-size: 40px; padding: 0 16px 0 12px; border-radius: 999px; background: var(--stage-chip); color: var(--stage-chip-text); font-size: 14px; font-weight: 500; line-height: 1.25; white-space: nowrap">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--state-adjust)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><rect x="9" y="3" width="6" height="18" rx="1.5" transform="rotate(25 12 12)"/><path d="M17 6.5a7 7 0 0 1 1.5 6M19.8 10.6l-1.3 2.2-2.2-1.2"/></svg>
+          <span>Stand the phone more upright</span>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Column 2 -->
+    <div style="display: flex; flex-direction: column; min-inline-size: 0">
+
+      <section aria-labelledby="ps-glyph" style="flex: none; block-size: 212px; display: flex; flex-direction: column">
+        <h2 id="ps-glyph" style="margin: 0; block-size: 20px; font-size: 14px; font-weight: 500; line-height: 20px; color: var(--color-muted-text); white-space: nowrap">Compact glyph</h2>
+        <div class="on-stage" style="margin-top: 8px; inline-size: 780px; block-size: 132px; border-radius: 14px; background: var(--stage); display: flex; align-items: center; justify-content: space-evenly">
+
+          <figure style="margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px">
+            <div style="display: flex; align-items: center; block-size: 44px">
+              <div role="img" aria-label="Position good" style="inline-size:40px;block-size:40px;border-radius:999px;background:var(--stage-chip);opacity:.6"><svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true"><ellipse cx="20" cy="19" rx="8" ry="10.5" fill="none" stroke="var(--stage-chip-muted)" stroke-width="1.5"/><circle cx="16.8" cy="17.5" r="1.6" fill="var(--gaze)"/><circle cx="23.2" cy="17.5" r="1.6" fill="var(--gaze)"/><circle cx="31" cy="31" r="7" fill="var(--state-good)"/><path d="M27.8 31.2l2.2 2.2 4.2-4.6" fill="none" stroke="var(--badge-ink)" stroke-width="2" stroke-linecap="round"/></svg></div>
+            </div>
+            <figcaption style="font-size: 14px; font-weight: 500; line-height: 1.25; color: var(--stage-ink); white-space: nowrap">Good</figcaption>
+          </figure>
+
+          <figure style="margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px">
+            <div style="display: flex; align-items: center; gap: 8px; block-size: 44px">
+              <div role="img" aria-label="Position drifting" style="inline-size:40px;block-size:40px;border-radius:999px;background:var(--stage-chip)"><svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true"><ellipse cx="20" cy="19" rx="8" ry="10.5" fill="none" stroke="var(--state-adjust)" stroke-width="1.5"/><circle cx="18" cy="17.5" r="1.6" fill="var(--gaze)"/><circle cx="22" cy="17.5" r="1.6" fill="var(--gaze)"/><circle cx="31" cy="31" r="7" fill="var(--state-adjust)"/><path d="M31 27.6v3.4" fill="none" stroke="var(--badge-ink)" stroke-width="2" stroke-linecap="round"/><circle cx="31" cy="34" r="1.1" fill="var(--badge-ink)"/></svg></div>
+              <span role="status" style="display: inline-flex; align-items: center; gap: 6px; block-size: 32px; padding: 0 12px 0 9px; border-radius: 999px; background: var(--stage-chip); color: var(--stage-chip-text); font-size: 14px; font-weight: 500; line-height: 1.25; white-space: nowrap">
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" style="flex: none"><circle cx="12" cy="12" r="12" fill="var(--state-adjust)"/><path d="M12 6.5v7" fill="none" stroke="var(--badge-ink)" stroke-width="2.5" stroke-linecap="round"/><circle cx="12" cy="17.5" r="1.6" fill="var(--badge-ink)"/></svg>
+                <span>A little closer</span>
+              </span>
+            </div>
+            <figcaption style="font-size: 14px; font-weight: 500; line-height: 1.25; color: var(--stage-ink); white-space: nowrap">Drifting</figcaption>
+          </figure>
+
+          <figure style="margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px">
+            <div style="display: flex; align-items: center; block-size: 44px">
+              <div role="img" aria-label="Position lost" style="inline-size:40px;block-size:40px;border-radius:999px;background:var(--stage-chip)"><svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true"><ellipse cx="20" cy="19" rx="8" ry="10.5" fill="none" stroke="var(--state-lost)" stroke-width="1.5" stroke-dasharray="3 3"/><circle cx="31" cy="31" r="7" fill="var(--state-lost)"/><path d="M28.5 28.5l5 5M33.5 28.5l-5 5" fill="none" stroke="var(--badge-ink)" stroke-width="2" stroke-linecap="round"/></svg></div>
+            </div>
+            <figcaption style="font-size: 14px; font-weight: 500; line-height: 1.25; color: var(--stage-ink); white-space: nowrap">Lost</figcaption>
+          </figure>
+
+          <figure style="margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px">
+            <div style="display: flex; align-items: center; gap: 8px; block-size: 44px">
+              <div role="img" aria-label="Position good" style="inline-size:40px;block-size:40px;border-radius:999px;background:var(--stage-chip);opacity:.6"><svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true"><ellipse cx="20" cy="19" rx="8" ry="10.5" fill="none" stroke="var(--stage-chip-muted)" stroke-width="1.5"/><circle cx="16.8" cy="17.5" r="1.6" fill="var(--gaze)"/><circle cx="23.2" cy="17.5" r="1.6" fill="var(--gaze)"/><circle cx="31" cy="31" r="7" fill="var(--state-good)"/><path d="M27.8 31.2l2.2 2.2 4.2-4.6" fill="none" stroke="var(--badge-ink)" stroke-width="2" stroke-linecap="round"/></svg></div>
+              <button class="icon-btn" type="button" aria-label="Pause" style="background: var(--stage-chip); color: var(--stage-chip-text)">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="7" y="5" width="3.2" height="14" rx="1" fill="currentColor" stroke="none"/><rect x="13.8" y="5" width="3.2" height="14" rx="1" fill="currentColor" stroke="none"/></svg>
+              </button>
+            </div>
+            <figcaption style="font-size: 14px; font-weight: 500; line-height: 1.25; color: var(--stage-ink); white-space: nowrap">Corner cluster</figcaption>
+          </figure>
+
+        </div>
+        <p style="margin: 8px 0 0; font-size: 14px; font-weight: 400; line-height: 1.55; color: var(--color-muted-text)">In warm-up levels it turns amber silently. Words appear only in Free look and the challenge.</p>
+      </section>
+
+      <section aria-labelledby="ps-pause" style="flex: none; display: flex; flex-direction: column">
+        <h2 id="ps-pause" style="margin: 0; block-size: 20px; font-size: 14px; font-weight: 500; line-height: 20px; color: var(--color-muted-text); white-space: nowrap">Auto-pause</h2>
+        <div class="on-stage" style="position: relative; margin-top: 8px; inline-size: 780px; block-size: 524px; border-radius: 14px; overflow: hidden; background: var(--stage)">
+
+          <svg viewBox="0 0 780 524" width="780" height="524" aria-hidden="true" style="position: absolute; inset: 0; display: block">
+            <g>
+              <rect x="289" y="12" width="20" height="4" rx="2" fill="var(--pip-on)"/>
+              <rect x="315" y="12" width="20" height="4" rx="2" fill="var(--pip-on)"/>
+              <rect x="341" y="12" width="20" height="4" rx="2" fill="var(--pip-on)"/>
+              <rect x="367" y="12" width="20" height="4" rx="2" fill="var(--pip-on)"/>
+              <rect x="393" y="12" width="20" height="4" rx="2" fill="var(--pip-on)"/>
+              <rect x="419" y="12" width="20" height="4" rx="2" fill="var(--pip-off)"/>
+              <rect x="445" y="12" width="20" height="4" rx="2" fill="var(--pip-off)"/>
+              <rect x="471" y="12" width="20" height="4" rx="2" fill="var(--pip-off)"/>
+            </g>
+            <g transform="translate(700 476)"><circle r="40" fill="var(--bubble-fill)" stroke="var(--bubble-edge)" stroke-width="2"/><path d="M-23.5-15.2A28 28 0 0 1-9.1-26.5" fill="none" stroke="var(--bubble-shine)" stroke-width="3" stroke-linecap="round"/><circle r="12" fill="var(--bubble-core)"/><path d="M-12-1.5h24v3h-24zM-1.5-12h3v24h-3z" fill="var(--stage)"/><path d="M-12-1.5h24v3h-24zM-1.5-12h3v24h-3z" fill="var(--bubble-fill)"/><circle r="4" fill="var(--bubble-core)"/></g>
+          </svg>
+          <div aria-hidden="true" style="position: absolute; inset: 0; background: var(--stage-scrim)"></div>
+
+          <div style="position: relative; display: flex; align-items: flex-start; gap: 20px; padding: 20px">
+
+            <div style="display: flex; flex-direction: column; gap: 12px; inline-size: 320px">
+              <section role="alertdialog" aria-labelledby="pp-phone-h" aria-describedby="pp-phone-d" style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px; border-radius: 14px; background: var(--stage-chip); color: var(--stage-chip-text); text-align: center">
+                <span style="font-size: 14px; font-weight: 500; line-height: 1.25; color: var(--stage-chip-muted); white-space: nowrap">Paused</span>
+                <div style="inline-size: 180px; block-size: 240px; border-radius: 12px; overflow: hidden; background: var(--preview-bg)">
+                  <svg viewBox="0 140 390 520" width="180" height="240" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Camera preview: face partly out of view to the right, dashed oval shows where to return" style="display: block">
+                    <g transform="translate(135 8)">
+                      <path d="M10 844C20 650 110 600 195 600S370 650 380 844Z" fill="var(--preview-figure)"/>
+                      <ellipse cx="195" cy="402" rx="124" ry="162" fill="var(--preview-figure)" stroke="var(--preview-edge)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                    </g>
+                    <ellipse cx="195" cy="397" rx="139" ry="181" fill="none" stroke="var(--color-text)" stroke-opacity="0.7" stroke-width="4.33" stroke-dasharray="13 10.8"/>
+                    <ellipse cx="330" cy="408" rx="122" ry="160" fill="none" stroke="var(--halo)" stroke-width="4" vector-effect="non-scaling-stroke"/>
+                    <ellipse cx="330" cy="408" rx="122" ry="160" fill="none" stroke="var(--color-text)" stroke-width="2" vector-effect="non-scaling-stroke"/>
+                    <circle cx="283" cy="380" r="10" fill="var(--gaze)" stroke="var(--gaze-outline)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                    <circle cx="377" cy="380" r="10" fill="var(--gaze)" stroke="var(--gaze-outline)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                  </svg>
+                </div>
+                <h3 id="pp-phone-h" style="margin: 0; font-size: 20px; font-weight: 500; line-height: 1.25; color: var(--stage-chip-text); white-space: nowrap">Move back into view</h3>
+                <p id="pp-phone-d" style="margin: 0; font-size: 14px; font-weight: 400; line-height: 1.55; color: var(--stage-chip-muted); white-space: nowrap">Carries on by itself</p>
+                <button class="btn btn--ghost" type="button" style="min-block-size: 44px">Exit</button>
+              </section>
+              <div style="display: flex; flex-direction: column; gap: 2px; padding: 0 4px; font-size: 14px; line-height: 1.25; color: var(--stage-chip-text)">
+                <span style="font-weight: 500">Phone · face drifting out</span>
+                <span style="font-weight: 400">The dashed oval marks home</span>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px; inline-size: 400px">
+              <section role="alertdialog" aria-labelledby="pp-web-h" aria-describedby="pp-web-d" style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px; border-radius: 14px; background: var(--stage-chip); color: var(--stage-chip-text); text-align: center">
+                <span style="font-size: 14px; font-weight: 500; line-height: 1.25; color: var(--stage-chip-muted); white-space: nowrap">Paused</span>
+                <div style="inline-size: 368px; block-size: 230px; border-radius: 12px; overflow: hidden; background: var(--preview-bg)">
+                  <svg viewBox="0 0 1440 900" width="368" height="230" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Camera preview: no face in view, dashed oval shows where to return" style="display: block">
+                    <ellipse cx="720" cy="423" rx="168" ry="218" fill="none" stroke="var(--color-text)" stroke-opacity="0.7" stroke-width="7.8" stroke-dasharray="23.5 19.6"/>
+                  </svg>
+                </div>
+                <h3 id="pp-web-h" style="margin: 0; font-size: 20px; font-weight: 500; line-height: 1.25; color: var(--stage-chip-text); white-space: nowrap">Look back at the screen</h3>
+                <p id="pp-web-d" style="margin: 0; font-size: 14px; font-weight: 400; line-height: 1.55; color: var(--stage-chip-muted); white-space: nowrap">Carries on by itself</p>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 8px">
+                  <button class="btn btn--ghost" type="button" style="min-block-size: 44px">Exit</button>
+                  <button class="btn btn--chip" type="button" style="min-block-size: 44px">Warm up again</button>
+                </div>
+              </section>
+              <div style="display: flex; flex-direction: column; gap: 2px; padding: 0 4px; font-size: 14px; line-height: 1.25; color: var(--stage-chip-text)">
+                <span style="font-weight: 500">Webcam · face lost for 10 seconds</span>
+                <span style="font-weight: 400">Adds a way to warm up again</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
