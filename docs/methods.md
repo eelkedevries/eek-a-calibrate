@@ -138,11 +138,12 @@ Metrics use the raw (unfiltered, uncorrected) predictions of valid frames.
   do not break a pair); SD = √(σx² + σy²);
   **BCEA₆₈ = 2kπσxσy√(1 − ρ²)** with k = −ln(1 − 0.68) = 1.1394, from at least 3 valid samples
   (two samples always lie on a line, so ρ = ±1 and the area would read as 0).
-- **Data loss** = 1 − valid / expected, where expected = sampling time × the rate at which the
-  device processed frames (the median over targets of processed frames per second, at most the
-  camera's frame rate, 30 if unknown). A device slower than its camera therefore has a lower
-  effective rate, not more data loss; a stall within one target still counts as loss there. The
-  funnel shows every stage from the camera's rate: expected, delivered, processed, face, eyes
+- **Data loss** = 1 − valid / basis, where basis = sampling time × the rate at which the device
+  processed frames (the median over targets of processed frames per second, at most the camera's
+  frame rate, 30 if unknown): the frames the device could analyse. A device slower than its
+  camera therefore has a lower effective rate, not more data loss; a stall within one target
+  still counts as loss there. The funnel shows every stage from the camera's rate: expected
+  (sampling time × the camera's frame rate, so not the basis), delivered, processed, face, eyes
   open, head in range, valid.
 - **Effective rate** = valid samples per second of sampling time (capture clock).
 - **Latency** = mean time from capture to result.
