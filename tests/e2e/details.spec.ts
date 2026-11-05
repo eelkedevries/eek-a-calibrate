@@ -50,7 +50,8 @@ const database = (page: Page) =>
 
 test('opens from the top bar and the deep link, by keyboard, and closes on Esc and Done', async ({ page }) => {
   const problems = watch(page);
-  await page.goto('./?e2e=1#/complete');
+  // Warm-up complete needs a scored Test round (prompt 015): its fixture shows one, without a fit.
+  await page.goto('./?e2e=1&fixture=complete-good#/complete');
   const trigger = page.getByRole('button', { name: 'Details' });
   await trigger.click();
   let s = await onTab(page, 'results');

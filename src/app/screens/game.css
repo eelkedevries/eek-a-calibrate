@@ -1,0 +1,599 @@
+/* The warm-up levels and Warm-up complete (design §2.6–§2.12, §4.3–§4.5, §6.1; spec §17.6–§17.7).
+   Colour only through the role tokens of style.css; the grey stage is never themed. Layouts switch
+   by aspect ratio (5/4) and height (480 px), never by orientation. */
+
+/* ---------------------------------------------------------------- Stimulus HUD (design §2.6) */
+
+.app[data-screen='warmup'] .stage {
+  pointer-events: none;
+}
+
+/* The pip line on the camera edge: 12 px in from the top, inside the side gutters. */
+.pips {
+  position: absolute;
+  z-index: 1;
+  top: max(12px, env(safe-area-inset-top));
+  left: var(--pad-l);
+  right: var(--pad-r);
+  display: flex;
+  gap: 4px;
+  block-size: 4px;
+  pointer-events: none;
+}
+
+.pip {
+  flex: 1 1 0;
+  min-inline-size: 0;
+  border-radius: 2px;
+  background: var(--pip-off);
+}
+
+.pip[data-on] {
+  background: var(--pip-on);
+}
+
+.pips--bar {
+  border-radius: 2px;
+  background: var(--pip-off);
+}
+
+.pips__fill {
+  display: block;
+  inline-size: calc(var(--fill, 0) * 100%);
+  block-size: 100%;
+  border-radius: 2px;
+  background: var(--pip-on);
+}
+
+/* The corner cluster, farthest from the camera: the glyph, then Pause (44 px dark chip). */
+.corner {
+  position: absolute;
+  z-index: 2;
+  right: var(--pad-r);
+  bottom: var(--pad-b);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  transition: opacity 0.2s ease-out;
+}
+
+.corner[data-faded] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.corner__pause {
+  display: grid;
+  place-items: center;
+  inline-size: var(--tap);
+  block-size: var(--tap);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--stage-chip);
+  color: var(--stage-chip-text);
+  cursor: pointer;
+}
+
+.corner__pause:hover {
+  box-shadow: inset 0 0 0 999px var(--stage-chip-raise);
+}
+
+/* Turn your head's caption chip under the arcs (design §2.9). */
+.head-chip {
+  position: absolute;
+  z-index: 1;
+  transform: translateX(-50%);
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--stage-chip);
+  color: var(--stage-chip-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: var(--line-height-tight);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Cards are centred on the grey, above the stage and the HUD. */
+.stim-layer {
+  grid-area: stage;
+  position: relative;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  min-inline-size: 0;
+  min-block-size: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  pointer-events: none;
+}
+
+.stim-layer:empty {
+  display: none;
+}
+
+/* A card that ends the level (screen changed, fix the set-up, failed) replaces the pause overlay. */
+.app:has(.stim-dialog--end) > .pause {
+  display: none !important;
+}
+
+.stim-layer > * {
+  grid-area: auto;
+  pointer-events: auto;
+}
+
+/* Regular landscape (desktop): the pip line and the cluster 24 px in. */
+@media (min-aspect-ratio: 5/4) and (min-height: 480px) {
+  .pips {
+    left: max(24px, env(safe-area-inset-left));
+    right: max(24px, env(safe-area-inset-right));
+    gap: 6px;
+  }
+
+  .corner {
+    right: max(24px, env(safe-area-inset-right));
+  }
+}
+
+/* A phone on its side: the pip line runs down the camera side, the cluster sits at the far side. */
+@media (min-aspect-ratio: 5/4) and (max-height: 479.98px) {
+  .pips {
+    top: 24px;
+    bottom: 24px;
+    left: max(12px, env(safe-area-inset-left));
+    right: auto;
+    flex-direction: column;
+    inline-size: 4px;
+    block-size: auto;
+  }
+
+  .app[data-camera='right'] .pips {
+    left: auto;
+    right: max(12px, env(safe-area-inset-right));
+  }
+
+  .pips__fill {
+    inline-size: 100%;
+    block-size: calc(var(--fill, 0) * 100%);
+  }
+
+  .app[data-camera='right'] .corner {
+    left: var(--pad-l);
+    right: auto;
+  }
+
+  .stim-card {
+    inline-size: min(100%, 400px);
+  }
+}
+
+/* The state badges are drawings, not the text pills that share the class name in details.css. */
+svg.badge {
+  min-block-size: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+/* ---------------------------------------------------------------- Level cards (design §2.6) */
+
+.level-card__sound {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: var(--stage-chip-text);
+}
+
+.level-card__clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /*
+   * Clear of the Sound button in the card's corner, which reaches 28 px into a 328 px card's
+   * content box: centred in the room beside it, the line stays on one line at 360 px.
+   */
+  padding-inline: 0 28px;
+  text-wrap: balance;
+  gap: var(--space-sm);
+  font-size: 0.875rem;
+  line-height: var(--line-height-tight);
+  color: var(--stage-chip-muted);
+}
+
+/* A 400 px card (landscape) has room to centre the line on the card, clear of Sound on both sides. */
+@media (min-aspect-ratio: 5/4) {
+  .level-card__clear {
+    padding-inline: 40px;
+  }
+}
+
+.level-card__clear svg,
+.level-card__picto {
+  display: block;
+  flex: none;
+  color: var(--stage-chip-text);
+}
+
+.level-card__rule {
+  max-inline-size: 300px;
+  font-size: 1rem;
+  line-height: var(--line-height-normal);
+  text-wrap: balance;
+}
+
+.level-card__hint {
+  font-size: 0.875rem;
+  line-height: var(--line-height-normal);
+  color: var(--stage-chip-muted);
+}
+
+.level-card__go {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm) var(--space-md);
+  margin-block-start: var(--space-sm);
+}
+
+.level-card__timer {
+  flex: none;
+  inline-size: 40px;
+  block-size: 40px;
+  color: var(--stage-chip-text);
+}
+
+.level-card__timer svg {
+  display: block;
+}
+
+.level-card__digit {
+  font-family: var(--font-mono);
+}
+
+.stim-card .btn--ghost {
+  color: var(--stage-chip-text);
+}
+
+.stim-card .btn--ghost:hover {
+  background: var(--stage-chip-raise);
+}
+
+/* Short windows (a phone on its side): the card loses its pictogram and its spacing tightens. */
+@media (max-height: 479.98px) {
+  .level-card {
+    gap: var(--space-sm);
+    padding: var(--space-md);
+  }
+
+  .level-card__picto {
+    display: none;
+  }
+
+  .level-card__go {
+    margin-block-start: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- Dialog cards (design §2.6, §2.10, §2.16) */
+
+.stim-dialog {
+  gap: 12px;
+}
+
+.stim-dialog__title {
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: var(--line-height-tight);
+}
+
+.stim-dialog__body {
+  font-size: 0.875rem;
+  line-height: var(--line-height-normal);
+  color: var(--stage-chip-muted);
+}
+
+.stim-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-sm);
+  margin-block-start: var(--space-xs);
+}
+
+.pause-card {
+  padding-block-start: 56px;
+}
+
+.pause-card__tools {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: var(--space-xs);
+  color: var(--stage-chip-text);
+}
+
+.checking {
+  gap: var(--space-md);
+}
+
+.checking__title {
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: var(--line-height-tight);
+}
+
+.checking__bar {
+  inline-size: 100%;
+  block-size: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--node-line);
+}
+
+.checking__fill {
+  display: block;
+  inline-size: calc(var(--fill, 0) * 100%);
+  block-size: 100%;
+  background: var(--stage-chip-text);
+  transition: inline-size 0.2s ease-out;
+}
+
+.checking__late {
+  font-size: 0.875rem;
+  color: var(--stage-chip-muted);
+}
+
+/* ---------------------------------------------------------------- Warm-up complete (design §2.12) */
+
+.complete-stage {
+  display: grid;
+  place-items: center;
+  padding: var(--space-md);
+}
+
+.zone-map {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+
+.zone-map__mini {
+  display: block;
+  /* Contain-fit in the card (cq units measure its content box), less the legend and its gap, at
+     about the boards' share of the card's width at most. */
+  inline-size: min(74cqw, calc((100cqh - 2.25rem - 12px) * var(--ar, 1)));
+  block-size: auto;
+  aspect-ratio: var(--ar, 1);
+  overflow: visible;
+}
+
+.zone-map__screen {
+  fill: var(--stage);
+}
+
+.zone-map__zone {
+  fill: transparent;
+  stroke: var(--stage-line);
+}
+
+.zone-map__legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  font-size: 0.875rem;
+  line-height: var(--line-height-tight);
+  color: var(--color-muted-text);
+}
+
+.zone-map__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.zone-map__legend svg {
+  display: block;
+}
+
+.complete-panel {
+  align-items: center;
+  gap: var(--space-xs);
+  text-align: center;
+}
+
+.stars {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-block-end: var(--space-sm);
+}
+
+.star {
+  display: block;
+  inline-size: 28px;
+  block-size: 28px;
+  fill: none;
+  stroke: var(--star-off);
+  stroke-width: 1.5;
+}
+
+.star[data-on] {
+  fill: var(--star-on);
+  stroke: none;
+}
+
+.complete__sentence {
+  font-size: 1rem;
+  line-height: var(--line-height-normal);
+}
+
+.complete__tip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 0.875rem;
+  line-height: var(--line-height-normal);
+  color: var(--color-muted-text);
+}
+
+.complete__tip svg {
+  flex: none;
+}
+
+.link-btn {
+  min-block-size: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-link);
+  font: inherit;
+  font-size: 0.875rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  color: var(--color-text);
+}
+
+/* The secondary action keeps its content width; the primary fills the rest (design §4.3). */
+.complete__actions .btn--secondary {
+  flex: 0 0 auto;
+}
+
+/* Its icon shows only when the row is too narrow for the label (the fit guard's tier 1). */
+.complete__actions .btn--secondary > svg {
+  display: none;
+}
+
+.complete__actions[data-fit='1'] .btn--secondary {
+  inline-size: 56px;
+  padding: 0;
+}
+
+.complete__actions[data-fit='1'] .btn--secondary > svg {
+  display: block;
+}
+
+.complete__actions[data-fit='1'] .btn__label {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.complete__actions[data-fit='2'] .btn--secondary {
+  display: none;
+}
+
+@media (min-aspect-ratio: 5/4) {
+  .complete-panel {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
+@media (min-aspect-ratio: 5/4) and (min-height: 480px) {
+  .complete-panel {
+    gap: 12px;
+  }
+
+  .stars {
+    margin-block-end: var(--space-xs);
+  }
+
+  .star {
+    inline-size: 32px;
+    block-size: 32px;
+  }
+
+  .complete__judge {
+    margin-block-start: -8px;
+  }
+
+  /* On larger screens both actions keep their content width, as one group with the panel. */
+  .complete__actions .btn {
+    flex: 0 0 auto;
+  }
+}
+
+/* A phone on its side: the panel's spacing tightens to keep the actions in view. */
+@media (min-aspect-ratio: 5/4) and (max-height: 479.98px) {
+  .app[data-screen='complete'] .panel__title {
+    font-size: 1.25rem;
+  }
+
+  .stars {
+    margin-block-end: 0;
+  }
+
+  .star {
+    inline-size: 24px;
+    block-size: 24px;
+  }
+}
+
+/* The arrival (design §2.12): zones light up one by one, then the stars fill, then the actions. */
+@media (prefers-reduced-motion: no-preference) {
+  .app[data-arrive='animate'] .zone-map__zone {
+    animation: zone-in 360ms ease-out both;
+    animation-delay: calc(var(--k, 0) * 120ms);
+  }
+
+  .app[data-arrive='animate'] .star[data-on] {
+    animation: star-in 150ms ease-out both;
+    animation-delay: calc(var(--zones, 0) * 120ms + var(--k, 0) * 150ms);
+  }
+
+  .app[data-arrive='animate'] .complete__actions {
+    animation: fade-in 200ms ease-out both;
+    animation-delay: calc(var(--zones, 0) * 120ms + 450ms);
+  }
+}
+
+@keyframes zone-in {
+  from {
+    opacity: 0;
+    fill: var(--stage-lit);
+  }
+
+  50% {
+    opacity: 1;
+    fill: var(--stage-lit);
+  }
+
+  to {
+    opacity: 1;
+    fill: transparent;
+  }
+}
+
+@keyframes star-in {
+  from {
+    fill: transparent;
+    stroke: var(--star-off);
+  }
+
+  to {
+    fill: var(--star-on);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

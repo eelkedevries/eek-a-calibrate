@@ -142,9 +142,9 @@ test.describe('Title and Get ready', () => {
     await expect(action).toBeEnabled();
     await expect(action).toHaveText(g.action === 'start' ? t('ready.start') : t('ready.anyway'));
     if (g.action === 'anyway') await expect(page.getByText(t('ready.anywayNote'))).toBeVisible();
-    // Until prompt 015 the warm-up is the v1 calibration.
+    // The tap starts the presentation span and the warm-up levels.
     await action.click();
-    await expect.poll(() => route(page)).toBe('calibrate');
+    await expect.poll(() => route(page)).toBe('warmup');
     expect(problems).toEqual([]);
   });
 

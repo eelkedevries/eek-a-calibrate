@@ -4,16 +4,24 @@
 // onsetMs is the rAF timestamp of the first frame that shows it, and its offsetMs that of the
 // first frame without it.
 //
-// The stage lives on <body>, outside the router's outlet, so that calibration can hand a
-// fullscreen stage straight to validation without a new user gesture.
+// The v1 stage lives on <body>, outside the router's outlet, so that calibration can hand a
+// fullscreen stage straight to validation without a new user gesture. The warm-up levels (spec
+// §17.6) embed a stage in the game shell instead and run the same runner with game hooks: the
+// bubble, the firefly and the head arcs in place of the ring and the pose guide (`?target=ring`
+// keeps the ring), a 150 ms pop between items, pauses waited out by the screen's own cards and
+// the position guard, and progress reported to the pip line rather than drawn.
 import { FIXATION, HEAD_BLOCK } from '../../core/constants.ts';
 import { layoutToPx } from '../../core/geometry/screen.ts';
 import type { FrameRecorder } from '../../core/protocol/labelling.ts';
 import { pursuitTargetAt } from '../../core/protocol/pursuit.ts';
 import type { Presentation, PursuitItem, ScreenGeometry, TargetItem } from '../../core/types.ts';
+import { bubbleRadius, popProgress, type BubbleSizes } from '../../core/warmup/bubble.ts';
 import type { Invalidation, Presentation as Block } from '../../platform/presentation.ts';
 import { h } from '../dom.ts';
 import { t } from '../strings.en-GB.ts';
+import { drawBubble, drawBurst, type GameColours } from './bubble.ts';
+import { drawFirefly, FIREFLY_R, trailSegments, TRAIL_MS } from './firefly.ts';
+import { ArcProgress, arcsExtent, drawHeadArcs } from './headArcs.ts';
 import { drawPoseGuide, SectorTracker } from './poseGuide.ts';
 import { drawTarget, ringDiameterPx, type TargetSizes } from './target.ts';
 
@@ -37,6 +45,8 @@ const STAGE_CSS = `
 .stimulus-card .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1rem; }
 .stimulus-card button { min-height: 44px; min-width: 44px; }
 .stimulus-card .hint { color: var(--muted); font-size: 0.9rem; }
+.stimulus-stage.stimulus-stage--game { position: absolute; z-index: auto; display: block; background: var(--stage); }
+.stimulus-stage--game .stimulus-controls, .stimulus-stage--game .stimulus-progress, .stimulus-stage--game .stimulus-caption { display: none; }
 `;
 
 function injectStyle(): void {
@@ -79,7 +89,8 @@ export class StimulusStage {
   onPause: () => void = () => {};
   onAbort: () => void = () => {};
 
-  constructor() {
+  /** `game`: embedded in the game shell by the warm-up screen, which draws its own HUD. */
+  constructor(opts: { game?: boolean } = {}) {
     injectStyle();
     this.canvas = h('canvas', { 'aria-hidden': 'true' });
     const ctx = this.canvas.getContext('2d');
@@ -91,7 +102,15 @@ export class StimulusStage {
     this.abortButton = h('button', { type: 'button', class: 'stimulus-abort', onclick: () => this.onAbort() }, t('stimulus.abort'));
     this.controls = h('div', { class: 'stimulus-controls', hidden: true }, this.pauseButton, this.abortButton);
     this.layer = h('div', { class: 'stimulus-layer' });
-    this.el = h('div', { class: 'stimulus-stage', role: 'region', 'aria-label': t('stimulus.label') }, this.canvas, this.progressBar, this.caption, this.controls, this.layer);
+    this.el = h(
+      'div',
+      { class: `stimulus-stage${opts.game ? ' stimulus-stage--game' : ''}`, role: opts.game ? null : 'region', 'aria-label': opts.game ? null : t('stimulus.label'), 'aria-hidden': opts.game ? 'true' : null },
+      this.canvas,
+      this.progressBar,
+      this.caption,
+      this.controls,
+      this.layer,
+    );
   }
 
   show(): void {
@@ -119,10 +138,13 @@ export class StimulusStage {
     return { bg: cs.getPropertyValue('--stimulus-bg').trim() || '#808080', fg: cs.getPropertyValue('--stimulus-fg').trim() || '#000000' };
   }
 
+  /** Overrides the background `clear()` paints (the game's --stage). */
+  background: string | null = null;
+
   clear(): void {
     const g = this.geometry;
     if (!g) return;
-    this.ctx.fillStyle = this.colours().bg;
+    this.ctx.fillStyle = this.background ?? this.colours().bg;
     this.ctx.fillRect(0, 0, g.viewportWpx, g.viewportHpx);
   }
 
@@ -256,7 +278,31 @@ export function releaseStage(): void {
 
 // ----- The block runner ------------------------------------------------------------------
 
-export type PauseReason = 'manual' | 'face' | 'hidden';
+export type PauseReason = 'manual' | 'face' | 'hidden' | 'guard';
+
+/** How the warm-up levels draw and pause (spec §17.6); absent for the v1 screens. */
+export interface GameHooks {
+  /** The bubble (default) or the §4.7 ring (`?target=ring`, the pilot of §17.12). */
+  style: 'bubble' | 'ring';
+  bubble: BubbleSizes;
+  /** The static bubble's radius in Turn your head (32 px on phones, 40 px on larger screens). */
+  headR: number;
+  colours: GameColours;
+  /** Limited head movement halves the head block's sector targets (§17.6.5). */
+  limitedHead: boolean;
+  /** A pause began; the screen shows its card (manual, hidden page) or the guard's overlay. */
+  paused(reason: PauseReason): void;
+  /** The pause ended (Carry on, P again, the guard's resume, or an abort or invalidation). */
+  resumed(): void;
+  /** Items done of this level's total (a retried bubble adds one), and the pursuit's fraction. */
+  progress(done: number, total: number, fraction: number | null): void;
+  /** The target this frame (centre and the radius it reaches), or null between items. */
+  target(at: { x: number; y: number; r: number } | null): void;
+  /** A bubble popped (the soft pop and the 15 ms haptic). */
+  pop(): void;
+  /** Turn your head's caption chip under the arcs: a string key, or null to hide it. */
+  caption(key: string | null, at: { x: number; y: number; r: number } | null): void;
+}
 
 export interface RunContext {
   stage: StimulusStage;
@@ -277,6 +323,8 @@ export interface RunContext {
   faceLost(): boolean;
   /** The latest head pose, for the pose guide. */
   pose(): { yawDeg: number; pitchDeg: number } | null;
+  /** The warm-up levels' drawing and pausing; the v1 ring, pose guide and cards without it. */
+  game?: GameHooks;
 }
 
 export type RunOutcome = { kind: 'done' } | { kind: 'aborted' } | { kind: 'invalid'; invalidation: Invalidation };
@@ -295,10 +343,10 @@ function median(values: readonly number[]): number {
 
 /**
  * Presents blocks of items on the stage and records their presentations through the recorder's
- * labeller. A pause (the Pause button or P, a face lost for more than 400 ms, a hidden page)
- * interrupts the item on screen; it is shown again from its start once the pause ends. An
- * invalidation of the block (fullscreen left, an orientation, size, pixel-ratio or zoom change)
- * or Abort (the button or Esc) ends the run.
+ * labeller. A pause (the Pause button or P, a face lost for more than 400 ms, a hidden page; in
+ * the warm-up levels also the position guard) interrupts the item on screen; it is shown again
+ * from its start once the pause ends. An invalidation of the block (fullscreen left, an
+ * orientation, size, pixel-ratio or zoom change) or Abort (the button or Esc) ends the run.
  */
 export class BlockRunner {
   private readonly c: RunContext;
@@ -307,14 +355,19 @@ export class BlockRunner {
   private invalidation: Invalidation | null = null;
   private readonly attempts = new Map<string, number>();
   private readonly offs: (() => void)[] = [];
+  /** While a game-mode pause is waited out: ends it with 'resume', 'abort' or 'invalid'. */
+  private release: ((value: string) => void) | null = null;
   /** The item on screen, for the test hooks. */
   current: { itemId: string; phase: string } | null = null;
   done = 0;
   total = 0;
+  /** Bubbles shown again at the end of their block (the steadiness line counts them). */
+  retried = 0;
 
   constructor(c: RunContext) {
     this.c = c;
     c.stage.configure(c.geometry);
+    if (c.game) c.stage.background = c.game.colours.stage;
     c.stage.onPause = () => (this.paused === 'manual' ? this.resume() : this.pause('manual'));
     c.stage.onAbort = () => this.abort();
     this.offs.push(c.block.onInvalidate((inv) => this.invalidate(inv)));
@@ -325,6 +378,8 @@ export class BlockRunner {
     this.offs.push(() => document.removeEventListener('visibilitychange', onVisibility));
     const onKey = (e: KeyboardEvent): void => {
       if (this.c.stage.cardOpen) return;
+      // Keys in a dialog (the Details sheet over a paused level) belong to it: Esc closes the sheet.
+      if (e.target instanceof Element && e.target.closest('dialog')) return;
       if (e.key === 'p' || e.key === 'P') {
         e.preventDefault();
         if (this.paused === 'manual') this.resume();
@@ -338,22 +393,36 @@ export class BlockRunner {
     this.offs.push(() => document.removeEventListener('keydown', onKey));
   }
 
+  /** The pause in effect, if any. */
+  get pauseReason(): PauseReason | null {
+    return this.paused;
+  }
+
   pause(reason: PauseReason): void {
     if (this.paused === null) this.paused = reason;
   }
 
-  resume(): void {
-    this.c.stage.dismissCard('resume');
+  /**
+   * Ends a pause. With a reason, only a pause of that reason ends (the guard's resume never ends
+   * the player's own pause). A pause that the item loop has not reached yet is simply cancelled.
+   */
+  resume(reason?: PauseReason): void {
+    if (reason && this.paused !== reason) return;
+    if (this.release) this.release('resume');
+    else if (this.c.game) this.paused = null;
+    else this.c.stage.dismissCard('resume');
   }
 
   abort(): void {
     this.abortRequested = true;
+    this.release?.('abort');
     this.c.stage.dismissCard('abort');
   }
 
   invalidate(inv: Invalidation): void {
     if (this.invalidation) return;
     this.invalidation = inv;
+    this.release?.('invalid');
     this.c.stage.dismissCard('invalid');
   }
 
@@ -361,6 +430,8 @@ export class BlockRunner {
     for (const off of this.offs.splice(0)) off();
     this.c.stage.setControls(false);
     this.c.stage.setCaption('');
+    this.c.game?.target(null);
+    this.c.game?.caption(null, null);
   }
 
   /** Shows an instruction card between blocks; resolves false when the run was aborted or invalidated. */
@@ -386,11 +457,17 @@ export class BlockRunner {
     return null;
   }
 
+  private reportProgress(fraction: number | null = null): void {
+    if (this.c.game) this.c.game.progress(this.done, this.total, fraction);
+    else this.c.stage.setProgress(this.total > 0 ? this.done / this.total : 1);
+  }
+
   /** Presents the items of one block in order, then the failed fixation items once more (when `retry`). */
   async runBlock(items: readonly (TargetItem | PursuitItem)[]): Promise<RunOutcome> {
     const queue = [...items];
     const retried = new Set<string>();
-    this.c.stage.setControls(true);
+    if (!this.c.game) this.c.stage.setControls(true);
+    else this.reportProgress();
     try {
       for (let i = 0; i < queue.length; i++) {
         const item = queue[i] as TargetItem | PursuitItem;
@@ -410,15 +487,18 @@ export class BlockRunner {
             retried.add(item.id);
             queue.push(item);
             this.total++;
+            this.retried++;
           }
         }
         this.done++;
-        this.c.stage.setProgress(this.total > 0 ? this.done / this.total : 1);
+        this.reportProgress();
       }
       return this.outcome() ?? { kind: 'done' };
     } finally {
       this.current = null;
       this.c.stage.setCaption('');
+      this.c.game?.target(null);
+      this.c.game?.caption(null, null);
       this.c.stage.clear();
     }
   }
@@ -426,9 +506,27 @@ export class BlockRunner {
   /** Waits out a pause on its overlay; null to carry on, or the outcome that ends the run. */
   private async waitForResume(): Promise<RunOutcome | null> {
     const reason = this.paused ?? 'manual';
+    this.c.stage.clear();
+    const game = this.c.game;
+    if (game) {
+      game.target(null);
+      game.caption(null, null);
+      const ended = this.outcome();
+      if (ended) return ended;
+      const value = await new Promise<string>((resolve) => {
+        this.release = (v) => {
+          this.release = null;
+          resolve(v);
+        };
+        game.paused(reason);
+      });
+      this.paused = null;
+      if (value === 'abort') this.abortRequested = true;
+      game.resumed();
+      return this.outcome();
+    }
     this.c.stage.setControls(true, true);
     this.c.stage.setCaption('');
-    this.c.stage.clear();
     let faceBack: number | null = null;
     let timer: ReturnType<typeof setInterval> | null = null;
     if (reason === 'face') {
@@ -462,12 +560,17 @@ export class BlockRunner {
   private async present(item: TargetItem | PursuitItem, attempt: number): Promise<ItemOutcome> {
     const c = this.c;
     const { stage, recorder, geometry, sizes } = c;
+    const game = c.game;
     const colours = stage.colours();
     const guide = item.kind === 'target' && item.headMotion ? new SectorTracker() : null;
+    const arcs = guide && game ? new ArcProgress() : null;
+    // Limited head movement: twice the measured turn reaches the same sectors (±5° yaw, ±3.5° pitch).
+    const headScale = game?.limitedHead ? 2 : 1;
     const yawMs = item.kind === 'target' ? (item.sampleMs * HEAD_BLOCK.yawMs) / (HEAD_BLOCK.yawMs + HEAD_BLOCK.pitchMs) : 0;
     let onset: number | null = null;
     let p: Presentation | null = null;
     let last = 0;
+    let lastDrawn: { x: number; y: number; r: number } | null = null;
     const intervals: number[] = [];
     this.current = { itemId: item.id, phase: item.phase };
     for (;;) {
@@ -497,18 +600,22 @@ export class BlockRunner {
       const elapsed = ts - onset;
 
       let finished: boolean;
+      let yawPhase = true;
       if (item.kind === 'pursuit') {
         finished = elapsed >= item.holdMs + item.periodMs;
       } else if (guide) {
         const pose = c.pose();
         const motion = elapsed - item.settleMs;
-        const yawPhase = motion < yawMs || (motion >= item.sampleMs && !(guide.reached.has('left') && guide.reached.has('right')));
+        yawPhase = motion < yawMs || (motion >= item.sampleMs && !(guide.reached.has('left') && guide.reached.has('right')));
         if (pose) {
-          if (motion < 0) guide.addBaseline(pose.yawDeg, pose.pitchDeg);
-          else guide.add(pose.yawDeg, pose.pitchDeg, yawPhase ? 'yaw' : 'pitch');
+          if (motion < 0) guide.addBaseline(headScale * pose.yawDeg, headScale * pose.pitchDeg);
+          else {
+            guide.add(headScale * pose.yawDeg, headScale * pose.pitchDeg, yawPhase ? 'yaw' : 'pitch');
+            arcs?.update(guide, yawPhase ? 'yaw' : 'pitch');
+          }
         }
         finished = (motion >= item.sampleMs && guide.done) || motion >= item.maxSampleMs;
-        stage.setCaption(motion < 0 ? t('stimulus.head.look') : t(yawPhase ? 'stimulus.head.yaw' : 'stimulus.head.pitch'), item.yNorm > 0.5 ? 'top' : 'bottom');
+        if (!game) stage.setCaption(motion < 0 ? t('stimulus.head.look') : t(yawPhase ? 'stimulus.head.yaw' : 'stimulus.head.pitch'), item.yNorm > 0.5 ? 'top' : 'bottom');
       } else {
         const sampled = elapsed - item.settleMs;
         if (sampled < item.sampleMs) finished = false;
@@ -519,12 +626,17 @@ export class BlockRunner {
         stage.clear();
         this.close(p, ts, intervals, false);
         const counts = recorder.counts(p as Presentation);
+        if (game && lastDrawn && item.kind === 'target') await this.popAfter(lastDrawn);
         return { kind: 'complete', ...counts };
       }
 
       stage.clear();
       const norm = item.kind === 'pursuit' ? pursuitTargetAt(item, onset, ts) : ([item.xNorm, item.yNorm] as const);
       const [x, y] = layoutToPx(norm[0], norm[1], geometry);
+      if (game) {
+        lastDrawn = this.drawGame(item, x, y, elapsed, onset, ts, guide, arcs, yawPhase);
+        continue;
+      }
       const ring = ringDiameterPx(sizes, elapsed * c.speed, c.reducedMotion);
       drawTarget(stage.context, x, y, sizes, ring, colours);
       const guideR = Math.max(3 * sizes.discPx, 40);
@@ -535,5 +647,76 @@ export class BlockRunner {
       // The guide's pose dot can reach 1.2 radii out; 6 px keeps a visible gap to the buttons.
       stage.avoidTarget(x, y, (showGuide ? 1.2 * guideR + Math.max(4, guideR / 10) : sizes.discPx / 2) + 6);
     }
+  }
+
+  /** One frame of a warm-up level: the bubble, the firefly or the head arcs; returns what was drawn. */
+  private drawGame(
+    item: TargetItem | PursuitItem,
+    x: number,
+    y: number,
+    elapsed: number,
+    onset: number,
+    ts: number,
+    guide: SectorTracker | null,
+    arcs: ArcProgress | null,
+    yawPhase: boolean,
+  ): { x: number; y: number; r: number } {
+    const c = this.c;
+    const game = c.game as GameHooks;
+    const ctx = c.stage.context;
+    const col = game.colours;
+    let drawn: { x: number; y: number; r: number };
+    if (item.kind === 'pursuit') {
+      const motionStart = onset + item.holdMs;
+      const at = (t: number) => layoutToPx(...pursuitTargetAt(item, onset, t), c.geometry);
+      const trail = c.reducedMotion ? [] : trailSegments(at, ts, motionStart, TRAIL_MS / c.speed);
+      drawFirefly(ctx, x, y, trail, c.sizes, col);
+      drawn = { x, y, r: FIREFLY_R };
+      this.reportProgress(Math.min(1, elapsed / (item.holdMs + item.periodMs)));
+    } else if (guide && arcs) {
+      drawBubble(ctx, x, y, { r: game.headR, fullR: game.headR, ghost: false }, c.sizes, col);
+      const motion = elapsed - item.settleMs;
+      drawHeadArcs(ctx, x, y, game.headR, arcs.fills(guide), motion >= 0 ? arcs.current : null, col);
+      const extent = arcsExtent(game.headR);
+      game.caption(motion < 0 ? null : yawPhase ? 'warmup.head.turn' : 'warmup.head.nod', { x, y, r: extent });
+      drawn = { x, y, r: game.headR };
+      game.target({ x, y, r: extent });
+      return drawn;
+    } else if (game.style === 'ring') {
+      const ring = ringDiameterPx(c.sizes, elapsed * c.speed, c.reducedMotion);
+      drawTarget(ctx, x, y, c.sizes, ring, { fg: col.bubbleCore, bg: col.stage });
+      drawn = { x, y, r: Math.max(c.sizes.discPx, ring ?? 0) / 2 };
+    } else {
+      const r = bubbleRadius(elapsed, item, game.bubble, c.reducedMotion, c.speed);
+      drawBubble(ctx, x, y, { r, fullR: game.bubble.fullR, ghost: !c.reducedMotion }, c.sizes, col);
+      drawn = { x, y, r };
+    }
+    game.target({ x: drawn.x, y: drawn.y, r: item.kind === 'target' && game.style !== 'ring' ? game.bubble.fullR : drawn.r });
+    return drawn;
+  }
+
+  /**
+   * The pop after a bubble (design §2.6): 150 ms ÷ speed of the burst, outside every sampling
+   * window (the presentation is closed), then the next onset. None under reduced motion or for
+   * the ring; an abort or an invalidation cuts it short.
+   */
+  private async popAfter(at: { x: number; y: number; r: number }): Promise<void> {
+    const c = this.c;
+    const game = c.game as GameHooks;
+    game.caption(null, null);
+    if (c.reducedMotion || game.style === 'ring') {
+      game.target(null);
+      return;
+    }
+    game.pop();
+    const start = performance.now();
+    for (;;) {
+      const ts = await c.stage.frame();
+      const progress = popProgress(ts - start, c.speed);
+      c.stage.clear();
+      if (progress === null || this.abortRequested || this.invalidation || c.block.check()) break;
+      drawBurst(c.stage.context, at.x, at.y, at.r, progress, game.colours);
+    }
+    game.target(null);
   }
 }

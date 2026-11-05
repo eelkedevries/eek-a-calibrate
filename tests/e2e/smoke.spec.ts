@@ -105,7 +105,8 @@ test('a hash route survives a reload: the Details deep link and a v1 route', asy
 
 test('the Details sheet traps focus, switches tabs by key, closes on Esc and Done, and returns focus', async ({ page }) => {
   const problems = watch(page);
-  await page.goto('./?e2e=1#/complete');
+  // Warm-up complete needs a scored Test round (prompt 015): its fixture shows one.
+  await page.goto('./?e2e=1&fixture=complete-good#/complete');
   const trigger = page.getByRole('button', { name: 'Details' });
   await trigger.click();
   // Opening it never changes the route.

@@ -13,13 +13,20 @@ export type AoiGrid = 0 | 2 | 3 | 4;
  */
 export function halfCellDeg(n: number, screen: PlaneGeometry, distanceMm: number): number {
   if (!(Number.isInteger(n) && n >= 1)) throw new RangeError(`halfCellDeg: n must be a positive integer, got ${n}`);
+  return Math.min(halfCellDegAxis(n, screen.viewportWpx, screen.pxPerMm, distanceMm), halfCellDegAxis(n, screen.viewportHpx, screen.pxPerMm, distanceMm));
+}
+
+/**
+ * One axis of `halfCellDeg`: the smallest half-cell angle of n cells across an extent of
+ * `extentPx` (the rectangular zones of spec §17.7.2 choose each axis separately).
+ */
+export function halfCellDegAxis(n: number, extentPx: number, pxPerMm: number, distanceMm: number): number {
+  if (!(Number.isInteger(n) && n >= 1)) throw new RangeError(`halfCellDegAxis: n must be a positive integer, got ${n}`);
   let smallest = Infinity;
-  for (const extent of [screen.viewportWpx, screen.viewportHpx]) {
-    for (let k = 0; k < n; k++) {
-      const a = pxToDegAxis((k * extent) / n, extent, screen.pxPerMm, distanceMm);
-      const b = pxToDegAxis(((k + 1) * extent) / n, extent, screen.pxPerMm, distanceMm);
-      smallest = Math.min(smallest, (b - a) / 2);
-    }
+  for (let k = 0; k < n; k++) {
+    const a = pxToDegAxis((k * extentPx) / n, extentPx, pxPerMm, distanceMm);
+    const b = pxToDegAxis(((k + 1) * extentPx) / n, extentPx, pxPerMm, distanceMm);
+    smallest = Math.min(smallest, (b - a) / 2);
   }
   return smallest;
 }

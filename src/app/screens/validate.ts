@@ -4,33 +4,21 @@
 import { focalFromAssumedFov } from '../../core/geometry/distance.ts';
 import { FrameRecorder } from '../../core/protocol/labelling.ts';
 import { minAcceptedFrames, validationSchedule } from '../../core/protocol/schedule.ts';
-import type { EstimatorId, FitResult, Recording, SessionGeometry } from '../../core/types.ts';
-import { scoreRecording } from '../../fit/fitClient.ts';
+import type { FitResult, Recording, SessionGeometry } from '../../core/types.ts';
 import { exitFullscreen } from '../../platform/fullscreen.ts';
-import { startPresentation, viewportVerdict, type Presentation as Block } from '../../platform/presentation.ts';
+import { startPresentation, type Presentation as Block } from '../../platform/presentation.ts';
 import { acquireStage, BlockRunner, currentStage, releaseStage, type RunOutcome, type StimulusStage } from '../components/stimulusCanvas.ts';
 import { targetSizes } from '../components/target.ts';
 import { announce, h } from '../dom.ts';
 import type { Screen, ScreenContext } from '../router.ts';
-import { currentFit, ensureCapture, requestedEngines, setValidationRun, type Capture, type PendingFit } from '../session.ts';
-import { getState, setState } from '../state.ts';
+import { applyTestRound, CaptureLink, measuredScale, reducedMotion, sameLayout } from '../game/warmupRunner.ts';
+import { currentFit, ensureCapture, requestedEngines, type Capture, type PendingFit } from '../session.ts';
+import { getState } from '../state.ts';
 import { t } from '../strings.en-GB.ts';
-import { CaptureLink, installProtocolHooks, invalidationReason, measuredScale, publishProtocol, reducedMotion, runSchedule, SCREEN_CSS, type ProtocolSnapshot } from './calibrate.ts';
+import { installProtocolHooks, invalidationReason, publishProtocol, runSchedule, SCREEN_CSS, type ProtocolSnapshot } from './calibrate.ts';
 
-/** The estimator in use after validation: the one asked for with ?select=, when it was fitted, else Auto's choice. */
-export function chosenEstimator(fit: FitResult): EstimatorId {
-  const select = getState().settings.select;
-  if (select === 'auto') return fit.selection.estimator;
-  if (select === 'combined') return fit.combined ? 'combined' : fit.selection.estimator;
-  return fit.fits[select] ? select : fit.selection.estimator;
-}
-
-/** True when the block's viewport is the calibration's, within the viewport-mode tolerance. */
-function sameLayout(a: SessionGeometry['screen'], b: SessionGeometry['screen']): boolean {
-  if ((a.viewportWpx >= a.viewportHpx) !== (b.viewportWpx >= b.viewportHpx)) return false;
-  const tolerance = a.presentationMode === 'viewport' || b.presentationMode === 'viewport' ? undefined : 0;
-  return viewportVerdict({ w: a.viewportWpx, h: a.viewportHpx }, { w: b.viewportWpx, h: b.viewportHpx }, tolerance) !== 'abort';
-}
+// Moved to game/warmupRunner.ts; re-exported for anything that imports them from here.
+export { chosenEstimator } from '../game/warmupRunner.ts';
 
 class Validation {
   private readonly ctx: ScreenContext;
@@ -240,12 +228,7 @@ class Validation {
     if (!this.mounted) return;
     console.info(`Fit: ${Math.round(fit.fitMs)} ms; τ = ${fit.pursuitLagMs} ms; ${fit.selection.reason}`);
     try {
-      const state = getState();
-      const geometry = state.geometry as SessionGeometry;
-      const nominalFps = (this.capture as Capture).nominalFps();
-      const scored = scoreRecording(fit, rec, geometry, { nominalFps, receivedMs });
-      setValidationRun({ recording: rec, receivedMs, nominalFps });
-      setState({ fit, validation: [...scored.own, ...scored.intersection], estimator: chosenEstimator(fit) });
+      applyTestRound(fit, rec, receivedMs, (this.capture as Capture).nominalFps());
     } catch (error) {
       await this.end(block);
       this.phase = 'error';

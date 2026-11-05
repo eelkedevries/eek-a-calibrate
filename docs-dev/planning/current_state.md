@@ -318,10 +318,11 @@ wins and the gap is work still to be done.
 - **Contracts (additive, §17.11):** `Phase` gains `'game'`; `RecordedFrame.deviceTiltDeg` and
   `.deviceRollDeg`; `createVisionHost(cfg, prefer?, hooks?)` registers the progress listener
   before init.
-- **Status:** the shell and routes (013) and the Title and Get ready (014) are built; the warm-up
-  levels, Free look and the challenge follow (015, 016). The legacy screens (Welcome, Camera,
-  Calibrate, Validate, Results, Live, Data, About) stay until 018; Get ready's "Start warm-up"
-  opens the legacy `#/calibrate` until 015.
+- **Status:** the shell and routes (013), the Title and Get ready (014), the warm-up levels and
+  Warm-up complete (015) and the Details sheet (017) are built; Free look and the challenge follow
+  (016). The legacy screens (Welcome, Camera, Calibrate, Validate, Results, Live, Data, About)
+  stay until 018; until 016, Warm-up complete's "Try your zones" and "Play anyway" open the
+  legacy `#/live`.
 
 ## Title, Get ready and the position guard (after prompt 014)
 
@@ -350,6 +351,39 @@ wins and the gap is work still to be done.
 - **Test hooks and fixtures:** `__eek.guard()` and `__eek.forceGuard(name)`; fixtures
   `title-skip`, `title-blocked`, `title-unsupported`, `ready-<loading|searching|adjust|holding|
   ready|anyway>`, `guard-overlay`, `guard-overlay-late`.
+
+## The warm-up levels and Warm-up complete (after prompt 015)
+
+- **Presentation span (`app/game/gameState.ts`):** Get ready's "Start warm-up" calls
+  `startSpan(.app)` inside its tap: the game shell itself is the fullscreen (or viewport-mode)
+  element, so the warm-up, Warm-up complete and, from 016, Free look and the challenge render
+  inside it. `span()`, `releaseSpan()` (an invalidated span, fullscreen kept), `endSpan()`;
+  leaving the span's routes ends it. gameState also holds the warm-up mode (`full`, `restore`,
+  `quick-warmup`), the quick recalibrations, and each `WarmupResult` (`warmupResult()`,
+  `warmupHistory()`, with the levels' pauses for 016's export).
+- **Core (`src/core/warmup/`, `src/core/game/zones.ts`, DOM-free):** `levels.ts` (`warmupPlan`:
+  the level sets over the unchanged `calibrationSchedule`, `validationSchedule` and
+  `recalibrationSchedule`; `withoutItems` for a skipped pursuit), `bubble.ts` (`bubbleRadius`,
+  `bubbleDiameterPx`, the pop), `steadiness.ts`, `cause.ts`, `marks.ts` (Ḡ per Test-round target
+  and hit/miss), `stars.ts` (stars, outcome); `zoneGrid` chooses columns and rows separately with
+  `halfCellDegAxis` (added to `metrics/aoi.ts`; `aoiGrid` unchanged).
+- **Orchestration (`app/game/warmupRunner.ts`):** `CaptureLink`, `sessionGeometry`,
+  `finishCalibration`, `applyTestRound` and `chosenEstimator` moved here from the v1 calibrate and
+  validate screens (which call them, and re-export them for Live, until 018); `WarmupSession`
+  runs one warm-up (geometry measured at the start of Level 1, the recorders, level frames, the
+  refit of a quick warm-up); `warmupResultFrom` turns the scored Test round into zones, stars,
+  marks and the cause for the selected estimator in mode `own`.
+- **Stage (`components/stimulusCanvas.ts`):** `new StimulusStage({ game: true })` embeds the
+  stage in the shell; `RunContext.game` (`GameHooks`) draws the bubble, firefly and head arcs
+  (`components/{bubble,firefly,headArcs}.ts`; `?target=ring` keeps the §4.7 ring), pops between
+  items, reports progress to the pip line and waits out pauses through the screen (`paused`,
+  `resumed`); `resume(reason)` never ends another reason's pause. The v1 path is unchanged.
+- **Screens:** `screens/warmup.ts` (level cards, HUD, the guard in context `warmup` /
+  `warmup-head`, Pause card, three-pause card, screen-changed card, Checking your aim…) and
+  `screens/complete.ts` (zone map, stars, outcome copy and actions; an actions fit guard), styled
+  by `screens/game.css`. Test hooks `__eek.warmup()` and `__eek.result()`; fixtures
+  `warmup-<card|card-2|pop|follow|turn|checking|pause|changed|rotated|fix>` and
+  `complete-<great|good|rough|rough-two|failed|restore|quick>`.
 
 ## The Details sheet (after prompt 017)
 

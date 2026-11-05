@@ -1,12 +1,13 @@
-// mobile.spec.ts (spec §14.2.11, WP10): a phone held upright, emulated (isMobile, hasTouch, a
-// 390 × 844 portrait viewport, a notch and a home indicator as safe-area insets) with the portrait
-// fake camera (a 480 × 640 file from scripts/make-fake-video.sh --portrait; Chromium crops it to
-// the mobile camera request, still portrait). The default flow, Welcome → Camera → Calibrate →
-// Validate → Results → Live, completes by taps alone, never visits the optional screen-size and
-// distance steps and never asks for element fullscreen; every target, as scheduled and as drawn on
-// the stage, lies inside the safe rectangle, and the corner buttons are touch-sized; turning the
-// phone pauses live gaze and, during a calibration block, invalidates the block. Accuracy is not
-// asserted: the fake face does not look at the targets.
+// mobile.spec.ts (spec §14.2.11, §17.6, WP10, prompt 015): a phone held upright, emulated
+// (isMobile, hasTouch, a 390 × 844 portrait viewport, a notch and a home indicator as safe-area
+// insets) with the portrait fake camera (a 480 × 640 file from scripts/make-fake-video.sh
+// --portrait; Chromium crops it to the mobile camera request, still portrait). The game's warm-up,
+// Title → Play → Get ready → Start warm-up → the levels → Warm-up complete, completes by taps
+// alone without element fullscreen; every bubble, as scheduled and as drawn on the stage, lies
+// inside the safe rectangle where layoutToPx puts it with the measured insets; turning the phone
+// during a level shows "The screen changed", and "Warm up again" returns to the Level 1 card. The
+// v1 flow (Welcome → Camera → Calibrate → Validate → Results → Live) keeps its own tests until
+// prompt 018. Accuracy is not asserted: the fake face does not look at the targets.
 import { fileURLToPath } from 'node:url';
 import { expect, test, type CDPSession, type Locator, type Page } from '@playwright/test';
 import { t } from '../../src/app/strings.en-GB.ts';
@@ -354,6 +355,151 @@ test.describe('A phone held upright (portrait camera, touch only)', () => {
     // Back in portrait, calibration can start again.
     await page.setViewportSize(PORTRAIT);
     await expect(page.getByRole('button', { name: t('calibrate.startAgain') })).toBeEnabled({ timeout: 30_000 });
+    expect(await page.evaluate(() => (window as unknown as { __fullscreenRequests: number }).__fullscreenRequests)).toBe(0);
+    sameOrigin(page, seen.requests);
+    expect(seen.problems).toEqual([]);
+  });
+});
+
+// ----- The game's warm-up (prompt 015) ------------------------------------------------------------
+
+interface WarmupSnapshot {
+  phase: string;
+  card: string | null;
+  cards: string[];
+  level: { key: string; number: number; of: number } | null;
+  item: { itemId: string; phase: string } | null;
+  geometry: ScreenGeometry | null;
+  message: string | null;
+}
+
+const warmup = (page: Page) => page.evaluate(() => ((window.__eek as unknown as { warmup?: () => unknown }).warmup?.() ?? null) as WarmupSnapshot | null);
+const warmupResult = (page: Page) => page.evaluate(() => ((window.__eek as unknown as { result?: () => unknown }).result?.() ?? null) as { marks: unknown[]; levels: string[] } | null);
+
+/** Title → Play → Get ready → Start warm-up (or Start anyway), by taps. */
+async function tapIntoWarmup(page: Page, query: string): Promise<void> {
+  await page.goto(`./?${query}`);
+  await page.getByRole('button', { name: t('title.play') }).tap();
+  await expect.poll(() => route(page)).toBe('ready');
+  const action = page.locator('.ready-start');
+  await expect.poll(async () => ((await action.isEnabled().catch(() => false)) ? 'ready' : 'waiting'), { timeout: 120_000 }).toBe('ready');
+  await action.tap();
+  await expect.poll(() => route(page)).toBe('warmup');
+}
+
+/** Taps Start now on each level card (and Carry on on a Pause card) until `done()` holds. */
+async function tapThroughWarmup(page: Page, done: () => Promise<boolean>, timeoutMs: number, each?: (w: WarmupSnapshot | null) => Promise<void>): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (await done()) return;
+    const w = await warmup(page);
+    if (Date.now() > deadline) throw new Error(`timed out on ${await route(page)}: ${JSON.stringify(w)}`);
+    if (w && ['fix', 'failed'].includes(w.card ?? '')) throw new Error(`the warm-up stopped on the ${w.card} card: ${w.message}`);
+    if (each) await each(w);
+    if (w?.card === 'level') await page.locator('.level-card__start').tap({ timeout: 2000 }).catch(() => undefined);
+    else if (w?.card === 'pause') await page.getByRole('button', { name: t('warmup.paused.carryOn') }).tap({ timeout: 2000 }).catch(() => undefined);
+    await page.waitForTimeout(100);
+  }
+}
+
+/**
+ * The centre (CSS px) of the bubble as drawn on the game stage's canvas, from the bounding box of
+ * its near-black pixels (the bubble's solid edge and the core; the dashed ghost ring and the
+ * bubble's fill are lighter), or null when no whole bubble is drawn (the edge cut off by the
+ * canvas, or the pop's burst, whose box is not square).
+ */
+async function drawnBubble(page: Page): Promise<Drawn | null> {
+  return page.evaluate(() => {
+    const canvas = document.querySelector<HTMLCanvasElement>('.stimulus-stage--game canvas');
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx || canvas.width < 2 || canvas.clientWidth < 2) return null;
+    const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let x0 = width;
+    let y0 = height;
+    let x1 = -1;
+    let y1 = -1;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = 4 * (y * width + x);
+        if ((data[i] as number) > 60 || (data[i + 1] as number) > 60 || (data[i + 2] as number) > 60) continue;
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+    if (x1 < 0 || Math.abs(x1 - x0 - (y1 - y0)) > 2) return null;
+    const scale = canvas.width / canvas.clientWidth;
+    return { x: (x0 + x1 + 1) / 2 / scale, y: (y0 + y1 + 1) / 2 / scale };
+  });
+}
+
+test.describe('The game on a phone held upright (portrait camera, touch only)', () => {
+  test.describe.configure({ timeout: 420_000 });
+
+  test('the warm-up completes by taps without fullscreen; every bubble lies inside the safe rectangle', async ({ page }) => {
+    const seen = watch(page);
+    await instrument(page);
+    await tapIntoWarmup(page, 'e2e=1&speed=4&preset=quick&engines=geometric,eyepixel&seed=2613');
+    const drawn: Drawn[] = [];
+    await tapThroughWarmup(page, async () => (await route(page)) === 'complete', 300_000, async (w) => {
+      if (w?.phase === 'running' && w.level?.key === 'pop' && w.item) {
+        const d = await drawnBubble(page);
+        if (d) drawn.push(d);
+      }
+    });
+    // Warm-up complete: the result, its six marks and the zone map, in portrait.
+    const r = (await warmupResult(page))!;
+    expect(r.levels).toEqual(['pop', 'test']);
+    expect(r.marks).toHaveLength(6);
+    await expect(page.locator('.zone-map__mark')).toHaveCount(6);
+    await expect(page.locator('.complete__actions .btn--primary')).toBeVisible();
+
+    const state = await appState(page);
+    const cal = state.calibration!;
+    const { videoW, videoH } = cal.frames[0]!.meta;
+    expect(videoH, `${videoW} × ${videoH}`).toBeGreaterThan(videoW);
+    expect(state.geometry!.degreesApproximate).toBe(true);
+    // Viewport mode with the safe-area insets measured; every bubble inside the safe rectangle.
+    const g = cal.geometry.screen;
+    expect(g.presentationMode).toBe('viewport');
+    expect(g.fullscreen).toBe(false);
+    expect(g.viewportWpx).toBeLessThan(g.viewportHpx);
+    expect(g.insets).toEqual(INSETS);
+    insideSafeRect(cal.schedule.items, g);
+    drawnInsideSafeRect(drawn, cal.schedule.items, g);
+    expect(await page.evaluate(() => (window as unknown as { __fullscreenRequests: number }).__fullscreenRequests)).toBe(0);
+    sameOrigin(page, seen.requests);
+    expect(seen.problems).toEqual([]);
+  });
+
+  test('turning the phone during a level shows "The screen changed"; Warm up again returns to Level 1', async ({ page }) => {
+    const seen = watch(page);
+    await instrument(page);
+    await tapIntoWarmup(page, 'e2e=1&speed=2&preset=quick&engines=geometric&seed=2614');
+    await tapThroughWarmup(page, async () => {
+      const w = await warmup(page);
+      return w?.phase === 'running' && w.item !== null;
+    }, 60_000);
+    await page.setViewportSize(LANDSCAPE);
+    await expect.poll(async () => (await warmup(page))?.card).toBe('changed');
+    const card = page.getByRole('alertdialog', { name: t('warmup.changed.title') });
+    await expect(card).toBeVisible();
+    await expect(card).toContainText(t('warmup.changed.rotated'));
+    // The card lies inside the turned viewport.
+    const box = (await card.boundingBox())!;
+    expect(box.y + box.height).toBeLessThanOrEqual(LANDSCAPE.height);
+    expect(box.x + box.width).toBeLessThanOrEqual(LANDSCAPE.width);
+    expect((await appState(page)).calibration).toBeNull();
+
+    // Turned back, Warm up again starts from the Level 1 card.
+    await page.setViewportSize(PORTRAIT);
+    await card.getByRole('button', { name: t('warmup.changed.action') }).tap();
+    await expect.poll(async () => {
+      const w = await warmup(page);
+      return w?.card === 'level' ? w.level?.number : null;
+    }).toBe(1);
+    await expect(page.getByRole('dialog', { name: t('warmup.level.pop.name') })).toBeVisible();
     expect(await page.evaluate(() => (window as unknown as { __fullscreenRequests: number }).__fullscreenRequests)).toBe(0);
     sameOrigin(page, seen.requests);
     expect(seen.problems).toEqual([]);

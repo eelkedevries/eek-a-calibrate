@@ -426,6 +426,8 @@ export interface GameRecord {
   setup: Setup;
   setupChosen: boolean;
   warmup: WarmupMode;
+  /** Limited head movement halved the head block's sector targets (§17.6.5). */
+  limitedHead: boolean;
   motion: { permission: MotionPermission; source: 'motion' | 'orientation' | null };
 }
 
@@ -435,6 +437,7 @@ export function gameRecord(): GameRecord {
     setup: currentSetup(),
     setupChosen: getState().settings.setup !== null,
     warmup,
+    limitedHead: getState().prefs.limitedHead,
     motion: { permission: motionPermission(), source: motion?.source ?? null },
   };
 }

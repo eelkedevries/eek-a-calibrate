@@ -4,8 +4,7 @@
 // one instruction at a time; the dock with the status row and the action slot. While the player
 // settles, the engines load and, once a face is present, the device probe runs silently with the
 // run-set rule of §7 row 1. "Start warm-up" needs Ready (or "Start anyway"), the engines and the
-// probe. Until prompt 015 builds the warm-up it opens the v1 calibration, which starts its own
-// presentation from its own Start button.
+// probe; its tap starts the presentation span and opens the warm-up levels.
 import { MOBILE, PROBE } from '../../core/constants.ts';
 import { ReadyGuard, type CopyRef, type ReadyState, type ReadyView } from '../../core/position/guard.ts';
 import type { Home } from '../../core/position/home.ts';
@@ -42,6 +41,8 @@ import {
 import { getState, setState } from '../state.ts';
 import { t } from '../strings.en-GB.ts';
 import { registerFixture, testMode } from '../testHooks.ts';
+import { startSpan } from '../game/gameState.ts';
+import { measuredScale } from '../game/warmupRunner.ts';
 import { decideRunSet, matchesCurrentSetup, recordProbe, snapshotCapture } from './camera.ts';
 
 /** The probe starts once a face has been seen this long, so that the engines have work (as on #/camera). */
@@ -142,6 +143,7 @@ class ReadyScreen {
   private lastLumaMs = 0;
   private maxPct = 0;
   private storedHome: Home | null = null;
+  private starting = false;
 
   constructor(root: HTMLElement, ctx: ScreenContext) {
     this.root = root;
@@ -483,10 +485,22 @@ class ReadyScreen {
     if (speak(line)) this.lastSpoken = headline;
   }
 
+  /**
+   * Start warm-up (or Start anyway): the presentation span starts inside this tap, because
+   * fullscreen needs a gesture (§17.2.4), and stays on through the warm-up and what follows it.
+   */
   private start(): void {
-    if (this.action !== 'start' && this.action !== 'anyway') return;
-    // Prompt 015 starts the presentation span here (§17.2.4) and goes to #/warmup.
-    this.ctx.navigate('calibrate');
+    if ((this.action !== 'start' && this.action !== 'anyway') || this.starting) return;
+    this.starting = true;
+    startSpan(this.root, measuredScale(getState().geometry)).then(
+      () => {
+        if (this.mounted) this.ctx.navigate('warmup');
+      },
+      (error: unknown) => {
+        this.starting = false;
+        this.fail(t('ready.failed', { message: error instanceof Error ? error.message : String(error) }));
+      },
+    );
   }
 
   private snapshot(): unknown {

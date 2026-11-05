@@ -1,37 +1,33 @@
 // #/calibrate (specification §7 screen 4, §4.7, §14): instruction cards, blocks A, B and C on the
 // stimulus stage (fullscreen, or viewport mode where fullscreen is missing), pause overlays and
 // aborts, then the fit starts in the fit worker and the app moves straight on to validation.
-// Screen size and viewing distance are optional: without them typical values are assumed.
-import { DISTANCE, FIT_BUDGET_MS } from '../../core/constants.ts';
-import { referenceDistanceMm } from '../../core/calibration/dataset.ts';
+// Screen size and viewing distance are optional: without them typical values are assumed. The
+// protocol's orchestration lives in game/warmupRunner.ts, which the warm-up levels share; this
+// v1 screen stays until prompt 018.
 import { BLIND_SPOT_ASSUMED_DISTANCE_MM } from '../../core/geometry/blindSpot.ts';
-import { DistanceTracker, focalFromAssumedFov } from '../../core/geometry/distance.ts';
-import { isDegreesApproximate } from '../../core/geometry/screen.ts';
 import { FrameRecorder } from '../../core/protocol/labelling.ts';
 import { pursuitPeriodMs } from '../../core/protocol/pursuit.ts';
 import { calibrationSchedule, minAcceptedFrames, scheduleBlocks } from '../../core/protocol/schedule.ts';
-import { ENGINE_IDS } from '../../core/types.ts';
-import type { EngineId, FrameMeta, FrameResult, Recording, Schedule, ScreenGeometry, SessionGeometry } from '../../core/types.ts';
-import { fitRecording } from '../../fit/fitClient.ts';
+import type { EngineId, Schedule, SessionGeometry } from '../../core/types.ts';
 import { detectDeviceClass } from '../../platform/capabilities.ts';
-import { isFullscreen } from '../../platform/fullscreen.ts';
 import { startPresentation, type Invalidation, type Presentation as Block } from '../../platform/presentation.ts';
 import type { EngineStatus } from '../../vision/protocol.ts';
 import { acquireStage, BlockRunner, releaseStage, type RunOutcome } from '../components/stimulusCanvas.ts';
 import { targetSizes } from '../components/target.ts';
 import { announce, h } from '../dom.ts';
+import { CaptureLink, finishCalibration, fittedEngines, focalFor, measuredScale, reducedMotion, sessionGeometry } from '../game/warmupRunner.ts';
 import type { Screen, ScreenContext } from '../router.ts';
-import { ensureCapture, requestedEngines, resetSessionResults, setPendingFit, type Capture } from '../session.ts';
-import { getState, setState } from '../state.ts';
+import { ensureCapture, requestedEngines, type Capture } from '../session.ts';
+import { getState } from '../state.ts';
 import { t } from '../strings.en-GB.ts';
 import { registerTestHook } from '../testHooks.ts';
 
-/** No face in the results for longer than this (capture clock) pauses the block (§7). */
-export const FACE_LOST_MS = 400;
-/** No result at all for this long (a stalled host) counts as a lost face. */
-const STALL_MS = 3000;
-/** The longest wait at the end of a run for frames still being processed. */
-const DRAIN_MS = 2000;
+// Moved to game/warmupRunner.ts; re-exported for the v1 screens that import them from here.
+export { CaptureLink, FACE_LOST_MS, fittedEngines, focalFor, measuredScale, reducedMotion, sessionGeometry } from '../game/warmupRunner.ts';
+
+function positive(v: number | null | undefined): v is number {
+  return typeof v === 'number' && Number.isFinite(v) && v > 0;
+}
 
 export const SCREEN_CSS = `
 .protocol-intro { max-width: 46rem; margin: 0 auto; padding: var(--space-4) var(--space-3); background: var(--surface); color: var(--fg); border-radius: var(--radius); }
@@ -43,172 +39,6 @@ export const SCREEN_CSS = `
 .protocol-intro [role='alert'] { color: var(--danger); }
 body.immersive main { padding: var(--space-3); }
 `;
-
-function positive(v: number | null | undefined): v is number {
-  return typeof v === 'number' && Number.isFinite(v) && v > 0;
-}
-
-/** A measured distance model (blind spot), or null when the session's focal length is only assumed. */
-function measuredDistance(g: SessionGeometry | null): SessionGeometry['distance'] | null {
-  return g && g.distance.focalSource !== 'assumed-fov' && positive(g.distance.focalPx) ? g.distance : null;
-}
-
-/**
- * The focal length for D_t: the measured one, else that of an assumed 60° field of view across
- * the long side of the video the camera delivers now. An assumed value is never carried over from
- * an earlier calibration, whose camera may have delivered another frame size.
- */
-export function focalFor(g: SessionGeometry | null, videoW: number, videoH: number): number {
-  return measuredDistance(g)?.focalPx ?? focalFromAssumedFov(videoW || 640, videoH || 480);
-}
-
-/**
- * The session geometry of a block: its measured viewport and safe area, the measured screen
- * scale and distance model when there are any (§14.1), else 96 CSS px per inch and the focal
- * length of an assumed 60° field of view across the long side of the delivered video.
- */
-export function sessionGeometry(screen: ScreenGeometry, videoW: number, videoH: number, measured: SessionGeometry | null): SessionGeometry {
-  const distance = measuredDistance(measured) ?? {
-    focalPx: focalFor(null, videoW, videoH),
-    focalSource: 'assumed-fov' as const,
-    blindSpotMm: null,
-    blindSpotSdMm: null,
-    irisMm: DISTANCE.irisMm,
-  };
-  return { screen, distance: { ...distance }, refDistanceMm: null, degreesApproximate: isDegreesApproximate(screen, distance) };
-}
-
-/** The screen scale to measure blocks with: the measured one, or none (assumed). */
-export function measuredScale(g: SessionGeometry | null): { pxPerMm: number; pxPerMmSource: ScreenGeometry['pxPerMmSource'] } | undefined {
-  return g && g.screen.pxPerMmSource !== 'assumed' && positive(g.screen.pxPerMm) ? { pxPerMm: g.screen.pxPerMm, pxPerMmSource: g.screen.pxPerMmSource } : undefined;
-}
-
-export function reducedMotion(): boolean {
-  try {
-    return matchMedia('(prefers-reduced-motion: reduce)').matches;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Connects the running capture to a block: D_t from every result (DistanceTracker), the
- * face-lost and pose signals for the runner, and, while a recorder is armed, every result and
- * every refused frame whose capture time falls inside a presentation.
- */
-export class CaptureLink {
-  private readonly capture: Capture;
-  private tracker: DistanceTracker;
-  private recorder: FrameRecorder | null = null;
-  private block: Block | null = null;
-  private readonly offs: (() => void)[] = [];
-  private lastFaceCaptureMs = Number.NEGATIVE_INFINITY;
-  private lastResultCaptureMs = Number.NEGATIVE_INFINITY;
-  private lastPose: { yawDeg: number; pitchDeg: number } | null = null;
-  private drainWaiter: { untilMs: number; resolve: () => void } | null = null;
-
-  constructor(capture: Capture, focalPx: number, onCamera: (event: 'changed' | 'ended') => void) {
-    this.capture = capture;
-    this.tracker = new DistanceTracker({ focalPx, irisMm: DISTANCE.irisMm });
-    this.offs.push(
-      capture.onResult((r) => this.onResult(r)),
-      capture.onFrame((meta, submitted) => this.onFrame(meta, submitted)),
-      capture.camera.onChange(() => onCamera('changed')),
-      capture.camera.onEnded(() => onCamera('ended')),
-    );
-  }
-
-  setFocal(focalPx: number): void {
-    if (this.tracker.focalPx !== focalPx) this.tracker = new DistanceTracker({ focalPx, irisMm: DISTANCE.irisMm });
-  }
-
-  private onResult(r: FrameResult): void {
-    const t = r.meta.tCaptureMs;
-    let d: number | null = null;
-    try {
-      d = this.tracker.push(t, r.face ? r.face.eyes.irisDiamPx : Number.NaN, r.face ? r.face.eyes.open : false);
-    } catch {
-      // A camera restart resets the capture clock: start the window again.
-      this.tracker.reset();
-      d = this.tracker.push(t, r.face ? r.face.eyes.irisDiamPx : Number.NaN, r.face ? r.face.eyes.open : false);
-    }
-    this.lastResultCaptureMs = t;
-    if (r.face) {
-      this.lastFaceCaptureMs = t;
-      this.lastPose = { yawDeg: r.face.pose.yawDeg, pitchDeg: r.face.pose.pitchDeg };
-    }
-    const rec = this.recorder;
-    if (rec && rec.labeller.find(t)) {
-      rec.addResult(r, {
-        hidden: document.visibilityState === 'hidden',
-        notFullscreen: this.block?.mode === 'fullscreen' && !isFullscreen(),
-        distanceMm: d,
-      });
-    }
-    if (this.drainWaiter && t >= this.drainWaiter.untilMs) this.drainWaiter.resolve();
-  }
-
-  private onFrame(meta: FrameMeta, submitted: boolean): void {
-    const rec = this.recorder;
-    if (!submitted && rec && rec.labeller.find(meta.tCaptureMs)) rec.addDropped(meta);
-  }
-
-  arm(recorder: FrameRecorder, block: Block): void {
-    this.recorder = recorder;
-    this.block = block;
-  }
-
-  disarm(): void {
-    this.recorder = null;
-    this.block = null;
-  }
-
-  /** Waits until a frame captured at or after `untilMs` has been processed, for at most DRAIN_MS. */
-  drain(untilMs: number): Promise<void> {
-    if (this.lastResultCaptureMs >= untilMs) return Promise.resolve();
-    return new Promise<void>((resolve) => {
-      const timer = setTimeout(done, DRAIN_MS);
-      function done(): void {
-        clearTimeout(timer);
-        resolve();
-      }
-      this.drainWaiter = { untilMs, resolve: () => {
-        this.drainWaiter = null;
-        done();
-      } };
-    });
-  }
-
-  faceLost(): boolean {
-    return this.lastResultCaptureMs - this.lastFaceCaptureMs > FACE_LOST_MS || performance.now() - this.capture.lastResultMs > STALL_MS;
-  }
-
-  faceVisible(): boolean {
-    return Number.isFinite(this.lastFaceCaptureMs) && !this.faceLost();
-  }
-
-  pose(): { yawDeg: number; pitchDeg: number } | null {
-    return this.lastPose;
-  }
-
-  get distanceMm(): number | null {
-    return this.tracker.distanceMm;
-  }
-
-  dispose(): void {
-    this.disarm();
-    this.drainWaiter?.resolve();
-    for (const off of this.offs.splice(0)) off();
-  }
-}
-
-/** The engines to fit: those wanted by the settings or the run set that loaded. */
-export function fittedEngines(status: readonly EngineStatus[]): EngineId[] {
-  const { runSet, settings } = getState();
-  const wanted = runSet ?? (settings.engines === 'auto' ? [...ENGINE_IDS] : [...settings.engines]);
-  const ok = new Set(status.filter((s) => s.ok).map((s) => s.id));
-  return ENGINE_IDS.filter((id) => wanted.includes(id) && ok.has(id));
-}
 
 /** What a test can see of the protocol in progress (`__eek.protocol()`). */
 export interface ProtocolSnapshot {
@@ -480,23 +310,13 @@ class Calibration {
 
   private async finish(recorder: FrameRecorder, geometry: SessionGeometry, capture: Capture): Promise<void> {
     this.phase = 'finishing';
-    const last = recorder.recording.presentations[recorder.recording.presentations.length - 1];
-    if (last && this.link) await this.link.drain(last.offsetMs);
+    const link = this.link as CaptureLink;
+    const rec = await finishCalibration(recorder, geometry, link, fittedEngines(capture.status), getState().settings.seed, () => this.mounted);
     if (!this.mounted) return;
-    this.link?.disarm();
-    const rec: Recording = recorder.finish();
-    const ref = referenceDistanceMm([rec]);
-    const accepted = rec.frames.some((f) => f.label?.accepted);
-    if (!accepted || ref === null) {
+    if (!rec) {
       await this.stop({ kind: 'aborted' }, t('calibrate.error.noFrames'));
       return;
     }
-    rec.geometry = { ...geometry, refDistanceMm: ref };
-    const { settings } = getState();
-    const engines = fittedEngines(capture.status);
-    resetSessionResults();
-    setState({ calibration: rec, geometry: rec.geometry, fit: null, validation: null, estimator: null });
-    setPendingFit((onProgress) => fitRecording(rec, { seed: settings.seed, engines, maxMs: FIT_BUDGET_MS }, onProgress));
     this.setStatus(t('calibrate.status.fitting'));
     this.runner?.dispose();
     this.runner = null;

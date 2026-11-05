@@ -65,11 +65,15 @@ export const STATES: NoScrollState[] = [
   { name: 'Auto-pause overlay', route: '#/ready', fixture: 'guard-overlay' },
   { name: 'Auto-pause overlay after 10 s', route: '#/ready', fixture: 'guard-overlay-late' },
   { name: 'Get ready, Thorough', route: '#/ready', query: 'preset=thorough' },
-  { name: 'Warm-up', route: '#/warmup' },
-  { name: 'Warm-up, Thorough', route: '#/warmup', query: 'preset=thorough' },
-  { name: 'Warm-up complete', route: '#/complete' },
-  { name: 'Warm-up complete, Quick', route: '#/complete', query: 'preset=quick' },
-  { name: 'Warm-up complete, Thorough', route: '#/complete', query: 'preset=thorough' },
+  // The warm-up (prompt 015): without a presentation or a result each route sends the player to
+  // Get ready; its fixtures show a level card, a level in play, Checking, the pause and screen
+  // cards, and every Warm-up complete outcome.
+  { name: 'Warm-up without a presentation', route: '#/warmup' },
+  ...(['card', 'card-2', 'pop', 'follow', 'turn', 'checking', 'pause', 'changed', 'rotated', 'fix'] as const).map((f) => ({ name: `Warm-up, ${f}`, route: '#/warmup', fixture: `warmup-${f}` })),
+  { name: 'Warm-up, Thorough card', route: '#/warmup', query: 'preset=thorough', fixture: 'warmup-card-2' },
+  { name: 'Warm-up complete without a result', route: '#/complete' },
+  ...(['great', 'good', 'rough', 'rough-two', 'failed', 'restore', 'quick'] as const).map((f) => ({ name: `Warm-up complete, ${f}`, route: '#/complete', fixture: `complete-${f}` })),
+  { name: 'Warm-up complete, Thorough', route: '#/complete', query: 'preset=thorough', fixture: 'complete-good' },
   { name: 'Free look', route: '#/look' },
   { name: 'Challenge', route: '#/challenge' },
   { name: 'Page not found', route: '#/no-such-page' },
@@ -77,7 +81,7 @@ export const STATES: NoScrollState[] = [
       await walkTab(page, tab, `${tab} without a result`);
     } })),
   { name: 'Details over Get ready', route: '#/ready', action: openDetails },
-  { name: 'Details over Warm-up complete', route: '#/complete', action: openDetails },
+  { name: 'Details over Warm-up complete', route: '#/complete', fixture: 'complete-good', action: openDetails },
   { name: 'Details over Free look', route: '#/look', action: openDetails },
   { name: 'Delete confirmation', route: '#/details/about', action: openDeleteConfirmation },
   // The pages opened from Details → Device (prompt 017).

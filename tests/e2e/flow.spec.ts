@@ -1,9 +1,12 @@
-// flow.spec.ts (spec §10.4, WP8): with ?e2e=1&speed=4&preset=quick&engines=all and an injected
-// geometry, the Quick calibration and validation complete on the fake camera, the results table
-// has a row for every available engine plus Combined with Auto's reason, and the fit time is
-// logged. Accuracy is not asserted: the fake face does not look at the targets. A second test
-// runs the same flow on a phone-sized touch viewport with assumed geometry (§14), by taps.
+// flow.spec.ts (spec §10.4, §17.12): the game's warm-up from the Title: Play, Get ready, Start
+// warm-up (or Start anyway), the Quick set's two levels at speed=4 with an injected geometry,
+// Checking your aim… and Warm-up complete with its stars, zones and marks rendered and the result
+// in __eek.result(); and the Standard set's cards in order (Pop, Follow, Turn, Test). Accuracy is
+// not asserted: the fake face does not look at the targets. The v1 flows (calibration,
+// validation and results with every engine; the same on a phone-sized touch screen) stay until
+// prompt 018 removes those screens.
 import { expect, test, type Page } from '@playwright/test';
+import { t } from '../../src/app/strings.en-GB.ts';
 
 interface ProtocolSnapshot {
   screen: 'calibrate' | 'validate';
@@ -189,6 +192,149 @@ test.describe('Quick flow on a phone-sized touch screen (assumed geometry)', () 
     expect(accuracy).toMatch(/^\d+ px · [\d.]+ % of diagonal · ≈/);
     await checkResults(page, state);
     sameOrigin(page, seen.requests);
+    expect(seen.problems).toEqual([]);
+  });
+});
+
+// ----- The game's warm-up (prompt 015) ------------------------------------------------------------
+
+interface WarmupSnapshot {
+  phase: string;
+  mode: string;
+  card: string | null;
+  cards: string[];
+  levels: string[];
+  level: { key: string; number: number; of: number } | null;
+  item: { itemId: string; phase: string } | null;
+  message: string | null;
+}
+
+interface WarmupResult {
+  mode: string;
+  zones: { cols: number; rows: number };
+  stars: number;
+  outcome: string;
+  verdict: string;
+  cause: string | null;
+  marks: { itemId: string; hit: boolean; targetPx: [number, number] }[];
+  levels: string[];
+}
+
+const warmup = (page: Page) => page.evaluate(() => ((window.__eek as unknown as { warmup?: () => unknown }).warmup?.() ?? null) as WarmupSnapshot | null);
+const result = (page: Page) => page.evaluate(() => ((window.__eek as unknown as { result?: () => unknown }).result?.() ?? null) as WarmupResult | null);
+
+/** Title → Play → Get ready → Start warm-up (or Start anyway), by click or tap. */
+async function startWarmup(page: Page, tap: boolean): Promise<void> {
+  const press = (l: ReturnType<Page['locator']>) => (tap ? l.tap() : l.click());
+  await press(page.getByRole('button', { name: t('title.play') }));
+  await expect.poll(() => route(page)).toBe('ready');
+  const action = page.locator('.ready-start');
+  await expect.poll(async () => ((await action.isEnabled().catch(() => false)) ? 'ready' : 'waiting'), { timeout: 120_000 }).toBe('ready');
+  await press(action);
+  await expect.poll(() => route(page)).toBe('warmup');
+}
+
+/**
+ * Plays the warm-up to Warm-up complete: starts each level card at once (Start now) and carries
+ * on from any Pause card; `each` runs on every poll. Fails on a card that ends the warm-up.
+ */
+export async function playWarmup(page: Page, tap: boolean, timeoutMs: number, each?: (w: WarmupSnapshot | null) => Promise<void>): Promise<string[]> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if ((await route(page)) === 'complete') return (await result(page))?.levels ?? [];
+    const w = await warmup(page);
+    if (Date.now() > deadline) throw new Error(`the warm-up did not reach #/complete: ${JSON.stringify(w)}`);
+    if (w && ['fix', 'failed', 'changed'].includes(w.card ?? '')) throw new Error(`the warm-up stopped on the ${w.card} card: ${w.message}`);
+    if (each) await each(w);
+    if (w?.card === 'level') {
+      const start = page.locator('.level-card__start');
+      await (tap ? start.tap({ timeout: 2000 }) : start.click({ timeout: 2000 })).catch(() => undefined);
+    } else if (w?.card === 'pause') {
+      await page.getByRole('button', { name: t('warmup.paused.carryOn') }).click({ timeout: 2000 }).catch(() => undefined);
+    }
+    await page.waitForTimeout(100);
+  }
+}
+
+test.describe('The game: the Quick warm-up to Warm-up complete (desktop, injected geometry)', () => {
+  test.describe.configure({ timeout: 300_000 });
+
+  test('Title, Play, Get ready, two levels, Checking, then stars, zones and marks', async ({ page }) => {
+    const seen = watch(page);
+    await page.goto('./?e2e=1&speed=4&preset=quick&engines=geometric,eyepixel&seed=4242');
+    await expect(page.getByRole('heading', { level: 1, name: t('title.name') })).toBeVisible();
+    await page.evaluate(() => {
+      (window.__eek as unknown as { injectGeometry(g: unknown): void }).injectGeometry({
+        screen: { viewportWpx: 1280, viewportHpx: 720, screenWpx: 1280, screenHpx: 720, dpr: 1, fullscreen: false, pxPerMm: 4.2, pxPerMmSource: 'card' },
+        distance: { focalPx: 520, focalSource: 'blind-spot', blindSpotMm: 600, blindSpotSdMm: 14, irisMm: 11.7 },
+        refDistanceMm: 600,
+        degreesApproximate: false,
+      });
+    });
+    await startWarmup(page, false);
+    // The first card: Level 1 of 2, Pop the dots, with its countdown and Start now.
+    const card = page.getByRole('dialog', { name: t('warmup.level.pop.name') });
+    await expect(card).toBeVisible();
+    await expect(card.getByText(t('warmup.card.levelOf', { level: 1, levels: 2 }))).toBeVisible();
+    await expect(card.getByRole('timer')).toBeVisible();
+    // In play: the pip line on the camera edge and the corner cluster.
+    let sawHud = false;
+    let sawChecking = false;
+    const levels = await playWarmup(page, false, 240_000, async (w) => {
+      if (w?.phase === 'running' && w.item && !sawHud) {
+        const pips = page.getByRole('progressbar', { name: t('warmup.progress', { level: w.level!.number }) });
+        sawHud = (await pips.isVisible().catch(() => false)) && (await page.locator('.corner .glyph').isVisible().catch(() => false));
+      }
+      if (w?.card === 'checking') sawChecking = true;
+    });
+    expect(levels).toEqual(['pop', 'test']);
+    expect(sawHud).toBe(true);
+    // Checking may pass faster than a poll; the result and the route say it ran.
+    if (!sawChecking) console.log('flow.spec: Checking your aim… passed between two polls');
+
+    const r = (await result(page))!;
+    expect(r.mode).toBe('full');
+    expect(r.marks).toHaveLength(6);
+    expect(r.stars).toBeGreaterThanOrEqual(0);
+    expect(r.stars).toBeLessThanOrEqual(3);
+    expect(['great', 'good', 'rough', 'failed']).toContain(r.outcome);
+    for (const k of [r.zones.cols, r.zones.rows]) expect([0, 1, 2, 3, 4]).toContain(k);
+    // Rendered: the zone map with its six marks, the stars, the headline and the actions.
+    await expect(page.getByRole('img', { name: /test bubbles hit\.$/ })).toBeVisible();
+    await expect(page.locator('.zone-map__mark')).toHaveCount(6);
+    await expect(page.getByRole('img', { name: /^[0-3] of 3 stars$/ })).toHaveAttribute('aria-label', r.stars === 1 ? '1 of 3 stars' : `${r.stars} of 3 stars`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(r.outcome === 'failed' ? t('complete.headline.failed') : t('complete.headline.zones', { n: r.zones.cols * r.zones.rows }));
+    await expect(page.locator('.complete__actions .btn--primary')).toBeVisible();
+    await expect(page.getByRole('button', { name: t('complete.judge') })).toBeVisible();
+
+    // The same results as the v1 screens: the calibration of CAL9, the fit, the Test round's reports.
+    const state = await appState(page);
+    expect(new Set(state.calibration!.presentations.map((p) => p.itemId)).size).toBe(9);
+    expect(state.fit!.fitGeometry).toBeTruthy();
+    expect(state.geometry!.degreesApproximate).toBe(false);
+    expect(state.validation!.filter((v) => v.mode === 'own').length).toBeGreaterThan(0);
+    expect(seen.logs.some((l) => l.startsWith('Fit:'))).toBe(true);
+    sameOrigin(page, seen.requests);
+    expect(seen.problems).toEqual([]);
+  });
+
+  test("the Standard set's cards appear in order: Pop, Follow, Turn, Test", async ({ page }) => {
+    const seen = watch(page);
+    await page.goto('./?e2e=1&speed=8&preset=standard&engines=geometric&seed=99');
+    await startWarmup(page, false);
+    const names: string[] = [];
+    let keys: string[] = [];
+    await playWarmup(page, false, 240_000, async (w) => {
+      if (w) keys = w.cards;
+      if (w?.card !== 'level') return;
+      const title = await page.locator('.level-card .stim-card__title').textContent({ timeout: 1000 }).catch(() => null);
+      if (title && names[names.length - 1] !== title) names.push(title);
+    });
+    expect(keys).toEqual(['pop', 'follow', 'turn', 'test']);
+    expect(names).toEqual([t('warmup.level.pop.name'), t('warmup.level.follow.name'), t('warmup.level.turn.name'), t('warmup.level.test.name')]);
+    const r = (await result(page))!;
+    expect(r.levels).toEqual(['pop', 'follow', 'turn', 'test']);
+    expect(r.marks).toHaveLength(12);
     expect(seen.problems).toEqual([]);
   });
 });
