@@ -1,0 +1,561 @@
+/* Free look, Re-aim, the challenge and Round complete (design §2.13–§2.15, §4.3–§4.5, §5.4, §6.1;
+   spec §17.8, §17.9). Colour only through the role tokens of style.css; the grey stage is never
+   themed. Layouts switch by aspect ratio (5/4) and height (480 px), never by orientation. */
+
+/* ---------------------------------------------------------------- The board (design §5.4, §6.1) */
+
+/* The safe area the board is measured in: the shell's gutters of each layout (design §4.3–§4.5). */
+.board-probe {
+  position: absolute;
+  inset: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@media (min-aspect-ratio: 5/4) and (min-height: 480px) {
+  .board-probe {
+    inset: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  }
+}
+
+@media (min-aspect-ratio: 5/4) and (max-height: 479.98px) {
+  .board-probe {
+    inset: max(24px, env(safe-area-inset-top)) max(48px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(48px, env(safe-area-inset-left));
+  }
+}
+
+.zone-board {
+  position: absolute;
+  inset: 0;
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  pointer-events: none;
+}
+
+.zone-board__zone {
+  fill: none;
+  stroke: var(--stage-line);
+  stroke-width: 1.5;
+}
+
+.zone-board__zone[data-lit] {
+  fill: var(--stage-lit);
+  stroke: var(--halo);
+  stroke-width: 2;
+}
+
+.gaze-disc {
+  fill: var(--gaze-soft);
+  stroke: var(--gaze-outline);
+  stroke-width: 1.5;
+}
+
+.gaze-disc[data-greyed] {
+  fill: var(--stage-lit);
+  stroke-dasharray: 5 4;
+}
+
+.gaze-disc[data-hidden] {
+  display: none;
+}
+
+/* Round complete's stage card holds the Replay button, so it keeps its pointer events. */
+.app:is([data-screen='look'], [data-screen='challenge']) .stage:not(.round-stage) {
+  pointer-events: none;
+}
+
+/* The challenge's canvas (bubbles, decoy) lies over the board's SVG. */
+.app[data-screen='challenge'] .stage > .stimulus-stage.stimulus-stage--game {
+  z-index: 1;
+  background: transparent;
+}
+
+/* Absolute in every mode: the immersive shell puts its other children in flow (style.css). */
+.app[data-mode] .app__main > :is(.board-probe, .look-corner, .play-layer) {
+  position: absolute;
+}
+
+/* Cards and chips over a screen, centred on the grey (offers, Re-aim's outcome, the round cards). */
+.play-layer,
+.reaim__layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l);
+  pointer-events: none;
+}
+
+.play-layer:empty,
+.reaim__layer:empty {
+  display: none;
+}
+
+.play-layer > *,
+.reaim__layer > * {
+  grid-area: auto;
+  pointer-events: auto;
+}
+
+.offer-card {
+  gap: 12px;
+}
+
+.status-chip {
+  padding: 10px 20px;
+  border-radius: var(--radius-pill);
+  background: var(--stage-chip);
+  color: var(--stage-chip-text);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: var(--line-height-tight);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- Free look (design §2.13) */
+
+.look-dock {
+  transition: opacity 0.4s ease-out;
+}
+
+.look-dock__status {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-block-size: 40px;
+}
+
+.look-dock__tracking {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: var(--line-height-tight);
+  white-space: nowrap;
+}
+
+.look-dock__live {
+  flex: none;
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+}
+
+.look-dock__sentence {
+  font-size: 1rem;
+  line-height: var(--line-height-normal);
+  color: var(--stage-chip-text);
+}
+
+.look-dock__glyph {
+  display: flex;
+  align-items: center;
+}
+
+.look-dock__actions .btn--chip {
+  flex: 0 0 auto;
+}
+
+.look-dock__actions .btn--primary {
+  flex: 1 0 auto;
+}
+
+.look-bar-glyph,
+.look-corner {
+  display: none;
+}
+
+.look-corner {
+  position: absolute;
+  z-index: 2;
+  right: var(--pad-r);
+  bottom: var(--pad-b);
+  align-items: center;
+}
+
+.app[data-camera='right'] .look-corner {
+  right: auto;
+  left: var(--pad-l);
+}
+
+.app[data-screen='look'] > .topbar {
+  transition: opacity 0.4s ease-out;
+}
+
+/* Bar and dock fade after 3 s without input; the glyph stays in the corner (design §2.13). */
+.app[data-screen='look'][data-faded] > .topbar,
+.app[data-screen='look'][data-faded] .look-dock {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app[data-screen='look'][data-faded] .look-corner {
+  display: flex;
+}
+
+/* Expert mode: Live's extras on a small chip row under the bar. */
+.look-expert {
+  grid-area: cue;
+  justify-self: center;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  max-inline-size: 100%;
+  padding: 4px;
+  border-radius: var(--radius-card);
+  background: var(--stage-chip);
+  color: var(--stage-chip-text);
+  font-size: 0.875rem;
+}
+
+.look-expert select {
+  min-block-size: var(--tap);
+  padding: 0 8px;
+  border: 1px solid rgb(255 255 255 / 0.28);
+  border-radius: var(--radius-control);
+  background: var(--stage-chip-raise);
+  color: var(--stage-chip-text);
+  font: inherit;
+}
+
+.look-expert__status {
+  padding: 0 8px;
+  font-family: var(--font-mono);
+}
+
+.look-expert-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.app[data-screen='look'][data-faded] .look-expert {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (min-aspect-ratio: 5/4) and (min-height: 480px) {
+  .look-bar-glyph {
+    display: flex;
+  }
+
+  .look-dock__glyph {
+    display: none;
+  }
+
+  .app[data-screen='look'] .look-dock {
+    inline-size: min(100%, 760px);
+    gap: var(--space-md);
+  }
+
+  .app[data-screen='look'] .look-dock__status {
+    flex: none;
+    min-block-size: 0;
+  }
+
+  .look-dock__sentence {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+  }
+}
+
+/* A phone on its side: the dock is one row along the bottom, across both columns. */
+@media (min-aspect-ratio: 5/4) and (max-height: 479.98px) {
+  .app[data-screen='look'] .look-dock {
+    grid-row: 3;
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-md);
+    margin: 0;
+    padding: 8px var(--space-md);
+    border-radius: var(--radius-card);
+    background: var(--stage-chip);
+  }
+
+  .app[data-screen='look'] .look-dock__status {
+    grid-area: auto;
+    flex: none;
+    padding: 0;
+    background: none;
+  }
+
+  .app[data-screen='look'] .look-dock__sentence {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    font-size: 0.875rem;
+  }
+
+  .app[data-screen='look'] .look-dock__actions {
+    grid-area: auto;
+    flex: none;
+  }
+
+  .app[data-screen='look'] .look-dock__actions .btn--chip {
+    background: var(--stage-chip-raise);
+  }
+}
+
+/* ---------------------------------------------------------------- The challenge's HUD (design §2.14) */
+
+.score-chip {
+  position: absolute;
+  z-index: 2;
+  top: var(--pad-t);
+  left: var(--pad-l);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  block-size: 40px;
+  padding: 0 8px 0 14px;
+  border-radius: var(--radius-pill);
+  background: var(--stage-chip);
+  color: var(--stage-chip-text);
+  transition: opacity 0.2s ease-out;
+  pointer-events: none;
+}
+
+.score-chip[data-faded] {
+  opacity: 0;
+}
+
+.score-chip__value {
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.score-chip__streak,
+.score-chip__bonk {
+  display: inline-flex;
+  align-items: center;
+  block-size: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--stage-chip-raise);
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.score-chip__bonk {
+  color: var(--state-lost);
+}
+
+@media (min-aspect-ratio: 5/4) and (min-height: 480px) {
+  .score-chip {
+    left: max(24px, env(safe-area-inset-left));
+  }
+}
+
+@media (min-aspect-ratio: 5/4) and (max-height: 479.98px) {
+  .app[data-camera='right'] .score-chip {
+    left: auto;
+    right: var(--pad-r);
+  }
+}
+
+.round-card .level-card__meta {
+  margin-block-start: calc(-1 * var(--space-sm));
+}
+
+/* ---------------------------------------------------------------- Round complete (design §2.14) */
+
+.round-stage {
+  display: grid;
+  place-items: center;
+  padding: var(--space-md);
+}
+
+.round-map__replay {
+  position: absolute;
+  z-index: 1;
+  top: 12px;
+  right: 12px;
+  color: var(--color-text);
+}
+
+.round-map__replay:hover {
+  background: var(--color-border);
+}
+
+.round-map {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+
+.round-map__mini {
+  display: block;
+  inline-size: min(74cqw, calc((100cqh - 2.25rem - 12px) * var(--ar, 1)));
+  block-size: auto;
+  aspect-ratio: var(--ar, 1);
+  overflow: visible;
+}
+
+.round-map__screen {
+  fill: var(--stage);
+}
+
+.round-map__zone {
+  fill: transparent;
+  stroke: var(--stage-line);
+}
+
+.round-map__count {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  fill: var(--stage-ink);
+}
+
+.round-map__caption {
+  font-size: 0.875rem;
+  line-height: var(--line-height-tight);
+  color: var(--color-muted-text);
+}
+
+.replay__trail {
+  stroke: var(--gaze);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-opacity: 0.85;
+}
+
+.replay__head {
+  fill: var(--gaze);
+  stroke: var(--gaze-outline);
+}
+
+.round-panel {
+  align-items: center;
+  gap: var(--space-xs);
+  text-align: center;
+}
+
+.round-panel__eyebrow {
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: var(--line-height-tight);
+  color: var(--color-muted-text);
+}
+
+.round-panel__score {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: var(--line-height-normal);
+  color: var(--color-muted-text);
+  white-space: nowrap;
+}
+
+.round__actions .btn--secondary {
+  flex: 0 0 auto;
+}
+
+.round__actions .btn--secondary > svg {
+  flex: none;
+}
+
+/* Only Free look carries its icon (the board's back arrow); the others show one when the row is too narrow. */
+.round__actions:not([data-fit='1']) .btn--secondary:not([data-action='look']) > svg {
+  display: none;
+}
+
+.round__actions[data-fit='1'] .btn--secondary {
+  inline-size: 56px;
+  padding: 0;
+}
+
+.round__actions[data-fit='1'] .btn__label {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.round__actions[data-fit='2'] .btn--secondary {
+  display: none;
+}
+
+@media (min-aspect-ratio: 5/4) {
+  .round-panel {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
+@media (min-aspect-ratio: 5/4) and (min-height: 480px) {
+  .round-panel {
+    gap: 12px;
+  }
+
+  .round__actions .btn {
+    flex: 0 0 auto;
+  }
+}
+
+@media (min-aspect-ratio: 5/4) and (max-height: 479.98px) {
+  .app[data-screen='challenge'] .round-panel__headline {
+    font-size: 1.25rem;
+  }
+
+  .app[data-screen='challenge'] .round-panel .star {
+    inline-size: 24px;
+    block-size: 24px;
+  }
+}
+
+/* The arrival (design §2.14): zones, then the stars, then the actions; at once under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .app[data-arrive='animate'] .round-map__zone {
+    animation: zone-in 360ms ease-out both;
+    animation-delay: calc(var(--k, 0) * 120ms);
+  }
+
+  .app[data-arrive='animate'] .round-panel .star[data-on] {
+    animation: star-in 150ms ease-out both;
+    animation-delay: calc(var(--zones, 0) * 120ms + var(--k, 0) * 150ms);
+  }
+
+  .app[data-arrive='animate'] .round__actions {
+    animation: fade-in 200ms ease-out both;
+    animation-delay: calc(var(--zones, 0) * 120ms + 450ms);
+  }
+}
+
+/* ---------------------------------------------------------------- Re-aim (design §2.15) */
+
+.reaim,
+.app[data-mode][data-reaim] > .reaim {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: var(--stage);
+  color: var(--stage-ink);
+}
+
+.reaim__stage {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* While Re-aim runs over a screen, only it and the guard's overlay are seen. */
+.app[data-reaim] > :not(.reaim, .pause) {
+  visibility: hidden;
+}

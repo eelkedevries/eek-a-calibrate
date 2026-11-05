@@ -8,13 +8,29 @@ import { icon } from '../shell/icons.ts';
 /** A target nearer than this to the cluster hides it (design §2.6). */
 export const CLEARANCE_PX = 96;
 
+export interface AvoidTarget {
+  x: number;
+  y: number;
+  r: number;
+}
+
+/** Whether any target comes within `clearance` px of the box. */
+export function nearBox(box: DOMRect, target: AvoidTarget | readonly AvoidTarget[] | null, clearance: number = CLEARANCE_PX): boolean {
+  const list: readonly AvoidTarget[] = target === null ? [] : Array.isArray(target) ? target : [target as AvoidTarget];
+  return list.some((at) => {
+    const dx = Math.max(box.left - at.x, 0, at.x - box.right);
+    const dy = Math.max(box.top - at.y, 0, at.y - box.bottom);
+    return Math.hypot(dx, dy) - at.r < clearance;
+  });
+}
+
 export interface CornerCluster {
   el: HTMLElement;
   pause: HTMLButtonElement;
   /** Pause is shown only while a level is in play. */
   setPlaying(playing: boolean): void;
-  /** The target this frame (centre and radius, viewport px), or null. */
-  avoid(target: { x: number; y: number; r: number } | null): void;
+  /** The target or targets this frame (centre and radius, viewport px), or null. */
+  avoid(target: AvoidTarget | readonly AvoidTarget[] | null): void;
   /** Forgets the measured box (after a resize). */
   remeasure(): void;
 }
@@ -41,9 +57,7 @@ export function cornerCluster(glyph: HTMLElement, label: string, onPause: () => 
       let near = false;
       if (target) {
         box ??= el.getBoundingClientRect();
-        const dx = Math.max(box.left - target.x, 0, target.x - box.right);
-        const dy = Math.max(box.top - target.y, 0, target.y - box.bottom);
-        near = Math.hypot(dx, dy) - target.r < CLEARANCE_PX;
+        near = nearBox(box, target);
       }
       if (near === faded) return;
       faded = near;

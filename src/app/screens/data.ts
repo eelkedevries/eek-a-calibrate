@@ -15,7 +15,7 @@ import type { Screen, ScreenContext } from '../router.ts';
 import { currentValidationRun } from '../session.ts';
 import { deleteAllData, getState, subscribe } from '../state.ts';
 import { t } from '../strings.en-GB.ts';
-import { restoreProfile, sessionRecords } from './live.ts';
+import { restoreProfile, sessionRecords } from '../game/liveSession.ts';
 import { SETUP_CSS } from './welcome.ts';
 
 export { buildSessionExport, exportAvailability, type Omission, type SessionExport } from '../details/data.ts';

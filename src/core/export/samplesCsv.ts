@@ -16,20 +16,20 @@ export const SAMPLES_HEADER = [
   'device_tilt_deg', 'device_roll_deg',
 ] as const;
 
-export type TrialKind = 'calibration' | 'validation' | 'drift' | 'live';
+export type TrialKind = 'calibration' | 'validation' | 'drift' | 'live' | 'game';
 
-/** `calibration`, `validation-<n>`, `drift-<n>` or `live-<nnn>`, with n counted from 1. */
+/** `calibration`, `validation-<n>`, `drift-<n>`, `live-<nnn>` or `game-<nnn>` (a challenge round, §17.10.1), with n counted from 1. */
 export function trialName(kind: TrialKind, n = 1): string {
   if (kind === 'calibration') return 'calibration';
   if (!(Number.isSafeInteger(n) && n >= 1)) throw new RangeError(`trialName: n must be a positive integer, got ${n}`);
-  if (kind === 'live') return `live-${String(n).padStart(3, '0')}`;
+  if (kind === 'live' || kind === 'game') return `${kind}-${String(n).padStart(3, '0')}`;
   return `${kind}-${n}`;
 }
 
 export interface SampleRow {
   /** `trialName(...)`. */
   trial: string;
-  /** The phase of the frame's item (`fixation`, `pursuit`, …), `live` in Live, null between items. */
+  /** The phase of the frame's item (`fixation`, `pursuit`, …), `live` in Live, `game` in a challenge round, null between items. */
   phase: string | null;
   itemId: string | null;
   /** The selected estimator's sample for this frame. */

@@ -397,7 +397,7 @@ class CameraScreen {
                 type: 'button',
                 class: 'secondary',
                 onclick: async () => {
-                  const { restoreProfile } = await import('./live.ts');
+                  const { restoreProfile } = await import('../game/liveSession.ts');
                   restoreProfile(p);
                   this.ctx.navigate('live');
                 },

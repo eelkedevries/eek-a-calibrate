@@ -5,6 +5,8 @@
 // in the sheet's footer.
 //
 // The export is built here, and the v1 Data screen calls it until prompt 018 removes that screen.
+// Challenge rounds (§17.10.1) join it as the trials game-<nnn> of samples.csv and targets.csv, the
+// rows of game.csv and the game member of session.json.
 // The zip is assembled file by file rather than with buildExport, which writes everything or nothing:
 // geometry.yaml cannot be written without D_ref and events cannot be detected without a finite
 // SD₂d, and the rest of the export must still be produced, with README.txt saying what was left
@@ -12,6 +14,7 @@
 import type { ExportIdentity } from '../../core/export/csv.ts';
 import { csvTable, fmtInt, fmtMs, relMs } from '../../core/export/csv.ts';
 import { geometryYaml } from '../../core/export/geometryYaml.ts';
+import { gameCsv } from '../../core/export/gameCsv.ts';
 import { readmeText } from '../../core/export/readme.ts';
 import { samplesCsv, trialName, type SampleRow } from '../../core/export/samplesCsv.ts';
 import { datasetJson, sessionJson, type DatasetBlock, type SessionMeta } from '../../core/export/sessionJson.ts';
@@ -34,7 +37,8 @@ import { registerDetailsTab, type DetailsPage, type PageContext } from '../shell
 import { getState, setState, type Settings } from '../state.ts';
 import { t } from '../strings.en-GB.ts';
 import { setupRecord } from '../screens/camera.ts';
-import { assetHashes, sessionRecords, type LiveBlock, type SessionBlock } from '../screens/live.ts';
+import { assetHashes, sessionRecords, type GameBlock, type LiveBlock, type SessionBlock } from '../game/liveSession.ts';
+import { warmupHistory } from '../game/gameState.ts';
 import { actionRow, checkRow, note, para, reading, sheetPage } from './page.ts';
 import { engineSpecs } from './settings.ts';
 
@@ -51,6 +55,10 @@ interface ExportRecording {
 
 interface ExportLive {
   block: LiveBlock;
+}
+
+interface ExportGame {
+  game: GameBlock;
 }
 
 export interface Omission {
@@ -203,6 +211,39 @@ function liveRows(b: LiveBlock, now: SessionGeometry, wanted: EstimatorId): Bloc
   return { trial: b.trial, samples, rows, geometry: g, estimator: id };
 }
 
+/** The bubble on screen at a capture time (the last track point at or before it), for samples.csv. */
+function trackAt(track: GameBlock['track'], tMs: number): GameBlock['track'][number] | null {
+  let lo = 0;
+  let hi = track.length - 1;
+  let found = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if ((track[mid] as GameBlock['track'][number]).tMs <= tMs) {
+      found = mid;
+      lo = mid + 1;
+    } else hi = mid - 1;
+  }
+  return found >= 0 ? (track[found] as GameBlock['track'][number]) : null;
+}
+
+/** A challenge round's rows (phase game): as Live's, with the bubble's id and its centre at each frame. */
+function gameRows(b: GameBlock, now: SessionGeometry, wanted: EstimatorId): BlockOut {
+  const frames = [...b.frames].sort((x, y) => x.meta.index - y.meta.index);
+  // Each stretch between Re-aims is computed with the corrections it was played with.
+  const cuts = [{ fromIndex: Number.NEGATIVE_INFINITY, corrections: b.corrections }, ...b.segments];
+  const parts = cuts.map((c, k) => {
+    const until = cuts[k + 1]?.fromIndex ?? Number.POSITIVE_INFINITY;
+    return liveRows({ ...b, kind: 'live', markers: [], corrections: c.corrections, frames: frames.filter((f) => f.meta.index >= c.fromIndex && f.meta.index < until) }, now, wanted);
+  });
+  const out: BlockOut = { ...(parts[0] as BlockOut), samples: parts.flatMap((p) => p.samples), rows: parts.flatMap((p) => p.rows) };
+  const rows = out.rows.map((r, k) => {
+    const at = trackAt(b.track, (frames[k] as RecordedFrame).meta.tCaptureMs);
+    const shown = at && at.itemId !== null ? at : null;
+    return { ...r, phase: 'game', itemId: shown?.itemId ?? null, targetPx: shown ? ([shown.x, shown.y] as Vec2) : null };
+  });
+  return { ...out, rows };
+}
+
 /** Samples in strictly increasing capture time, as event detection requires. */
 function increasing(samples: readonly GazeSample[]): GazeSample[] {
   const out: GazeSample[] = [];
@@ -251,13 +292,15 @@ export async function buildSessionExport(opts: ExportOptions): Promise<SessionEx
   if (calibration) protocol.push({ trial: trialName('calibration'), recording: calibration, fit: baseFit, corrections: {}, irisPx: new Map() });
   if (firstValidation) protocol.push({ trial: trialName('validation', 1), recording: firstValidation.recording, fit: baseFit, corrections: {}, irisPx: new Map() });
   const blocks: SessionBlock[] = records ? [...records.blocks] : [];
-  const ordered: (ExportRecording | ExportLive)[] = [...protocol];
+  const ordered: (ExportRecording | ExportLive | ExportGame)[] = [...protocol];
   for (const b of blocks) {
     if (b.kind === 'live') ordered.push({ block: b });
+    else if (b.kind === 'game') ordered.push({ game: b });
     else ordered.push({ trial: b.trial, recording: b.recording, fit: b.fit, corrections: b.corrections, irisPx: b.irisPx });
   }
-  const outs: BlockOut[] = ordered.map((o) => ('block' in o ? liveRows(o.block, now, wanted) : recordingRows(o, now, wanted)));
-  const recordingsOnly = ordered.filter((o): o is ExportRecording => !('block' in o));
+  const outs: BlockOut[] = ordered.map((o) => ('block' in o ? liveRows(o.block, now, wanted) : 'game' in o ? gameRows(o.game, now, wanted) : recordingRows(o, now, wanted)));
+  const recordingsOnly = ordered.filter((o): o is ExportRecording => 'recording' in o);
+  const games = blocks.filter((b): b is GameBlock => b.kind === 'game');
   const geometryForFile: SessionGeometry = blockGeometry(fitNow.fitGeometry?.screen ?? now.screen, now);
 
   const files: { name: string; text: string }[] = [];
@@ -275,7 +318,13 @@ export async function buildSessionExport(opts: ExportOptions): Promise<SessionEx
     return header + parts.map(bodyOf).join('');
   });
   add('targets.csv', () => {
-    const parts = recordingsOnly.map((r) => targetsCsv(identity, [{ trial: r.trial, schedule: r.recording.schedule, presentations: r.recording.presentations }], r.recording.geometry.screen));
+    const parts = ordered.flatMap((o) => {
+      if ('recording' in o) return [targetsCsv(identity, [{ trial: o.trial, schedule: o.recording.schedule, presentations: o.recording.presentations }], o.recording.geometry.screen)];
+      if (!('game' in o)) return [];
+      const g = o.game;
+      const presentations = g.presentations.map((p) => ({ itemId: p.itemId, onsetMs: p.onsetMs, offsetMs: p.offsetMs, attempt: 1, frameIntervalMs: Number.NaN, aborted: false }));
+      return [targetsCsv(identity, [{ trial: g.trial, schedule: { items: g.items }, presentations }], g.geometry.screen)];
+    });
     const header = headerOf(targetsCsv(identity, [], geometryForFile.screen));
     return header + parts.map(bodyOf).join('');
   });
@@ -309,6 +358,8 @@ export async function buildSessionExport(opts: ExportOptions): Promise<SessionEx
   } else {
     omitted.push({ file: 'events.csv', reason: t('data.readme.noSd2d') });
   }
+
+  if (games.length > 0) add('game.csv', () => gameCsv(identity, games.map((g) => ({ trial: g.trial, round: g.round.round, key: g.round.key, records: g.records }))));
 
   const markerRows = blocks.flatMap((b) => (b.kind === 'live' ? b.markers.map((m) => [identity.participant, identity.session, b.trial, fmtInt(m.n), fmtMs(relMs(identity, m.tMs))]) : []));
   if (markerRows.length > 0) add('markers.csv', () => csvTable(['participant', 'session', 'trial', 'marker', 'time_ms'], markerRows));
@@ -356,6 +407,28 @@ export async function buildSessionExport(opts: ExportOptions): Promise<SessionEx
       driftEveryMin: state.settings.driftEveryMin,
       restoredProfile: records?.restored ? { key: records.restored.key, validated: records.restored.validated } : null,
       liveRecordings: blocks.filter((b): b is LiveBlock => b.kind === 'live').map((b) => ({ trial: b.trial, estimator: b.estimator, startMs: relMs(identity, b.startMs), endMs: relMs(identity, b.endMs ?? undefined), markers: b.markers.length })),
+    },
+    game: {
+      ...gameRecord(),
+      warmupLength: state.settings.preset,
+      warmups: warmupHistory().map((w) => ({
+        mode: w.mode,
+        preset: w.preset,
+        levels: w.log.map((l) => ({ key: l.key, number: l.number, of: l.of, skipped: l.skipped, retried: l.retried, steadiness: l.steadiness, pauses: l.pauses.map((x) => ({ reason: x.reason, timeMs: relMs(identity, x.atMs) })) })),
+        estimator: w.estimator,
+        verdict: w.verdict,
+        zones: w.zones,
+        needDeg: w.needDeg,
+        stars: w.stars,
+        outcome: w.outcome,
+        cause: w.cause,
+        marks: w.marks,
+        viewport: w.viewport,
+        restoreRejected: w.restoreRejected,
+        timeMs: relMs(identity, w.atMs),
+      })),
+      rounds: games.map((g) => ({ ...g.round, startMs: relMs(identity, g.startMs), endMs: relMs(identity, g.endMs ?? undefined) })),
+      offsetCorrections: (records?.driftLog ?? []).filter((e) => e.source === 'game').map((e) => ({ timeMs: relMs(identity, e.tMs), offsetDeg: e.offsetDeg, applied: e.applied })),
     },
     licences: {
       app: 'MIT',
@@ -427,7 +500,7 @@ export async function storeSessionSummary(includeDataset: boolean): Promise<void
     if (calibration) recordings.push({ trial: trialName('calibration'), recording: calibration });
     const v = records?.base?.validation ?? currentValidationRun();
     if (v) recordings.push({ trial: trialName('validation', 1), recording: v.recording });
-    for (const b of records?.blocks ?? []) if (b.kind !== 'live') recordings.push({ trial: b.trial, recording: b.recording });
+    for (const b of records?.blocks ?? []) if (b.kind !== 'live' && b.kind !== 'game') recordings.push({ trial: b.trial, recording: b.recording });
   }
   const now = Date.now();
   const record: SessionRecord = {

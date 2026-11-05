@@ -11,6 +11,7 @@ export const FILE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   'validation.csv': 'validation metrics per estimator, mode (own or intersection) and target, then one summary row each',
   'cv.csv': 'cross-validated error of every engine, mapper and relative ridge penalty',
   'events.csv': 'fixations, saccades, blinks and bad data of the selected estimator',
+  'game.csv': 'every challenge bubble and spike: zone, position, onset and offset, outcome, time to pop, score, streak, gaze offset',
   'geometry.yaml': 'viewport size, viewing distance and coordinate conventions, for eek-a-gaze',
   'session.json': 'versions, assets, settings, geometry, schedules, fitted mappings, validations, drift log, thresholds',
   'dataset.json': 'derived per-frame features and labels for offline refitting (no images, no landmarks)',
@@ -73,6 +74,8 @@ export function readmeText(r: ReadmeInput): string {
     `- flags is a bit mask: ${flags}.`,
     `  A frame is valid when none of ${invalid} is set.`,
     '- Verdicts in validation.csv are heuristic. Results from one session do not generalise.',
+    '- Challenge rounds are the trials game-<nnn> in samples.csv (phase game; target_x and target_y',
+    '  follow a drifting bubble) and targets.csv; game.csv has one row per bubble or spike.',
     '',
   ];
   return lines.join('\n');

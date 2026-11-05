@@ -10,6 +10,7 @@ import { samplesCsv, type SampleRow } from './samplesCsv.ts';
 import { datasetJson, sessionJson, type DatasetBlock, type SessionMeta } from './sessionJson.ts';
 import { targetsCsv, type TargetsBlock } from './targetsCsv.ts';
 import { cvCsv, eventsCsv, validationCsv, type EventsBlock } from './validationCsv.ts';
+import { gameCsv, type GameCsvBlock } from './gameCsv.ts';
 
 export const EXPORT_FILES = [
   'README.txt',
@@ -18,6 +19,7 @@ export const EXPORT_FILES = [
   'validation.csv',
   'cv.csv',
   'events.csv',
+  'game.csv',
   'geometry.yaml',
   'session.json',
   'dataset.json',
@@ -71,6 +73,8 @@ export interface ExportInput {
   session: SessionMeta;
   /** dataset.json is written only when this is given (off by default). */
   dataset?: readonly DatasetBlock[];
+  /** game.csv is written only when challenge rounds were played (§17.10.1). */
+  game?: readonly GameCsvBlock[];
 }
 
 export interface ExportBundle {
@@ -82,7 +86,7 @@ export interface ExportBundle {
 /** Every export file, then the zip. Throws, writing nothing, when any file cannot be written. */
 export function buildExport(input: ExportInput): ExportBundle {
   const { identity: id } = input;
-  const names = EXPORT_FILES.filter((n) => n !== 'dataset.json' || input.dataset !== undefined);
+  const names = EXPORT_FILES.filter((n) => (n !== 'dataset.json' || input.dataset !== undefined) && (n !== 'game.csv' || input.game !== undefined));
   const text: Record<ExportFileName, () => string> = {
     'README.txt': () =>
       readmeText({ participant: id.participant, session: id.session, appVersion: input.session.app.version, appCommit: input.session.app.commit, files: names }),
@@ -91,6 +95,7 @@ export function buildExport(input: ExportInput): ExportBundle {
     'validation.csv': () => validationCsv(input.validations),
     'cv.csv': () => cvCsv(input.fit),
     'events.csv': () => eventsCsv(id, input.events),
+    'game.csv': () => gameCsv(id, input.game ?? []),
     'geometry.yaml': () => geometryYaml(input.geometry),
     'session.json': () =>
       sessionJson({ ...input.session, identity: id, exportedAt: input.exportedAt, geometry: input.geometry, fit: input.fit, validations: input.validations }),

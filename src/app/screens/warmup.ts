@@ -6,8 +6,9 @@
 // HUD is the pip line on the camera edge and the corner cluster. The position guard pauses and
 // resumes the level (its overlay); Pause opens the Pause card; three pauses in a level ask to fix
 // the set-up; a screen change offers to warm up again. After the Test round, "Checking your aim…"
-// waits for the fit and the scoring, and Warm-up complete follows. The protocol, gating,
-// labelling, fit and scoring are the existing ones (game/warmupRunner.ts).
+// waits for the fit and the scoring, and Warm-up complete follows; a stored calibration that
+// passes its Test round first runs the forced Re-aim of §4.13 (§17.4.4). The protocol, gating,
+// labelling, fit and scoring are the existing ones (game/warmupRunner.ts, game/liveSession.ts).
 import { SETUP } from '../../core/constants.ts';
 import { layoutToPx } from '../../core/geometry/screen.ts';
 import { median } from '../../core/maths/stats.ts';
@@ -55,6 +56,7 @@ import {
   type LevelPause,
   type LevelRecord,
 } from '../game/gameState.ts';
+import { adoptQuickWarmup, adoptRestoreTestRound, cancelReaim, estimatorInUse, liveGeometry, runReaim } from '../game/liveSession.ts';
 import { applyTestRound, awaitFit, fittedEngines, measuredScale, reducedMotion, sameLayout, WarmupSession, warmupResultFrom } from '../game/warmupRunner.ts';
 import type { Screen, ScreenContext } from '../router.ts';
 import { openDetails } from '../shell/detailsSheet.ts';
@@ -181,7 +183,7 @@ class WarmupScreen {
   private colours: GameColours | null = null;
   private mode: WarmupMode = 'full';
   private levelIndex = -1;
-  private phase: 'starting' | 'card' | 'running' | 'checking' | 'done' | 'stopped' = 'starting';
+  private phase: 'starting' | 'card' | 'running' | 'checking' | 'reaim' | 'done' | 'stopped' = 'starting';
   private log: LevelRecord[] = [];
   private record: LevelRecord | null = null;
   private stop: Stop | null = null;
@@ -271,7 +273,7 @@ class WarmupScreen {
 
   /** "Skip warm-up": the stored calibration that matches this camera and screen, made the session's (§17.4.4). */
   private async restore(capture: Capture, block: Block): Promise<boolean> {
-    const [{ listProfiles }, { matchesCurrentSetup }, { restoreProfile }] = await Promise.all([import('../../platform/storage.ts'), import('./camera.ts'), import('./live.ts')]);
+    const [{ listProfiles }, { matchesCurrentSetup }, { restoreProfile }] = await Promise.all([import('../../platform/storage.ts'), import('./camera.ts'), import('../game/liveSession.ts')]);
     const profiles = await listProfiles().catch(() => []);
     const p = profiles.find((x) => matchesCurrentSetup(x, capture) && x.fit.fitGeometry && sameLayout(x.fit.fitGeometry.screen, block.geometry()));
     if (!p || !this.mounted) return false;
@@ -617,7 +619,7 @@ class WarmupScreen {
 
   // ----- Checking your aim… ----------------------------------------------------------------------
 
-  private async check(): Promise<'done' | 'stopped'> {
+  private async check(): Promise<'done' | 'restart' | 'stopped'> {
     const view = this.view as WarmupView;
     const session = this.session as WarmupSession;
     const capture = this.capture as Capture;
@@ -633,6 +635,10 @@ class WarmupScreen {
       // Exit or "Get ready again" on the guard's overlay, or a stopped camera, while the fit ran.
       if (!this.mounted || this.stop) return 'stopped';
       console.info(`Fit: ${Math.round(fit.fitMs)} ms; τ = ${fit.pursuitLagMs} ms; ${fit.selection.reason}`);
+      const test = { rec, receivedMs, nominalFps: capture.nominalFps() };
+      // The quick warm-up's refit joins the lineage of the fit it replaces (its records and blocks stay).
+      const oldFit = getState().fit;
+      if (this.mode === 'quick-warmup' && session.recalibrationRecording && oldFit) adoptQuickWarmup({ oldFit, fit, recalibration: session.recalibrationRecording, test });
       const scored = applyTestRound(fit, rec, receivedMs, capture.nominalFps());
       if (this.mode === 'quick-warmup' && session.recalibrationRecording) addQuickRecalibration(session.recalibrationRecording);
       const estimator = getState().estimator ?? fit.selection.estimator;
@@ -653,6 +659,15 @@ class WarmupScreen {
       const latest = this.guard?.state().home;
       if (latest && latest !== NEUTRAL_HOME && (this.relatched || session.plan.levels.some((l) => l.rehome))) setReadyHome(latest, readyHome()?.cls ?? currentClass());
       checking.set(1);
+      if (this.mode === 'restore') {
+        const verdict = scored.own.find((r) => r.estimator === estimator)?.verdict ?? 'not-tracking';
+        if (adoptRestoreTestRound({ fit, test, verdict })) {
+          clearInterval(timer);
+          view.clearCard('checking');
+          const after = await this.forcedReaim();
+          if (after !== 'done') return after;
+        }
+      }
     } catch (error) {
       if (!this.mounted || this.stop) return 'stopped';
       this.fail('warmup.failed.fit', error);
@@ -663,6 +678,43 @@ class WarmupScreen {
     this.phase = 'done';
     this.ctx.navigate('complete');
     return 'done';
+  }
+
+  /**
+   * The drift check that a restored calibration forces (§4.13, §17.4.4), as Re-aim over this
+   * screen, before Warm-up complete. "Warm up again" after a large shift starts the full warm-up;
+   * Exit leaves the game.
+   */
+  private async forcedReaim(): Promise<'done' | 'restart' | 'stopped'> {
+    const block = span();
+    const capture = this.capture;
+    const session = this.session;
+    const fit = getState().fit;
+    if (!block || !capture || !session || !fit) return 'done';
+    this.phase = 'reaim';
+    for (;;) {
+      const out = await runReaim({
+        root: this.root,
+        capture,
+        link: session.link,
+        guard: this.guard,
+        block,
+        fit,
+        geometry: liveGeometry(fit, block.geometry()),
+        estimator: estimatorInUse(fit),
+        forced: true,
+        onExit: () => this.leave('exit'),
+      });
+      if (!this.mounted || this.stop) return 'stopped';
+      if (out.result === 'invalid') return this.screenChanged(out.invalidation ?? null);
+      if (out.choice === 'again') continue;
+      if (out.choice === 'full') {
+        this.mode = 'full';
+        setWarmupMode('full');
+        return 'restart';
+      }
+      return out.result === 'aborted' ? 'stopped' : 'done';
+    }
   }
 
   // ----- Fixtures (test mode) -----------------------------------------------------------------
@@ -815,6 +867,7 @@ class WarmupScreen {
     this.stop ??= 'unmounted';
     snapshot = null;
     for (const off of this.offs.splice(0)) off();
+    cancelReaim();
     this.runner?.abort();
     this.runner?.dispose();
     this.card?.dispose();

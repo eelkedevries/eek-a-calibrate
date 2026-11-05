@@ -8,219 +8,59 @@
 // large leads to a quick recalibration (RECAL5, refit) and a VAL6 revalidation; a restored
 // calibration is usable only once VAL6 gives at least "acceptable" (§4.15).
 //
-// Raw outputs are what is recorded; filtering is for display only (§4.11). The session's blocks
-// (live recordings, drift checks, recalibrations and revalidations) stay in memory for export
-// (#/data) and are never stored unless the person opts in there.
-import manifestUrl from '../../../assets-manifest.json?url';
-import {
-  driftDecision,
-  driftOffset,
-  driftSchedule,
-  forcedDriftReasons,
-  nextDriftDueMs,
-  recalibrationSchedule,
-  type DriftContext,
-  type DriftForceReason,
-} from '../../core/calibration/drift.ts';
+// The session's records, the display stream and the checks' scoring live in game/liveSession.ts,
+// which Free look, Re-aim and the challenge share; this v1 screen calls it until prompt 018
+// removes the screen.
+import { driftSchedule, nextDriftDueMs, recalibrationSchedule } from '../../core/calibration/drift.ts';
 import { ESTIMATOR_NAMES } from '../../core/calibration/select.ts';
-import { FIT_BUDGET_MS } from '../../core/constants.ts';
-import type { DriftLogEntry } from '../../core/export/sessionJson.ts';
 import { trialName } from '../../core/export/samplesCsv.ts';
-import { BLINK_HOLD_INITIAL, blinkHold, type BlinkHoldState } from '../../core/filters/blinkHold.ts';
-import { OneEuroFilter2D } from '../../core/filters/oneEuro.ts';
 import { degToPx } from '../../core/geometry/angles.ts';
-import { isDegreesApproximate, safeRect, viewportDiagonalPx } from '../../core/geometry/screen.ts';
+import { safeRect, viewportDiagonalPx } from '../../core/geometry/screen.ts';
 import { applyBlinkMask } from '../../core/protocol/gating.ts';
 import { FrameRecorder } from '../../core/protocol/labelling.ts';
 import { minAcceptedFrames, validationSchedule } from '../../core/protocol/schedule.ts';
 import { ENGINE_IDS, Flags } from '../../core/types.ts';
-import type {
-  EngineId,
-  EstimatorId,
-  FitResult,
-  FrameMeta,
-  FrameResult,
-  GazeSample,
-  RecordedFrame,
-  Recording,
-  Schedule,
-  ScreenGeometry,
-  SessionGeometry,
-  ValidationReport,
-  Vec2,
-} from '../../core/types.ts';
-import { fitRecording, frameBaseFlags, restoreEstimatorSet, scoreRecording, type EstimatorSet } from '../../fit/fitClient.ts';
-import { loadManifest } from '../../platform/assets.ts';
+import type { EngineId, EstimatorId, FitResult, FrameMeta, FrameResult, Schedule, ScreenGeometry, SessionGeometry, Vec2 } from '../../core/types.ts';
 import { isFullscreen } from '../../platform/fullscreen.ts';
 import { holdWakeLock, startPresentation, viewportVerdict, type Invalidation, type Presentation as Block, type WakeLockHold } from '../../platform/presentation.ts';
-import { onDataDeleted, profileKey, saveProfile, saveSession, touchProfile, type ProfileKeyParts, type ProfileRecord } from '../../platform/storage.ts';
 import { BANNER_CSS, banner } from '../components/banner.ts';
 import { aoiCell, drawAoiGrid, drawEngineDot, drawGazeDot } from '../components/gazeDot.ts';
 import { accuracyText } from '../components/metricTable.ts';
 import { acquireStage, BlockRunner, releaseStage, type StimulusStage } from '../components/stimulusCanvas.ts';
 import { targetSizes } from '../components/target.ts';
 import { announce, h } from '../dom.ts';
+import {
+  adoptRecalibration,
+  applyDriftCheck,
+  applyRevalidation,
+  collectForced,
+  currentRecords,
+  driftContextOf,
+  estimatorInUse,
+  GazeStream,
+  liveFrame,
+  liveGeometry,
+  noteForced,
+  ownReport,
+  refitWithRecalibration,
+  sameCamera,
+  saveProfileOnce,
+  saveSessionSummary,
+  settleRestore,
+  NO_DISPLAY,
+  type CheckBlock,
+  type CheckRun,
+  type LiveBlock,
+  type LiveRecords,
+} from '../game/liveSession.ts';
+import type { DriftLogEntry } from '../../core/export/sessionJson.ts';
 import type { Screen, ScreenContext } from '../router.ts';
-import { currentValidationRun, ensureCapture, resetSessionResults, setValidationRun, type Capture, type ValidationRun } from '../session.ts';
+import { ensureCapture, type Capture } from '../session.ts';
 import { getState, setState, subscribe } from '../state.ts';
 import { t } from '../strings.en-GB.ts';
 import { registerTestHook } from '../testHooks.ts';
 import { CaptureLink, installProtocolHooks, invalidationReason, measuredScale, publishProtocol, reducedMotion, runSchedule, SCREEN_CSS } from './calibrate.ts';
 import { snapshotCapture } from './camera.ts';
-
-// ----- Session blocks and records (read by #/data for the export) --------------------------
-
-interface BlockBase {
-  /** `trialName(...)`: live-<nnn>, drift-<n> (a check and the recalibration it led to), validation-<n>. */
-  trial: string;
-  /** The fit in effect while the block was recorded; its samples are computed with it. */
-  fit: FitResult;
-  geometry: SessionGeometry;
-  estimator: EstimatorId;
-  /** The drift correction (added to θ) of the estimator in use, or null before any. */
-  correctionDeg: Vec2 | null;
-  /** Every estimator's correction in effect while the block was recorded. */
-  corrections: Partial<Record<EstimatorId, Vec2>>;
-  /** Iris diameter by frame index, for the export's iris_px. */
-  irisPx: Map<number, number>;
-}
-
-export interface LiveBlock extends BlockBase {
-  kind: 'live';
-  frames: RecordedFrame[];
-  /** HIDDEN, NOT_FULLSCREEN and DROPPED by frame index (a live frame has no label to carry them). */
-  extraFlags: Map<number, number>;
-  markers: { tMs: number; n: number }[];
-  startMs: number;
-  endMs: number | null;
-}
-
-export interface CheckBlock extends BlockBase {
-  kind: 'drift' | 'recalibration' | 'validation';
-  recording: Recording;
-  receivedMs: Map<number, number>;
-  nominalFps: number;
-}
-
-export type SessionBlock = LiveBlock | CheckBlock;
-
-export interface LiveRecords {
-  /** The fits of this session's calibration: the first, then each quick-recalibration refit. */
-  lineage: FitResult[];
-  /** The calibration and its first validation, captured when Live first saw the fit. */
-  base: { calibration: Recording | null; validation: ValidationRun | null; fit: FitResult } | null;
-  blocks: SessionBlock[];
-  driftLog: DriftLogEntry[];
-  driftChecks: number;
-  recalibrations: Recording[];
-  liveCount: number;
-  validationCount: number;
-  corrections: Partial<Record<EstimatorId, Vec2>>;
-  restored: { key: string; parts: ProfileKeyParts; cameraLabel: string; validated: boolean } | null;
-  revalidationNeeded: boolean;
-  forced: DriftForceReason[];
-  lastCheckMs: number;
-  context: DriftContext | null;
-  saved: WeakSet<FitResult>;
-  sessionId: string;
-}
-
-let records: LiveRecords | null = null;
-
-function freshRecords(fit: FitResult, base: LiveRecords['base']): LiveRecords {
-  return {
-    lineage: [fit],
-    base,
-    blocks: [],
-    driftLog: [],
-    driftChecks: 0,
-    recalibrations: [],
-    liveCount: 0,
-    validationCount: base?.validation ? 1 : 0,
-    corrections: {},
-    restored: null,
-    revalidationNeeded: false,
-    forced: [],
-    lastCheckMs: performance.now(),
-    context: null,
-    saved: new WeakSet(),
-    sessionId: `${getState().clock.startEpochMs}-${Math.round(performance.now())}`,
-  };
-}
-
-/** The records of the fit in use, started afresh when a new calibration replaced the fit. */
-function currentRecords(): LiveRecords | null {
-  const { fit, calibration } = getState();
-  if (!fit) return null;
-  if (!records || !records.lineage.includes(fit)) records = freshRecords(fit, { calibration, validation: currentValidationRun(), fit });
-  return records;
-}
-
-/** This session's records for the export, or null when there are none for the fit in use. */
-export function sessionRecords(): Readonly<LiveRecords> | null {
-  const fit = getState().fit;
-  return records && fit && records.lineage.includes(fit) ? records : null;
-}
-
-onDataDeleted(() => {
-  records = null;
-});
-
-/**
- * Makes a stored profile the session's calibration (§4.15): the fit and its geometry, Auto's
- * estimator, no validation. Live then requires a VAL6 check with a verdict of at least
- * "acceptable" before the gaze is shown, followed by a drift check.
- */
-export function restoreProfile(p: ProfileRecord): void {
-  const fit = p.fit;
-  if (!fit.fitGeometry) throw new RangeError('This stored calibration has no geometry and cannot be restored.');
-  resetSessionResults();
-  setState({
-    fit,
-    calibration: null,
-    validation: null,
-    geometry: { ...fit.fitGeometry, refDistanceMm: fit.refDistanceMm },
-    estimator: fit.selection.estimator,
-  });
-  records = freshRecords(fit, null);
-  records.restored = { key: p.key, parts: p.parts, cameraLabel: p.cameraLabel ?? '', validated: false };
-}
-
-// ----- Asset hashes (profile key, session.json) -------------------------------------------
-
-let manifest: Promise<Record<string, string>> | null = null;
-
-/** sha256 of every runtime and model file, by asset id, from the asset manifest. */
-export function assetHashes(): Promise<Record<string, string>> {
-  manifest ??= loadManifest(manifestUrl).then(
-    (m) => Object.fromEntries([...m.entries.values()].map((e) => [e.id, e.sha256])),
-    (error: unknown) => {
-      manifest = null;
-      throw error;
-    },
-  );
-  return manifest;
-}
-
-const MODEL_ASSET: Partial<Record<EngineId, string>> = { blazegaze: 'blazegaze-weights', peekr: 'peekr-model' };
-
-/** The profile key parts of a fit made with this camera (§4.15). */
-export async function profileParts(fit: FitResult, cameraHash: string | null, video: { w: number; h: number }): Promise<ProfileKeyParts> {
-  const hashes = await assetHashes().catch(() => ({}) as Record<string, string>);
-  const s = fit.fitGeometry?.screen;
-  const engines = ENGINE_IDS.filter((e) => fit.fits[e]).map((e) => {
-    const asset = MODEL_ASSET[e];
-    const sha = asset ? (hashes[asset] ?? 'unknown').slice(0, 8) : 'none';
-    return `${e}@${fit.fits[e]!.chosen.featureVersion}+${sha}`;
-  });
-  return {
-    origin: location.origin,
-    viewport: s ? `${Math.round(s.viewportWpx)}x${Math.round(s.viewportHpx)}@${s.dpr}` : 'unknown',
-    cameraHash: cameraHash ?? 'unknown',
-    video: `${video.w}x${video.h}`,
-    engines: engines.join(','),
-  };
-}
 
 // ----- Helpers ----------------------------------------------------------------------------
 
@@ -228,12 +68,6 @@ export async function profileParts(fit: FitResult, cameraHash: string | null, vi
 const RATE_WINDOW_MS = 2000;
 /** How often Live looks for a forced or timed drift check. */
 const WATCH_MS = 1000;
-/** Flags that hide the dot (blinks are left to the blink hold, OUT_OF_RANGE only greys it). */
-const HIDE_FLAGS = Flags.NO_FACE | Flags.DROPPED | Flags.ENGINE_ERROR | Flags.HIDDEN | Flags.NOT_FULLSCREEN;
-
-function positive(v: number | null | undefined): v is number {
-  return typeof v === 'number' && Number.isFinite(v) && v > 0;
-}
 
 /** True when a block's viewport is the calibration's, within the viewport-mode tolerance (as validation checks it). */
 function sameLayout(a: ScreenGeometry, b: ScreenGeometry): boolean {
@@ -242,21 +76,8 @@ function sameLayout(a: ScreenGeometry, b: ScreenGeometry): boolean {
   return viewportVerdict({ w: a.viewportWpx, h: a.viewportHpx }, { w: b.viewportWpx, h: b.viewportHpx }, tolerance) !== 'abort';
 }
 
-/**
- * The stored calibration was made with this camera at this frame size. Some browsers change device
- * ids between visits, so a camera of the same name also counts; the VAL6 check then decides.
- */
-export function sameCamera(p: { parts: ProfileKeyParts; cameraLabel: string }, hash: string | null, label: string, video: { width: number; height: number }): boolean {
-  const camera = p.parts.cameraHash === (hash ?? 'unknown') || (p.cameraLabel !== '' && p.cameraLabel === label);
-  return camera && p.parts.video === `${video.width}x${video.height}`;
-}
-
 function liveEngines(fit: FitResult): EngineId[] {
   return ENGINE_IDS.filter((e) => fit.fits[e] !== undefined || e === 'geometric');
-}
-
-function ownReport(reports: readonly ValidationReport[] | null, id: EstimatorId): ValidationReport | null {
-  return reports?.find((r) => r.mode === 'own' && r.estimator === id) ?? null;
 }
 
 /** An offset in degrees as text: px (and % of the diagonal) first while degrees are approximate. */
@@ -269,10 +90,6 @@ function offsetText(deg: Vec2, g: SessionGeometry): string {
   const degText = `${g.degreesApproximate ? '≈' : ''}${Math.hypot(deg[0], deg[1]).toFixed(2)}°`;
   const pxText = t('live.offset.px', { px: px.toFixed(0), pct: pct.toFixed(1) });
   return g.degreesApproximate ? `${pxText} · ${degText}` : `${degText} · ${pxText}`;
-}
-
-function isGood(verdict: ValidationReport['verdict'] | undefined): boolean {
-  return verdict === 'good' || verdict === 'acceptable';
 }
 
 const LIVE_CSS = `
@@ -296,16 +113,6 @@ const LIVE_CSS = `
 .live-message:empty { display: none; }
 `;
 
-interface Display {
-  /** Drift-corrected position, unfiltered and filtered (CSS px), or null. */
-  raw: Vec2 | null;
-  filtered: Vec2 | null;
-  perEngine: Partial<Record<EngineId, Vec2>>;
-  confidence: number;
-  greyed: boolean;
-  visible: boolean;
-}
-
 interface Snapshot {
   mode: string;
   results: number;
@@ -323,9 +130,6 @@ interface Snapshot {
 
 let snapshotFn: () => Snapshot | null = () => null;
 
-type CheckDone = { kind: 'done'; rec: Recording; receivedMs: Map<number, number>; irisPx: Map<number, number> };
-type CheckRun = CheckDone | { kind: 'aborted' } | { kind: 'invalid' };
-
 // ----- The screen -------------------------------------------------------------------------
 
 class LiveScreen {
@@ -341,7 +145,7 @@ class LiveScreen {
   private aoiN = 2;
   private capture: Capture | null = null;
   private link: CaptureLink | null = null;
-  private set: EstimatorSet | null = null;
+  private stream: GazeStream | null = null;
   private geometry: SessionGeometry | null = null;
   private stage: StimulusStage | null = null;
   private block: Block | null = null;
@@ -351,9 +155,6 @@ class LiveScreen {
   private recordButton: HTMLButtonElement | null = null;
   private markerButton: HTMLButtonElement | null = null;
   private mode: 'idle' | 'starting' | 'live' | 'check' | 'paused' = 'idle';
-  private filter = new OneEuroFilter2D();
-  private hold: BlinkHoldState = { ...BLINK_HOLD_INITIAL };
-  private display: Display = { raw: null, filtered: null, perEngine: {}, confidence: 0, greyed: false, visible: false };
   private recording: LiveBlock | null = null;
   private checkIris: Map<number, number> | null = null;
   private readonly resultTimes: number[] = [];
@@ -449,10 +250,7 @@ class LiveScreen {
   }
 
   private estimator(): EstimatorId {
-    const state = getState();
-    const fit = this.fit();
-    const e = state.estimator ?? fit.selection.estimator;
-    return e === 'combined' ? (fit.combined ? e : fit.selection.estimator) : fit.fits[e] ? e : fit.selection.estimator;
+    return estimatorInUse(this.fit());
   }
 
   private fillEstimators(): void {
@@ -483,7 +281,7 @@ class LiveScreen {
 
   private renderBlocks(): void {
     const items = this.rec.blocks.map((b) =>
-      h('li', null, t(`live.block.${b.kind}`, { trial: b.trial, n: b.kind === 'live' ? b.frames.length : b.recording.frames.length, markers: b.kind === 'live' ? b.markers.length : 0 })),
+      h('li', null, t(`live.block.${b.kind}`, { trial: b.trial, n: b.kind === 'live' || b.kind === 'game' ? b.frames.length : b.recording.frames.length, markers: b.kind === 'live' ? b.markers.length : 0 })),
     );
     this.blocksList.replaceChildren(...(items.length > 0 ? items : [h('li', { class: 'note' }, t('live.block.none'))]));
   }
@@ -515,9 +313,9 @@ class LiveScreen {
     const c = this.capture;
     snapshotCapture(c);
     this.wake = holdWakeLock();
-    const g = this.baseGeometry();
+    const g = liveGeometry(fit);
     this.link = new CaptureLink(c, g.distance.focalPx, (event) => this.cameraEvent(event));
-    this.set = restoreEstimatorSet(fit, g);
+    this.stream = new GazeStream(fit, g, () => this.rec.corrections);
     this.geometry = g;
     this.offs.push(
       c.onResult((r) => this.onResult(r)),
@@ -538,83 +336,19 @@ class LiveScreen {
     } else {
       void this.saveProfileOnce(c);
     }
-    this.saveSessionSummary();
+    saveSessionSummary(this.rec);
     this.setStatus(t('live.ready'));
     this.startButton.disabled = false;
   }
 
-  /** The session geometry for the estimators before a block starts (the calibration's viewport). */
-  private baseGeometry(): SessionGeometry {
-    const fit = this.fit();
-    const g = getState().geometry ?? (fit.fitGeometry as SessionGeometry);
-    const fitFocal = fit.fitGeometry?.distance.focalPx ?? g.distance.focalPx;
-    const ref = positive(g.refDistanceMm) ? g.refDistanceMm : (fit.refDistanceMm * g.distance.focalPx) / fitFocal;
-    const screen = fit.fitGeometry ? { ...fit.fitGeometry.screen, pxPerMm: g.screen.pxPerMm, pxPerMmSource: g.screen.pxPerMmSource } : g.screen;
-    return { screen, distance: { ...g.distance }, refDistanceMm: ref, degreesApproximate: isDegreesApproximate(screen, g.distance) };
-  }
-
   /** Stores the calibration as a profile once per fit, when it has been validated in this session. */
   private async saveProfileOnce(c: Capture): Promise<void> {
-    const state = getState();
-    const fit = this.fit();
-    if (this.rec.saved.has(fit) || !state.validation || this.rec.revalidationNeeded) return;
-    this.rec.saved.add(fit);
-    const firstFrame = this.rec.base?.calibration?.frames[0]?.meta;
-    const video = firstFrame ? { w: firstFrame.videoW, h: firstFrame.videoH } : { w: c.camera.settings.width, h: c.camera.settings.height };
-    const parts = await profileParts(fit, c.camera.info.deviceIdHash, video);
-    const id = this.estimator();
-    const r = ownReport(state.validation, id);
-    const now = Date.now();
-    const profile: ProfileRecord = {
-      key: profileKey(parts),
-      parts,
-      savedAt: now,
-      lastUsedAt: now,
-      participant: state.settings.pid,
-      session: state.settings.session,
-      preset: state.settings.preset,
-      cameraLabel: c.camera.info.label,
-      fit,
-      summary: { estimator: id, verdict: r?.verdict ?? null, accuracyPctDiag: r ? r.accuracyPctDiag : null, accuracyDeg: r ? r.accuracyMeanDeg : null, degreesApproximate: r?.degreesApproximate ?? true },
-    };
-    try {
-      await saveProfile(profile);
-      if (this.mounted) this.status.after(h('p', { class: 'note' }, t('live.saved')));
-    } catch (error) {
-      console.warn('The calibration could not be stored', error);
-    }
-  }
-
-  private saveSessionSummary(): void {
-    const state = getState();
-    if (!state.validation && this.rec.driftLog.length === 0) return;
-    const now = Date.now();
-    void saveSession({
-      id: this.rec.sessionId,
-      savedAt: state.clock.startEpochMs,
-      updatedAt: now,
-      participant: state.settings.pid,
-      session: state.settings.session,
-      preset: state.settings.preset,
-      estimator: this.estimator(),
-      geometry: state.geometry,
-      reports: state.validation ?? [],
-      driftLog: this.rec.driftLog.map((e) => ({ ...e })),
-      summary: {
-        seed: state.settings.seed,
-        selection: this.fit().selection,
-        engines: Object.keys(this.fit().fits),
-        restored: this.rec.restored?.key ?? null,
-        blocks: this.rec.blocks.map((b) => b.trial),
-      },
-    }).catch((error: unknown) => console.warn('The session summary could not be stored', error));
+    if ((await saveProfileOnce(this.rec, c)) && this.mounted) this.status.after(h('p', { class: 'note' }, t('live.saved')));
   }
 
   private useEstimator(id: EstimatorId): void {
     setState({ estimator: id });
-    this.set?.setDrift(this.rec.corrections[id] ?? [0, 0]);
-    this.filter.reset();
-    this.hold = { ...BLINK_HOLD_INITIAL };
+    this.stream?.setDrift(this.rec.corrections[id] ?? [0, 0]);
     this.renderSummary();
     if (this.toolbar) {
       const select = this.toolbar.querySelector('select');
@@ -631,50 +365,13 @@ class LiveScreen {
       return;
     }
     // A camera change (resolution or frame rate) forces a drift check (§4.13).
-    if (!this.rec.forced.includes('camera')) this.rec.forced.push('camera');
+    noteForced(this.rec, 'camera');
     const s = this.capture?.camera.settings;
     if (s && this.capture) snapshotCapture(this.capture);
-    if (s && s.width > 0) this.link?.setFocal(this.geometry?.distance.focalPx ?? this.baseGeometry().distance.focalPx);
-  }
-
-  private context(): DriftContext | null {
-    const c = this.capture;
-    const g = this.geometry;
-    if (!c || !g) return null;
-    const s = c.camera.settings;
-    const backends: Partial<Record<EngineId, string>> = {};
-    for (const e of c.host.engineStatus) if (e.ok && e.backend) backends[e.id] = e.backend;
-    return {
-      videoW: s.width,
-      videoH: s.height,
-      frameRate: s.frameRate,
-      deviceIdHash: c.camera.info.deviceIdHash,
-      viewportWpx: g.screen.viewportWpx,
-      viewportHpx: g.screen.viewportHpx,
-      dpr: g.screen.dpr,
-      hostKind: c.host.kind,
-      delegate: c.host.info?.delegate ?? null,
-      backends,
-      workerRestarts: c.host.stats().restarts,
-    };
+    if (s && s.width > 0) this.link?.setFocal(this.geometry?.distance.focalPx ?? liveGeometry(this.fit()).distance.focalPx);
   }
 
   // ----- Frames -------------------------------------------------------------------------
-
-  private liveFrame(r: FrameResult): RecordedFrame {
-    const face = r.face;
-    return {
-      meta: r.meta,
-      distanceMm: this.link?.distanceMm ?? null,
-      yawDeg: face ? face.pose.yawDeg : null,
-      pitchDeg: face ? face.pose.pitchDeg : null,
-      rollDeg: face ? face.pose.rollDeg : null,
-      eyeMidNorm: face ? face.eyes.eyeMidNorm : null,
-      open: face !== null && face.eyes.open,
-      label: null,
-      engines: r.engines,
-    };
-  }
 
   private extraFlags(): number {
     let flags = 0;
@@ -685,66 +382,25 @@ class LiveScreen {
 
   private onResult(r: FrameResult): void {
     if (this.checkIris && r.face) this.checkIris.set(r.meta.index, r.face.eyes.irisDiamPx);
-    if (this.mode !== 'live' || !this.set || !this.geometry) return;
+    if (this.mode !== 'live' || !this.stream || !this.geometry) return;
     const now = performance.now();
     this.results++;
     this.resultTimes.push(now);
     while (this.resultTimes.length > 0 && (this.resultTimes[0] as number) < now - RATE_WINDOW_MS) this.resultTimes.shift();
-    const f = this.liveFrame(r);
+    const f = liveFrame(r, this.link?.distanceMm ?? null);
     const extra = this.extraFlags();
-    const id = this.estimator();
-    const sample = this.set.estimator(id).estimate(f, frameBaseFlags(f) | extra);
+    this.stream.push(f, r, extra, this.estimator());
     if (this.recording) {
       this.recording.frames.push(f);
       if (extra !== 0) this.recording.extraFlags.set(f.meta.index, extra);
       if (r.face) this.recording.irisPx.set(f.meta.index, r.face.eyes.irisDiamPx);
     }
-    this.updateDisplay(sample, r);
   }
 
   private onDropped(meta: FrameMeta): void {
     if (this.mode !== 'live' || !this.recording) return;
     this.recording.frames.push({ meta, distanceMm: null, yawDeg: null, pitchDeg: null, rollDeg: null, eyeMidNorm: null, open: false, label: null, engines: {} });
     this.recording.extraFlags.set(meta.index, Flags.DROPPED | this.extraFlags());
-  }
-
-  private distanceOf(s: GazeSample): number {
-    const g = this.geometry as SessionGeometry;
-    return positive(s.distanceMm) ? s.distanceMm : (g.refDistanceMm as number);
-  }
-
-  private updateDisplay(s: GazeSample, r: FrameResult): void {
-    const g = this.geometry as SessionGeometry;
-    const showable = s.correctedDeg !== null && s.correctedPx !== null && (s.flags & HIDE_FLAGS) === 0;
-    const gazeValid = showable && (s.flags & Flags.BLINK) === 0;
-    const decision = blinkHold(this.hold, {
-      tMs: r.meta.tCaptureMs,
-      blinkL: r.face ? r.face.eyes.blinkL : null,
-      blinkR: r.face ? r.face.eyes.blinkR : null,
-      gazeValid,
-    });
-    this.hold = decision.state;
-    if (decision.display === 'hide') {
-      this.display = { ...this.display, visible: false };
-      return;
-    }
-    if (decision.display === 'hold') return;
-    const d = this.distanceOf(s);
-    const corrected = s.correctedDeg as Vec2;
-    const filtDeg = this.filter.filter(corrected[0], corrected[1], s.tCaptureMs);
-    const perEngine: Partial<Record<EngineId, Vec2>> = {};
-    for (const [e, deg] of Object.entries(s.perEngineDeg) as [EngineId, Vec2][]) {
-      const c = this.rec.corrections[e] ?? [0, 0];
-      perEngine[e] = degToPx([deg[0] + c[0], deg[1] + c[1]], g.screen, d);
-    }
-    this.display = {
-      raw: s.correctedPx,
-      filtered: degToPx(filtDeg, g.screen, d),
-      perEngine,
-      confidence: s.confidence,
-      greyed: (s.flags & Flags.OUT_OF_RANGE) !== 0,
-      visible: true,
-    };
   }
 
   // ----- Presentation -------------------------------------------------------------------
@@ -794,23 +450,17 @@ class LiveScreen {
     }
     this.block = block;
     this.invalid = false;
-    const base = this.baseGeometry();
-    const screen = block.geometry();
-    this.geometry = { ...base, screen, degreesApproximate: isDegreesApproximate(screen, base.distance) };
-    this.set = restoreEstimatorSet(fit, this.geometry);
-    this.set.setDrift(this.rec.corrections[this.estimator()] ?? [0, 0]);
+    this.geometry = liveGeometry(fit, block.geometry());
+    const screen = this.geometry.screen;
+    this.stream?.rebuild(fit, this.geometry);
+    this.stream?.setDrift(this.rec.corrections[this.estimator()] ?? [0, 0]);
     this.link?.setFocal(this.geometry.distance.focalPx);
     stage.configure(screen);
     // During a check the block runner reports the invalidation through its outcome instead.
     this.blockOffs.push(block.onInvalidate((inv) => (this.mode === 'check' ? undefined : this.onInvalidate(inv))));
     document.addEventListener('keydown', this.onKey);
     this.blockOffs.push(() => document.removeEventListener('keydown', this.onKey));
-    const now = this.context();
-    if (now && this.rec.context) {
-      for (const reason of forcedDriftReasons(this.rec.context, now)) if (!this.rec.forced.includes(reason)) this.rec.forced.push(reason);
-    } else if (now) {
-      this.rec.context = now;
-    }
+    collectForced(this.rec, driftContextOf(this.capture, this.geometry));
     return true;
   }
 
@@ -819,9 +469,7 @@ class LiveScreen {
     this.mode = 'live';
     this.colours = {};
     this.buildToolbar();
-    this.filter.reset();
-    this.hold = { ...BLINK_HOLD_INITIAL };
-    this.display = { ...this.display, visible: false };
+    this.stream?.reset();
     this.raf = requestAnimationFrame((ts) => this.draw(ts));
     if (this.watchTimer === null) this.watchTimer = setInterval(() => this.watch(), WATCH_MS);
     this.renderSummary();
@@ -895,7 +543,7 @@ class LiveScreen {
     const W = g.screen.viewportWpx;
     const H = g.screen.viewportHpx;
     stage.clear();
-    const d = this.display;
+    const d = this.stream?.display ?? NO_DISPLAY;
     const point = this.options.raw ? d.raw : d.filtered;
     if (this.options.aoi) drawAoiGrid(ctx, safeRect(g.screen), this.aoiN, d.visible && point && !d.greyed ? aoiCell(point, safeRect(g.screen), this.aoiN) : null);
     if (d.visible && this.options.engines) {
@@ -922,8 +570,7 @@ class LiveScreen {
   /** Forced and timed drift checks, while the gaze is shown. */
   private watch(): void {
     if (this.mode !== 'live') return;
-    const ctx = this.context();
-    if (ctx && this.rec.context) for (const reason of forcedDriftReasons(this.rec.context, ctx)) if (!this.rec.forced.includes(reason)) this.rec.forced.push(reason);
+    collectForced(this.rec, driftContextOf(this.capture, this.geometry));
     if (this.rec.forced.length > 0) {
       void this.driftCheck('forced');
       return;
@@ -1095,23 +742,6 @@ class LiveScreen {
     return { kind: 'done', rec: recorder.finish(), receivedMs: recorder.receivedMs, irisPx: iris };
   }
 
-  private checkBlock(kind: CheckBlock['kind'], trial: string, run: CheckDone, fit: FitResult): CheckBlock {
-    const id = this.estimator();
-    return {
-      kind,
-      trial,
-      fit,
-      geometry: this.geometry as SessionGeometry,
-      estimator: id,
-      correctionDeg: this.rec.corrections[id] ?? null,
-      corrections: { ...this.rec.corrections },
-      irisPx: run.irisPx,
-      recording: run.rec,
-      receivedMs: run.receivedMs,
-      nominalFps: this.capture?.nominalFps() ?? 30,
-    };
-  }
-
   private async driftCheck(why: 'manual' | 'timed' | 'forced'): Promise<void> {
     if (this.mode !== 'live' || !this.stage) return;
     const { settings } = getState();
@@ -1128,28 +758,10 @@ class LiveScreen {
     const run = await this.runCheck('drift', schedule);
     if (run.kind === 'aborted') this.resumeLive();
     if (run.kind !== 'done') return;
-    this.rec.driftChecks = n;
-    const trial = trialName('drift', n);
     const g = this.geometry as SessionGeometry;
-    const nominalFps = this.capture?.nominalFps() ?? 30;
-    const scored = scoreRecording(fit, run.rec, g, { nominalFps, receivedMs: run.receivedMs });
-    this.rec.blocks.push(this.checkBlock('drift', trial, run, fit));
-    this.rec.lastCheckMs = performance.now();
-    this.rec.forced = [];
-    this.rec.context = this.context();
-    const state = getState();
-    const id = this.estimator();
     // Each estimator keeps its own correction, measured on the same frames; the one in use decides what happens next.
-    let inUse: { o: Vec2; action: 'apply' | 'recalibrate'; correction: Vec2; limit: number } | null = null;
-    for (const r of scored.own) {
-      const m = driftOffset(r);
-      if (!m.offsetDeg) continue;
-      const acc = ownReport(state.validation, r.estimator)?.accuracyMeanDeg ?? Number.NaN;
-      const d = driftDecision(m.offsetDeg, acc);
-      if (d.action === 'apply') this.rec.corrections[r.estimator] = d.correctionDeg;
-      if (r.estimator === id) inUse = { o: m.offsetDeg, action: d.action, correction: d.correctionDeg, limit: d.limitDeg };
-    }
-    const onset = run.rec.presentations[0]?.onsetMs ?? performance.now();
+    const inUse = applyDriftCheck(this.rec, n, run, fit, g, this.estimator(), this.capture?.nominalFps() ?? 30);
+    this.rec.context = driftContextOf(this.capture, this.geometry);
     const stage = this.stage as StimulusStage;
     this.mode = 'paused';
     if (!inUse) {
@@ -1159,12 +771,9 @@ class LiveScreen {
       if (v === 'again') void this.driftCheck('manual');
       return;
     }
-    this.rec.driftLog.push({ tMs: onset, offsetDeg: inUse.o, applied: inUse.action === 'apply' });
     this.lastCheck = { kind: 'drift', targets: 2, verdict: null, action: inUse.action };
-    this.saveSessionSummary();
     if (inUse.action === 'apply') {
-      this.set?.setDrift(inUse.correction);
-      this.filter.reset();
+      this.stream?.setDrift(inUse.correction);
       announce(t('live.drift.applied.title'));
       await stage.card({ title: t('live.drift.applied.title'), body: [t('live.drift.applied.body', { value: offsetText(inUse.o, g) })], actions: [{ label: t('stimulus.continue'), value: 'go' }] });
       this.resumeLive();
@@ -1190,7 +799,7 @@ class LiveScreen {
       return;
     }
     this.mode = 'live';
-    await this.quickRecalibration(n);
+    await this.quickRecalibration();
   }
 
   private resumeLive(): void {
@@ -1204,9 +813,8 @@ class LiveScreen {
   }
 
   /** RECAL5 → refit with the new rows at weight ×2 → VAL6 (§4.13). */
-  private async quickRecalibration(driftN: number): Promise<void> {
-    const base = this.rec.base?.calibration;
-    if (!base) return;
+  private async quickRecalibration(): Promise<void> {
+    if (!this.rec.base?.calibration) return;
     const { settings } = getState();
     const oldFit = this.fit();
     const n = this.rec.recalibrations.length + 1;
@@ -1220,9 +828,7 @@ class LiveScreen {
     const engines = ENGINE_IDS.filter((e) => oldFit.fits[e] && ok.has(e));
     let fit: FitResult;
     try {
-      fit = await fitRecording(base, { seed: settings.seed, engines, maxMs: FIT_BUDGET_MS, recalibration: [...this.rec.recalibrations, run.rec] }, (_stage, fraction) =>
-        stage.setCaption(t('live.recal.fitting', { percent: Math.round(100 * fraction) })),
-      );
+      fit = await refitWithRecalibration(this.rec, run, engines, (fraction) => stage.setCaption(t('live.recal.fitting', { percent: Math.round(100 * fraction) })));
     } catch (error) {
       stage.setCaption('');
       if (!this.mounted) return;
@@ -1232,16 +838,9 @@ class LiveScreen {
     }
     stage.setCaption('');
     if (!this.mounted) return;
-    this.rec.recalibrations.push(run.rec);
-    this.rec.blocks.push(this.checkBlock('recalibration', trialName('drift', driftN), run, oldFit));
-    this.rec.lineage.push(fit);
-    this.rec.corrections = {};
-    this.rec.revalidationNeeded = true;
-    // Any recalibration invalidates the previous validation (§4.13): its run belongs to the old fit.
-    setValidationRun(null);
-    setState({ fit, validation: null });
-    this.set = restoreEstimatorSet(fit, this.geometry);
-    this.set.setDrift([0, 0]);
+    adoptRecalibration(this.rec, run, oldFit, fit, this.geometry as SessionGeometry, this.estimator(), this.capture?.nominalFps() ?? 30);
+    this.stream?.rebuild(fit, this.geometry as SessionGeometry);
+    this.stream?.setDrift([0, 0]);
     this.fillEstimators();
     this.mode = 'live';
     if (await this.revalidate('recalibration')) this.resumeLive();
@@ -1250,31 +849,21 @@ class LiveScreen {
   /** VAL6 (§4.13 after a recalibration, §4.15 after restoring); true when live gaze may go on. */
   private async revalidate(why: 'restore' | 'recalibration'): Promise<boolean> {
     const { settings } = getState();
-    const n = this.rec.validationCount + 1;
     const schedule = validationSchedule({ preset: 'quick', seed: settings.seed, speed: settings.speed });
     const fit = this.fit();
     const run = await this.runCheck('validation', schedule);
     // Without the validation there is no live gaze: an abort returns to the page (an invalidated block pauses instead).
     if (run.kind === 'aborted') await this.exit();
     if (run.kind !== 'done') return false;
-    this.rec.validationCount = n;
     const g = this.geometry as SessionGeometry;
-    const nominalFps = this.capture?.nominalFps() ?? 30;
-    const scored = scoreRecording(fit, run.rec, g, { nominalFps, receivedMs: run.receivedMs });
-    setState({ validation: [...scored.own, ...scored.intersection] });
-    setValidationRun({ recording: run.rec, receivedMs: run.receivedMs, nominalFps });
-    this.rec.blocks.push(this.checkBlock('validation', trialName('validation', n), run, fit));
-    const r = ownReport(scored.own, this.estimator());
+    const { report: r } = applyRevalidation(this.rec, run, fit, g, this.estimator(), this.capture?.nominalFps() ?? 30);
     const verdict = r?.verdict ?? 'not-tracking';
     const stage = this.stage as StimulusStage;
     const value = r ? accuracyText(r, viewportDiagonalPx(g.screen)) : t('results.none.value');
     this.lastCheck = { kind: 'validation', targets: run.rec.schedule.items.filter((i) => i.kind === 'target').length, verdict, action: null };
     this.mode = 'paused';
     if (why === 'restore') {
-      const restored = this.rec.restored as NonNullable<LiveRecords['restored']>;
-      const passed = isGood(verdict);
-      restored.validated = passed;
-      this.saveSessionSummary();
+      const passed = settleRestore(this.rec, verdict);
       if (!passed) {
         await stage.card({ title: t('live.restored.failed.title'), body: [t('live.restored.failed.body', { value, verdict: t(`results.verdict.${verdict}`) })], actions: [{ label: t('stimulus.continue'), value: 'go' }] });
         await this.exit();
@@ -1282,12 +871,10 @@ class LiveScreen {
         this.renderSummary();
         return false;
       }
-      void touchProfile(restored.key).catch(() => undefined);
-      if (!this.rec.forced.includes('restore')) this.rec.forced.push('restore');
       await stage.card({ title: t('live.restored.passed.title'), body: [t('live.restored.passed.body', { value, verdict: t(`results.verdict.${verdict}`) })], actions: [{ label: t('stimulus.continue'), value: 'go' }] });
     } else {
       this.rec.revalidationNeeded = false;
-      this.saveSessionSummary();
+      saveSessionSummary(this.rec);
       if (this.capture) void this.saveProfileOnce(this.capture);
       await stage.card({ title: t('live.revalidate.done.title'), body: [t('live.revalidate.done.body', { value, verdict: t(`results.verdict.${verdict}`) })], actions: [{ label: t('stimulus.continue'), value: 'go' }] });
     }
@@ -1303,7 +890,7 @@ class LiveScreen {
     if (!this.stage || this.mode === 'idle') return;
     this.invalid = true;
     if (this.recording) this.stopRecording();
-    if (!this.rec.forced.includes('viewport')) this.rec.forced.push('viewport');
+    noteForced(this.rec, 'viewport');
     this.mode = 'paused';
     cancelAnimationFrame(this.raf);
     this.showToolbar(false);
@@ -1369,7 +956,7 @@ class LiveScreen {
       lastDot: this.lastDot,
       recording: this.recording !== null,
       estimator: getState().fit ? this.estimator() : null,
-      blocks: this.rec.blocks.map((b) => ({ trial: b.trial, kind: b.kind, frames: b.kind === 'live' ? b.frames.length : b.recording.frames.length, markers: b.kind === 'live' ? b.markers.length : 0 })),
+      blocks: this.rec.blocks.map((b) => ({ trial: b.trial, kind: b.kind, frames: b.kind === 'live' || b.kind === 'game' ? b.frames.length : b.recording.frames.length, markers: b.kind === 'live' ? b.markers.length : 0 })),
       driftLog: this.rec.driftLog.map((e) => ({ ...e })),
       restored: this.rec.restored ? { key: this.rec.restored.key, validated: this.rec.restored.validated } : null,
       revalidationNeeded: this.rec.revalidationNeeded,

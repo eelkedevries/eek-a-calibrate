@@ -74,6 +74,12 @@ export interface DriftLogEntry {
   offsetDeg: Vec2;
   /** Applied as the translation correction, or a quick recalibration was prompted instead. */
   applied: boolean;
+  /**
+   * `check`: a drift check (Re-aim), measured on uncorrected gaze, whose correction replaces the
+   * one in use. `game`: the challenge's offset correction (§17.9.3), measured on corrected gaze and
+   * added to it. Absent means `check`.
+   */
+  source?: 'check' | 'game';
 }
 
 /** Everything in session.json that is not shared with the other files. */
@@ -94,6 +100,13 @@ export interface SessionMeta {
   driftLog: readonly DriftLogEntry[];
   /** Session-specific thresholds (θ_D used for events, say); Appendix A is always included. */
   thresholds?: Readonly<Record<string, unknown>>;
+  /**
+   * The game (§17.10.1): the set-up choice, the warm-up length, Limited head movement, the motion
+   * permission, each Warm-up complete (levels with the guard's pauses, zones, stars, marks) and
+   * each challenge round (seed, score, stars, per-zone statistics). Times in it are relative to
+   * session start.
+   */
+  game?: unknown;
   licences: unknown;
 }
 
@@ -132,8 +145,9 @@ export function sessionJson(input: SessionJsonInput): string {
       selection: input.fit?.selection ?? null,
       validations: input.validations,
       pairedDifferences: allPairedDifferences(input.validations),
-      driftLog: input.driftLog.map((e) => ({ timeMs: relMs(input.identity, e.tMs), offsetDeg: e.offsetDeg, applied: e.applied })),
+      driftLog: input.driftLog.map((e) => ({ timeMs: relMs(input.identity, e.tMs), offsetDeg: e.offsetDeg, applied: e.applied, source: e.source ?? 'check' })),
       thresholds: { appendixA: { ...constants }, session: input.thresholds ?? {} },
+      game: input.game ?? null,
       licences: input.licences,
     },
     true,

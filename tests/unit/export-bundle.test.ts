@@ -151,13 +151,13 @@ const table = (csv: string): string[][] => csv.trimEnd().split('\n').map((l) => 
 
 test('the zip parses and holds every file, flat and in a fixed order', () => {
   const bundle = buildExport(input());
-  assert.deepEqual(bundle.files.map((f) => f.name), EXPORT_FILES.filter((n) => n !== 'dataset.json'));
+  assert.deepEqual(bundle.files.map((f) => f.name), EXPORT_FILES.filter((n) => n !== 'dataset.json' && n !== 'game.csv'));
   const unzipped = unzipSync(bundle.zip);
   assert.deepEqual(Object.keys(unzipped), bundle.files.map((f) => f.name));
   for (const f of bundle.files) assert.equal(strFromU8(unzipped[f.name] as Uint8Array), f.text, f.name);
   assert.equal(bundle.name, exportZipName('P 01', 'S1', new Date(Date.UTC(2026, 10, 1, 9, 30, 15))));
   const withDataset = buildExport({ ...input(), dataset: [{ trial: 'validation-1', recording: validationRecording() }] });
-  assert.deepEqual(withDataset.files.map((f) => f.name), [...EXPORT_FILES]);
+  assert.deepEqual(withDataset.files.map((f) => f.name), EXPORT_FILES.filter((n) => n !== 'game.csv'));
   const dataset = JSON.parse(strFromU8(unzipSync(withDataset.zip)['dataset.json'] as Uint8Array));
   assert.equal(dataset.schema, 'eek-a-calibrate/dataset@1');
   assert.equal(dataset.blocks[0].frames.length, 360);
@@ -245,7 +245,7 @@ test('session.json: schema, exportedAt, the fit, validations, paired differences
   assert.deepEqual(s.weights, constants.WEIGHTS);
   assert.equal(s.geometry.uncertainty, null);
   assert.equal(s.validations[0].latencyMs, null, 'NaN is written as null');
-  assert.deepEqual(s.driftLog, [{ applied: true, offsetDeg: [0.4, -0.2], timeMs: 60_000 }], 'drift times relative to session start');
+  assert.deepEqual(s.driftLog, [{ applied: true, offsetDeg: [0.4, -0.2], source: 'check', timeMs: 60_000 }], 'drift times relative to session start; a check by default');
   assert.ok(text.endsWith('}\n'));
 });
 

@@ -1,7 +1,7 @@
 // ===== src/core/types.ts =====
 // Contract: specification §6, written verbatim by WP1 (001_scaffold_and_contracts.md), with the
 // additive v0.2 fields of §14.3 (ScreenGeometry.insets and .presentationMode, FitResult.fitGeometry)
-// and the additive v0.5 tilt fields of §17.11 (RecordedFrame.deviceTiltDeg and .deviceRollDeg).
+// and the additive v0.5 changes of §17.11 (Phase 'game'; RecordedFrame.deviceTiltDeg and .deviceRollDeg).
 // Frozen: changing anything here needs a specification version bump.
 export type Ms = number;
 export type Vec2 = readonly [number, number];
@@ -45,7 +45,7 @@ export interface DistanceModel {
 }
 export interface SessionGeometry { screen: ScreenGeometry; distance: DistanceModel; refDistanceMm: number | null; degreesApproximate: boolean; }
 
-export type Phase = 'fixation' | 'pursuit' | 'head' | 'validation' | 'drift';
+export type Phase = 'fixation' | 'pursuit' | 'head' | 'validation' | 'drift' | 'game';
 export type Preset = 'quick' | 'standard' | 'thorough';
 export interface TargetItem { kind: 'target'; id: string; phase: Phase; block: number; xNorm: number; yNorm: number;
   groupId: string; settleMs: Ms; sampleMs: Ms; maxSampleMs: Ms; headMotion?: boolean; }

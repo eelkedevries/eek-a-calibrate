@@ -13,7 +13,8 @@ export const TARGETS_HEADER = [
 export interface TargetsBlock {
   /** `trialName(...)` of the schedule's run. */
   trial: string;
-  schedule: Schedule;
+  /** A schedule, or a challenge round's bubbles as target items with phase `game` (§17.10.1). */
+  schedule: Pick<Schedule, 'items'>;
   presentations: readonly Presentation[];
 }
 

@@ -319,10 +319,9 @@ wins and the gap is work still to be done.
   `.deviceRollDeg`; `createVisionHost(cfg, prefer?, hooks?)` registers the progress listener
   before init.
 - **Status:** the shell and routes (013), the Title and Get ready (014), the warm-up levels and
-  Warm-up complete (015) and the Details sheet (017) are built; Free look and the challenge follow
-  (016). The legacy screens (Welcome, Camera, Calibrate, Validate, Results, Live, Data, About)
-  stay until 018; until 016, Warm-up complete's "Try your zones" and "Play anyway" open the
-  legacy `#/live`.
+  Warm-up complete (015), the Details sheet (017), and Free look, Re-aim and the challenge (016)
+  are built. The legacy screens (Welcome, Camera, Calibrate, Validate, Results, Live, Data,
+  About) stay until 018.
 
 ## Title, Get ready and the position guard (after prompt 014)
 
@@ -416,6 +415,39 @@ wins and the gap is work still to be done.
   `screens/screen.ts`, `pages.css`); `from=details` returns to the screen Details was opened over
   (`detailsReturnHash`). The card match lies at true size in the stage (across, upright, or upright
   and cut, matching the card's width). The lab's cards page in the stage (`Section` select).
+
+## Free look, Re-aim and the challenge (after prompt 016)
+
+- **Live machinery (`app/game/liveSession.ts`):** extracted from the v1 Live screen, which now
+  calls it: the session's records (lineage of fits, blocks `live`, `drift`, `recalibration`,
+  `validation` and `game`, the drift log with `source` `check` or `game`, the corrections, a
+  restored profile, forced-check reasons), `GazeStream` (estimator set, One Euro, blink hold),
+  `applyDriftCheck`, `refitWithRecalibration`/`adoptRecalibration`, `applyRevalidation`,
+  `settleRestore`, `adoptQuickWarmup` and `adoptRestoreTestRound` (called by the warm-up screen),
+  `applyGameOffset` (the challenge's correction, added to the one in use within the §4.13 limit),
+  `runReaim` (the drift schedule as two bubbles over the screen that offered it, with its chip or
+  card), and `LivePlay` (the capture, guard and overlay, records and stream for Free look and the
+  challenge; it applies the route guards of §17.2.3).
+- **Core (`src/core/game/`, DOM-free, every value heuristic in `params.ts`):** `board.ts` (the
+  safe area less 4 % per side, zones with 16 px gutters, snap to the nearest zone, bubble size),
+  `placement.ts` (seeded: no repeats, balanced, every fifth in the centre zone when both counts are
+  odd, decoy zone, drift direction), `dwell.ts` (leaky dwell), `round.ts` (`Round`: lifetime,
+  gaps, decoy bonk, drifters, score and streak, a record per bubble and decoy, the 400 ms median
+  offset at each pop), `scoring.ts`, `stars.ts`, `stats.ts` (per-zone statistics, marks,
+  outcome, hardest zone), `offset.ts` (the quality check), `reaim.ts` (offer rules, outcome).
+- **Screens:** `screens/look.ts` (zone board, gaze disc at the p68 Test-round error, dock, fading
+  bar and dock, the glyph in the bar on desktop and in the dock on phones, offers, Expert mode)
+  and `screens/challenge.ts` (round cards, the round on a transparent canvas over the board's SVG,
+  score chip, pause and offers, Round complete in framed mode with Replay; best scores via
+  `recordScore`), styled by `screens/play.css`. Warm-up complete's "Try your zones" opens Free
+  look, "Play anyway" and "Back to the challenge" the challenge; "Skip warm-up" that passes its
+  Test round runs the forced Re-aim before Warm-up complete. Hooks `__eek.look()`,
+  `__eek.challenge()` and, for the fake camera, `__eek.forceZones(cols, rows)`; fixtures
+  `look`, `look-faded`, `look-offer`, `look-reaim`, `reaim-<fixed|fine|large>` and
+  `challenge-<card-1|card-2|card-3|play|offer|done-well|done-final|done-badly|done-shift>`.
+- **Export:** rounds are trials `game-<nnn>` (phase `game`, the bubble's centre per frame) in
+  `samples.csv` and `targets.csv`, rows of the new `game.csv`, and `session.json`'s `game` member
+  (set-up, warm-ups with their pauses, rounds, offset corrections).
 
 ## In progress
 

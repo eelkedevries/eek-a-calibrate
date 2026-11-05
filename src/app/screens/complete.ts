@@ -12,7 +12,7 @@ import { playSound } from '../../platform/feedback.ts';
 import { starsRow } from '../components/starsRow.ts';
 import { zoneMap, type ZoneMap } from '../components/zoneMap.ts';
 import { h } from '../dom.ts';
-import { endSpan, setWarmupMode, setWarmupResult, startSpan, warmupResult, type WarmupResult } from '../game/gameState.ts';
+import { endSpan, setNextRound, setWarmupMode, setWarmupResult, startSpan, warmupResult, type WarmupResult } from '../game/gameState.ts';
 import { measuredScale, reducedMotion } from '../game/warmupRunner.ts';
 import type { Screen, ScreenContext } from '../router.ts';
 import { addCleanup } from '../shell/appShell.ts';
@@ -231,11 +231,11 @@ class CompleteScreen {
         this.ctx.navigate('challenge');
         break;
       case 'try':
+        this.ctx.navigate('look');
+        break;
       case 'anyway':
-        // Until prompt 016 builds Free look and the challenge, both open the v1 live screen, which
-        // presents its own stage: the span ends first, so the hidden game shell is not fullscreen.
-        await endSpan();
-        this.ctx.navigate('live');
+        setNextRound(1);
+        this.ctx.navigate('challenge');
         break;
     }
     this.busy = false;

@@ -28,6 +28,7 @@ export const strings: Readonly<Record<string, string>> = {
   'live.block.drift': '{trial}: drift check, {n} frames',
   'live.block.recalibration': '{trial}: quick recalibration, {n} frames',
   'live.block.validation': '{trial}: validation on 6 dots, {n} frames',
+  'live.block.game': '{trial}: challenge round, {n} frames',
   'live.accuracy': 'Validation accuracy of {name}: {value} ({verdict}; the verdict is heuristic).',
   'live.noValidation': 'This calibration has not been validated yet.',
   'live.correction': 'Drift correction in use: {value}.',

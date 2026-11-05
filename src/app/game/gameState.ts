@@ -1,19 +1,22 @@
-// The game's state across routes (spec §17.2.4, §17.6, §17.7): the presentation span started by
+// The game's state across routes (spec §17.2.4, §17.6–§17.9): the presentation span started by
 // Get ready's "Start warm-up" and kept through the warm-up, Warm-up complete, Free look and the
 // challenge; the warm-up's mode (full, restore after "Skip warm-up", or the quick warm-up of
-// §17.8.3); the levels played with their pauses; the quick recalibrations; and each Warm-up
-// complete result (zones, stars, marks, cause). *home* stays in session.ts, where Get ready
-// latches it. Nothing here is stored on the device.
+// §17.8.3); the levels played with their pauses; the quick recalibrations; each Warm-up complete
+// result (zones, stars, marks, cause); and the challenge's rounds with the best score of each zone
+// set. *home* stays in session.ts, where Get ready latches it. Only the best scores are stored on
+// the device (platform/storage.ts); everything else lives in memory.
 import type { Mark } from '../../core/warmup/marks.ts';
 import type { Cause } from '../../core/warmup/cause.ts';
 import type { LevelKey, WarmupMode } from '../../core/warmup/levels.ts';
 import type { Steadiness } from '../../core/warmup/steadiness.ts';
-import type { Outcome, Verdict } from '../../core/warmup/stars.ts';
+import { outcomeFor, starsFor, type Outcome, type Verdict } from '../../core/warmup/stars.ts';
+import type { RoundKey } from '../../core/game/params.ts';
+import type { ItemRecord, RoundSummary } from '../../core/game/stats.ts';
 import type { EstimatorId, Preset, Recording, ScreenGeometry } from '../../core/types.ts';
 import { exitFullscreen, fullscreenElement } from '../../platform/fullscreen.ts';
 import { startPresentation, type Presentation } from '../../platform/presentation.ts';
 import { setWarmupMode as setSessionWarmup, warmupMode as sessionWarmup } from '../session.ts';
-import { registerTestHook } from '../testHooks.ts';
+import { registerTestHook, testMode } from '../testHooks.ts';
 
 export type { WarmupMode };
 
@@ -196,6 +199,96 @@ registerTestHook('result', () => (result ? structuredClone(result) : null));
 /** A new warm-up replaces the result until its own Test round is scored. */
 export function clearWarmupResult(): void {
   result = null;
+}
+
+/**
+ * The zones Free look and the challenge may use: those of a scored warm-up that worked (at least
+ * two zones, not a stored calibration that failed its Test round), or null (spec §17.2.3).
+ */
+export function playableZones(): { cols: number; rows: number } | null {
+  const r = result;
+  if (!r || r.outcome === 'failed' || r.restoreRejected || r.zones.cols * r.zones.rows < 2) return null;
+  return r.zones;
+}
+
+/**
+ * `__eek.forceZones(cols, rows)` (test mode only): the fake face of the end-to-end tests looks at
+ * nothing, so its warm-up rarely unlocks two zones. This gives the latest result the zones asked
+ * for, as a poor result at worst, so that Free look and the challenge can be driven.
+ */
+registerTestHook('forceZones', (cols: number, rows: number) => {
+  if (!testMode() || !result) return null;
+  const verdict: Verdict = result.verdict === 'not-tracking' ? 'poor' : result.verdict;
+  const n = cols * rows;
+  result = { ...result, zones: { cols, rows }, verdict, stars: starsFor(verdict, n), outcome: outcomeFor(verdict, n), restoreRejected: false };
+  history[history.length - 1] = result;
+  return structuredClone(result);
+});
+
+// ----- The challenge (spec §17.9) ------------------------------------------------------------
+
+/** One round as played: what Round complete shows and session.json records. */
+export interface RoundResult {
+  /** `game-<nnn>`, the round's block in the export. */
+  trial: string;
+  round: number;
+  key: RoundKey;
+  seed: number;
+  cols: number;
+  rows: number;
+  score: number;
+  summary: RoundSummary;
+  records: ItemRecord[];
+  /** The smoothed gaze over the round (CSS px of the round's viewport), for Replay. */
+  trail: { x: number; y: number }[];
+  viewport: { w: number; h: number };
+  /** The quality check corrected a shift for the next round (§17.9.3). */
+  corrected: boolean;
+  /** The zone set's best score after this round (stored on the device), or null when unknown. */
+  best: number | null;
+  ended: 'complete' | 'aborted';
+}
+
+let nextRoundNumber = 1;
+let roundsZones = '';
+const rounds: RoundResult[] = [];
+const bestScores = new Map<string, number>();
+
+function zonesKey(z: { cols: number; rows: number }): string {
+  return `${z.cols}x${z.rows}`;
+}
+
+/** The round to play next, 1–3; back to 1 when the zones change (a new warm-up). */
+export function nextRound(): number {
+  const z = playableZones();
+  if (z && zonesKey(z) !== roundsZones) {
+    roundsZones = zonesKey(z);
+    nextRoundNumber = 1;
+  }
+  return nextRoundNumber;
+}
+
+export function setNextRound(n: number): void {
+  nextRoundNumber = Math.min(3, Math.max(1, Math.round(n)));
+}
+
+export function addRoundResult(r: RoundResult): void {
+  rounds.push(r);
+  if (r.best !== null) bestScores.set(zonesKey(r), Math.max(r.best, bestScores.get(zonesKey(r)) ?? 0));
+}
+
+/** Every round of this page load, in order. */
+export function roundResults(): readonly RoundResult[] {
+  return rounds;
+}
+
+export function lastRoundResult(): RoundResult | null {
+  return rounds[rounds.length - 1] ?? null;
+}
+
+/** The best score of a zone set seen in this page load (the device's store holds it across visits). */
+export function bestInMemory(z: { cols: number; rows: number }): number | null {
+  return bestScores.get(zonesKey(z)) ?? null;
 }
 
 // ----- The pilot's target (spec §17.2.5, §17.12) ----------------------------------------------

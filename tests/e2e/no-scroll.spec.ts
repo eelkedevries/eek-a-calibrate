@@ -74,15 +74,27 @@ export const STATES: NoScrollState[] = [
   { name: 'Warm-up complete without a result', route: '#/complete' },
   ...(['great', 'good', 'rough', 'rough-two', 'failed', 'restore', 'quick'] as const).map((f) => ({ name: `Warm-up complete, ${f}`, route: '#/complete', fixture: `complete-${f}` })),
   { name: 'Warm-up complete, Thorough', route: '#/complete', query: 'preset=thorough', fixture: 'complete-good' },
-  { name: 'Free look', route: '#/look' },
-  { name: 'Challenge', route: '#/challenge' },
+  // Free look, Re-aim and the challenge (prompt 016): without a fit each route sends the player
+  // to the Title; the fixtures show Free look (bar and dock shown, faded), the Re-aim offer, Re-aim
+  // in play and its outcomes, each round card, a round in play (round 2, with a spike), the offer
+  // in a round, and each Round complete outcome.
+  { name: 'Free look without a fit', route: '#/look' },
+  ...(['look', 'look-faded', 'look-offer', 'look-reaim', 'reaim-fixed', 'reaim-fine', 'reaim-large'] as const).map((f) => ({ name: `Free look, ${f}`, route: '#/look', fixture: f })),
+  { name: 'Free look, Thorough', route: '#/look', query: 'preset=thorough', fixture: 'look' },
+  { name: 'Challenge without a fit', route: '#/challenge' },
+  ...(['challenge-card-1', 'challenge-card-2', 'challenge-card-3', 'challenge-play', 'challenge-offer', 'challenge-done-well', 'challenge-done-final', 'challenge-done-badly', 'challenge-done-shift'] as const).map((f) => ({
+    name: `Challenge, ${f.slice('challenge-'.length)}`,
+    route: '#/challenge',
+    fixture: f,
+  })),
   { name: 'Page not found', route: '#/no-such-page' },
   ...TABS.map((tab) => ({ name: `Details, ${tab}, every page`, route: `#/details/${tab}`, action: async (page: Page) => {
       await walkTab(page, tab, `${tab} without a result`);
     } })),
   { name: 'Details over Get ready', route: '#/ready', action: openDetails },
   { name: 'Details over Warm-up complete', route: '#/complete', fixture: 'complete-good', action: openDetails },
-  { name: 'Details over Free look', route: '#/look', action: openDetails },
+  { name: 'Details over Free look', route: '#/look', fixture: 'look', action: openDetails },
+  { name: 'Details over Round complete', route: '#/challenge', fixture: 'challenge-done-well', action: openDetails },
   { name: 'Delete confirmation', route: '#/details/about', action: openDeleteConfirmation },
   // The pages opened from Details → Device (prompt 017).
   { name: 'Screen size', route: '#/screen?from=details', action: expectPanelClear },

@@ -3,7 +3,9 @@
 // of N", the level's pictogram, name, rule and hint, the 3 s countdown ring that starts the level
 // by itself (÷ speed in test mode; a static ring under reduced motion, the digit still counting),
 // "Start now", the Sound toggle in its corner and, on the pursuit card under reduced motion,
-// "Skip this level". A tap anywhere or Space starts the level at once. role="dialog".
+// "Skip this level". A tap anywhere or Space starts the level at once. role="dialog". The
+// challenge's round cards (design §2.14) are the same card with their own count line, pictogram
+// and meta line (components/roundCard.ts).
 import { compactTrack, type TrackModel } from '../shell/levelTrack.ts';
 import { h, svg } from '../dom.ts';
 import { icon } from '../shell/icons.ts';
@@ -66,6 +68,12 @@ export interface LevelCardOptions {
   tapArea: HTMLElement;
   /** A fixture shows the card frozen at its start. */
   frozen?: boolean;
+  /** Round cards: "Round 1 of 3" in place of "Level n of N". */
+  count?: string;
+  /** Round cards: a drawn pictogram in place of a level's. */
+  picto?: SVGSVGElement;
+  /** Round cards: "16 bubbles · about 1 minute" under the hint. */
+  meta?: string;
 }
 
 export interface LevelCard {
@@ -110,11 +118,12 @@ export function levelCard(o: LevelCardOptions): LevelCard {
     { class: 'stim-card level-card', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId, 'aria-describedby': ruleId },
     sound,
     o.clear ? h('p', { class: 'level-card__clear' }, stateBadge('good', 16), t('warmup.card.clear', { level: o.clear.level, line: o.clear.line })) : null,
-    h('div', { class: 'stim-card__progress' }, compactTrack(o.track), h('p', { class: 'stim-card__count' }, t('warmup.card.levelOf', { level: o.level, levels: o.levels }))),
-    pictogram(o.pictogram),
+    h('div', { class: 'stim-card__progress' }, compactTrack(o.track), h('p', { class: 'stim-card__count' }, o.count ?? t('warmup.card.levelOf', { level: o.level, levels: o.levels }))),
+    o.picto ?? pictogram(o.pictogram),
     h('h2', { class: 'stim-card__title', id: titleId }, o.name),
     h('p', { class: 'level-card__rule', id: ruleId }, o.rule),
     h('p', { class: 'level-card__hint' }, o.hint),
+    o.meta ? h('p', { class: 'level-card__hint level-card__meta' }, o.meta) : null,
     h('div', { class: 'level-card__go' }, timer, startNow),
     skip,
   );
