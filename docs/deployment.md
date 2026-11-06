@@ -138,5 +138,12 @@ curl -sI "$base/models/peekr-1.0.7/peekr.onnx" | grep -i content-type
 Expected: the built `assets/index-*.js`; both policy headers; `application/wasm` with
 `content-encoding: gzip`; `text/javascript`; `application/octet-stream` twice.
 
+To run the browser tests against the live site instead of a local build (with the fake camera;
+`LIVE_URL` overrides the address):
+
+```bash
+npx playwright test -c playwright.live.config.ts smoke flow mobile ready no-scroll
+```
+
 Then open the page in a browser with a camera and go through the checks in
 `docs-dev/manual-verification.md` that the change could affect.
