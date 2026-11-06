@@ -14,7 +14,7 @@ import type { RoundKey } from '../../core/game/params.ts';
 import type { ItemRecord, RoundSummary } from '../../core/game/stats.ts';
 import type { EstimatorId, Preset, Recording, ScreenGeometry } from '../../core/types.ts';
 import { exitFullscreen, fullscreenElement } from '../../platform/fullscreen.ts';
-import { startPresentation, type Presentation } from '../../platform/presentation.ts';
+import { simulateInvalidation, startPresentation, type Presentation } from '../../platform/presentation.ts';
 import { setWarmupMode as setSessionWarmup, warmupMode as sessionWarmup } from '../session.ts';
 import { registerTestHook, testMode } from '../testHooks.ts';
 
@@ -64,6 +64,10 @@ export function startSpan(el: HTMLElement, scale?: { pxPerMm: number; pxPerMmSou
     return handle;
   });
 }
+
+// `__eek.simulateFullscreenExit()` (failures.spec.ts): an exit from fullscreen during a level, Free
+// look or a round, as the span would report it; false when no valid span is running.
+registerTestHook('simulateFullscreenExit', () => (current ? simulateInvalidation(current.handle, 'fullscreen-exit', 'simulated by the test hook') : false));
 
 /** The running span, or null (never started, ended, or the page reloaded inside it). */
 export function span(): Presentation | null {

@@ -1,15 +1,16 @@
 # Engines
 
-Four gaze engines process the same camera frames of the same calibration and validation, so
-they can be compared for the same person on the same device. Each gets its own personal
+Four gaze engines process the same camera frames of the same warm-up (the calibration, and the
+Test round as its validation), so they can be compared for the same person on the same device. Each gets its own personal
 mapping, cross-validated on identical labels and folds, and is validated on identical targets
 (see [methods](methods.md)). The engines are listed in their a-priori rank order, which breaks
 near-ties when Auto chooses.
 
 None of them has an independently validated accuracy for this use, and this app quotes none
 until checks with real cameras have been done. What each engine's authors report is given with
-its source. The same details, read from each engine's own description, appear on the app's
-About page.
+its source. The same details, read from each engine's own description, appear in Details → About
+and on the Methods page; Details → Results shows each engine's result as a card, and Details →
+Device its timings in the device check and any engine that could not load.
 
 | Rank | Engine | Family | Runtime | Download | Licence |
 |---|---|---|---|---|---|

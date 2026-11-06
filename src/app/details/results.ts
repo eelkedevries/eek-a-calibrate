@@ -5,8 +5,7 @@
 // the cross-validation candidates, the paired differences with the single-session caveat, the
 // areas-of-interest advice, the notes from the fit and the approximate-degrees note.
 //
-// The computations shared with the v1 Results screen live here and that screen calls them, until
-// prompt 018 removes it. Nothing is computed anew: the reports are the state's (scored again by
+// Nothing is computed anew: the reports are the state's (scored again by
 // the measurement pages when the geometry changes, §14.1.3), and only the plot's samples are
 // predicted, once per fit, validation and geometry.
 import { VERDICT } from '../../core/constants.ts';
@@ -20,7 +19,6 @@ import type { CandidateScore, EngineId, EstimatorId, FitResult, Funnel, Recordin
 import { scoreRecording, type ScoredRecording } from '../../fit/fitClient.ts';
 import type { EngineStatus } from '../../vision/protocol.ts';
 import { accuracyPxText, degText, metricCard } from '../components/metricCard.ts';
-import type { MetricRow } from '../components/metricTable.ts';
 import { targetPlot } from '../components/targetPlot.ts';
 import { h } from '../dom.ts';
 import { activeCapture, currentValidationRun, type ValidationRun } from '../session.ts';
@@ -29,7 +27,7 @@ import { getState, setState } from '../state.ts';
 import { t } from '../strings.en-GB.ts';
 import { actionRow, checkRow, linkButton, note, num, para, reading, sheetPage, starRow } from './page.ts';
 
-// ----- Computations shared with the v1 Results screen -------------------------------------
+// ----- Computations -------------------------------------------------------------------------
 
 function median(values: readonly number[]): number {
   const s = values.filter(Number.isFinite).sort((a, b) => a - b);
@@ -66,47 +64,10 @@ export function missingOf(fit: FitResult, id: EstimatorId, status: readonly Engi
   return s && !s.ok ? { code: 'unavailable', reason: s.reason ?? t('details.none') } : { code: 'not-fitted' };
 }
 
-/** The v1 table's wording of `missingOf`. */
-function missingReason(fit: FitResult, id: EstimatorId, status: readonly EngineStatus[]): string | null {
-  const m = missingOf(fit, id, status);
-  if (!m) return null;
-  return m.code === 'combined' ? t('results.noCombined') : m.code === 'unavailable' ? t('results.unavailable', { reason: m.reason }) : t('results.notFitted');
-}
-
 /** The Details card's wording of `missingOf`. */
 function missingSentence(m: Missing | null): string | null {
   if (!m) return null;
   return m.code === 'combined' ? t('details.results.missing.combined') : m.code === 'unavailable' ? t('details.results.missing.unavailable', { reason: m.reason }) : t('details.results.missing.notFitted');
-}
-
-/** One row per estimator for the v1 comparison table, from the reports of one mode. */
-export function estimatorRows(fit: FitResult, reports: readonly ValidationReport[], recording: Recording, status: readonly EngineStatus[]): MetricRow[] {
-  return estimatorIds(fit).map((id): MetricRow => {
-    const report = reports.find((r) => r.estimator === id) ?? null;
-    if (id === 'combined') {
-      const members = fit.combined?.members ?? [];
-      return {
-        estimator: id,
-        name: ESTIMATOR_NAMES.combined,
-        missing: missingReason(fit, id, status),
-        backend: null,
-        cv: fit.combined?.cv ?? null,
-        report,
-        computeMsP50: members.length > 0 ? members.reduce((s, e) => s + computeMsP50(recording, e), 0) : Number.NaN,
-        selected: fit.selection.estimator === 'combined',
-      };
-    }
-    return {
-      estimator: id,
-      name: ESTIMATOR_NAMES[id],
-      missing: missingReason(fit, id, status),
-      backend: status.find((x) => x.id === id)?.backend ?? null,
-      cv: fit.fits[id]?.cv ?? null,
-      report,
-      computeMsP50: computeMsP50(recording, id),
-      selected: fit.selection.estimator === id,
-    };
-  });
 }
 
 /** Each engine's best candidate per mapper (lowest CV error), and whether it is the chosen one. */

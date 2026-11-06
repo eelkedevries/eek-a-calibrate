@@ -1,6 +1,7 @@
 // Helpers for the Details sheet (design §2.17): its state through `window.__eek.sheet()`, walking
-// every page of a tab, and playing the v1 Quick flow to get a scored Test round to show.
+// every page of a tab, and playing the Quick warm-up to get a scored Test round to show.
 import { expect, type Page } from '@playwright/test';
+import { playWarmup, startWarmup } from './game.ts';
 import { expectNoScroll } from './noScroll.ts';
 
 export interface SheetState {
@@ -49,33 +50,13 @@ export async function walkTab(page: Page, tab: string, what: string): Promise<st
   return seen;
 }
 
-interface Snapshot {
-  phase: string;
-  message: string | null;
-}
-
 /**
- * Plays the v1 Quick calibration and validation on the fake camera to the v1 Results screen, so
- * that the session holds a fit and a scored Test round (the game's own warm-up arrives with
- * prompt 015). Continues every card and resumes any pause.
+ * Plays the game's Quick warm-up on the fake camera to Warm-up complete, so that the session holds
+ * a fit and a scored Test round. The results live in memory: move within the page afterwards.
  */
 export async function playQuickFlow(page: Page, timeoutMs = 240_000): Promise<void> {
-  await page.goto('./?e2e=1&speed=4&preset=quick&engines=geometric,eyepixel&seed=17&pid=P01&session=S1#/calibrate');
-  const start = page.getByRole('button', { name: 'Start calibration' });
-  await expect(start).toBeEnabled({ timeout: 120_000 });
-  await start.click();
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const route = await page.evaluate(() => window.__eek!.route());
-    if (route === 'results') break;
-    if (Date.now() > deadline) throw new Error(`the Quick flow did not reach #/results (route ${route})`);
-    const card = page.locator('.stimulus-card');
-    if (await card.isVisible().catch(() => false)) {
-      await card.getByRole('button', { name: /^(Continue|Resume)$/ }).click({ timeout: 2000 }).catch(() => undefined);
-    }
-    const snap = await page.evaluate(() => (window.__eek as unknown as { protocol(): Snapshot | null }).protocol());
-    if (snap && (snap.phase === 'error' || snap.phase === 'stopped')) throw new Error(`the protocol stopped: ${snap.message}`);
-    await page.waitForTimeout(150);
-  }
+  await page.goto('./?e2e=1&speed=4&preset=quick&engines=geometric,eyepixel&seed=17&pid=P01&session=S1');
+  await startWarmup(page);
+  await playWarmup(page, { timeoutMs });
   await expect.poll(() => page.evaluate(() => Boolean((window.__eek!.state() as { validation: unknown[] | null }).validation?.length))).toBe(true);
 }

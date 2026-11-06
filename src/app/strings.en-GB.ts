@@ -6,11 +6,10 @@
 // Anti-fabrication: no accuracy figure may appear here unless it carries a
 // source from spec Appendix B or is labelled heuristic.
 import { strings as about } from './strings/about.ts';
-import { strings as calibrate } from './strings/calibrate.ts';
 import { strings as camera } from './strings/camera.ts';
+import { strings as capture } from './strings/capture.ts';
 import { strings as challenge } from './strings/challenge.ts';
 import { strings as complete } from './strings/complete.ts';
-import { strings as components } from './strings/components.ts';
 import { strings as data } from './strings/data.ts';
 import { strings as details } from './strings/details.ts';
 import { strings as detailsAbout } from './strings/details-about.ts';
@@ -19,24 +18,18 @@ import { strings as detailsDevice } from './strings/details-device.ts';
 import { strings as detailsResults } from './strings/details-results.ts';
 import { strings as detailsSettings } from './strings/details-settings.ts';
 import { strings as distance } from './strings/distance.ts';
-import { strings as drift } from './strings/drift.ts';
 import { strings as guard } from './strings/guard.ts';
 import { strings as lab } from './strings/lab.ts';
-import { strings as live } from './strings/live.ts';
 import { strings as look } from './strings/look.ts';
-import { strings as meters } from './strings/meters.ts';
 import { strings as methods } from './strings/methods.ts';
 import { strings as ready } from './strings/ready.ts';
 import { strings as results } from './strings/results.ts';
 import { strings as screen } from './strings/screen.ts';
 import { strings as shell } from './strings/shell.ts';
-import { strings as site } from './strings/site.ts';
-import { strings as stimulus } from './strings/stimulus.ts';
+import { strings as storage } from './strings/storage.ts';
 import { strings as title } from './strings/title.ts';
 import { strings as track } from './strings/track.ts';
-import { strings as validate } from './strings/validate.ts';
 import { strings as warmup } from './strings/warmup.ts';
-import { strings as welcome } from './strings/welcome.ts';
 
 export type StringTable = Readonly<Record<string, string>>;
 
@@ -58,23 +51,16 @@ export const STRING_MODULES: Readonly<Record<string, StringTable>> = {
   look,
   challenge,
   methods,
-  // The legacy screens' copy, until prompt 018 removes them.
-  site,
-  stimulus,
-  calibrate,
-  validate,
+  // Shared by the screens and the Details sheet.
+  about,
   results,
+  data,
   camera,
+  capture,
+  storage,
   lab,
-  components,
-  welcome,
-  meters,
   screen,
   distance,
-  drift,
-  live,
-  data,
-  about,
 };
 
 /** Merges string modules into one table; a key defined in two modules is an error. */

@@ -1,12 +1,10 @@
 // Methods, the long read (#/methods; spec §17.2): a document page, the one game route that may
-// scroll, because it is a document. It holds what the v1 About page held (spec §7 row 9): the
+// scroll, because it is a document. It holds the long read of spec §7 row 9: the
 // method, screen and distance with the degree formulae, the metrics and their formulae, the
 // protocol and how the game presents it, filtering and events, drift, the engines with their
 // licences and citations (read from each engine's own spec), the limitations, privacy and the
 // references, consistent with docs/methods.md. Every number is a design value, a formula, or
 // carries its source; heuristic thresholds say so. No accuracy figure for this app is given.
-//
-// The v1 About screen shows the same sections (`methodsSections`) until prompt 018 removes it.
 import './pages.css';
 import { ENGINE_IDS } from '../../core/types.ts';
 import { ENGINE_SPECS } from '../../engines/specs.ts';
@@ -76,7 +74,7 @@ function engines(): HTMLElement[] {
   });
 }
 
-/** The long read's sections, shared with the v1 About screen. */
+/** The long read's sections. */
 export function methodsSections(): HTMLElement[] {
   const refs: HTMLLIElement[] = [];
   for (let n = 1; n < 100; n++) {

@@ -176,27 +176,6 @@ function describeOrientation(o: OrientationState): string {
   return o.angle === null ? name : `${name} (${o.angle}°)`;
 }
 
-/** Calls `onTurn` each time the orientation differs from the previous reading (for Live, §14.2.3). */
-export function watchOrientation(onTurn: (now: OrientationState, before: OrientationState) => void): () => void {
-  let last = readOrientation();
-  const check = (): void => {
-    const now = readOrientation();
-    if (!orientationChanged(last, now)) return;
-    const before = last;
-    last = now;
-    onTurn(now, before);
-  };
-  const so = typeof screen !== 'undefined' ? screen.orientation : undefined;
-  so?.addEventListener('change', check);
-  window.addEventListener('orientationchange', check);
-  window.addEventListener('resize', check);
-  return () => {
-    so?.removeEventListener('change', check);
-    window.removeEventListener('orientationchange', check);
-    window.removeEventListener('resize', check);
-  };
-}
-
 /**
  * The safe-area insets in CSS px, read from a probe element padded with
  * env(safe-area-inset-*). They are non-zero only on devices with a notch, a
@@ -241,7 +220,7 @@ export interface WakeLockHold {
 }
 
 /**
- * Keeps the screen on (§14.2.6) during camera setup, calibration, validation and Live:
+ * Keeps the screen on (§14.2.6) while the game runs, from Play to leaving the game:
  * navigator.wakeLock.request('screen'), re-acquired whenever the page becomes visible again
  * (the browser drops the lock when it is hidden). Unsupported or refused requests are ignored.
  */
@@ -617,6 +596,11 @@ class PresentationHandle implements Presentation {
     notifyAll(this.toleratedListeners, change);
   }
 
+  /** Invalidates the block as the event would have (the test hook of `simulateInvalidation`). */
+  simulate(reason: InvalidationReason, detail: string): void {
+    if (!this.invalid && !this.ended) this.invalidate(reason, this.lastSize, detail);
+  }
+
   private invalidate(reason: InvalidationReason, to: Size, detail: string): void {
     const invalidation: Invalidation = { reason, atMs: performance.now(), from: this.startSize, to, detail };
     this.invalid = invalidation;
@@ -721,4 +705,14 @@ export async function startPresentation(stage: HTMLElement, opts: PresentationOp
     startSize,
     toleranceFrac,
   });
+}
+
+/**
+ * Test mode only (`__eek.simulateFullscreenExit()`, failures.spec.ts): invalidates a running block
+ * for `reason` as the browser's event would; false when there is no valid block to invalidate.
+ */
+export function simulateInvalidation(p: Presentation, reason: InvalidationReason, detail: string): boolean {
+  if (!(p instanceof PresentationHandle) || p.invalidation) return false;
+  p.simulate(reason, detail);
+  return p.invalidation !== null;
 }

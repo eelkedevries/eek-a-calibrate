@@ -87,7 +87,7 @@ class ChallengeScreen {
   // The round's view (stimulus mode)
   private readonly heading = h('h1', { class: 'sr-only' }, t('challenge.name'));
   private readonly board: ZoneBoard = zoneBoard(t('challenge.name'));
-  private readonly stage = new StimulusStage({ game: true });
+  private readonly stage = new StimulusStage();
   private readonly probe = h('div', { class: 'board-probe', 'aria-hidden': 'true' });
   private readonly layer = h('div', { class: 'play-layer' });
   private readonly pips: PipLine = pipLine(t('challenge.progress', { round: 1 }));

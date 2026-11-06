@@ -54,30 +54,3 @@ export class SectorTracker {
     return this.reached.size >= HEAD_BLOCK.sectorsNeeded;
   }
 }
-
-/**
- * Draws the guide centred on (x, y) with radius r: four sector arcs (filled when reached) and a
- * dot at the current pose, scaled so that the aimed amplitude reaches the ring.
- */
-export function drawPoseGuide(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, t: SectorTracker, colours: { fg: string; done: string; dim: string }): void {
-  const arcs: Record<Sector, [number, number]> = {
-    right: [-Math.PI / 4, Math.PI / 4],
-    down: [Math.PI / 4, (3 * Math.PI) / 4],
-    left: [(3 * Math.PI) / 4, (5 * Math.PI) / 4],
-    up: [(5 * Math.PI) / 4, (7 * Math.PI) / 4],
-  };
-  ctx.lineWidth = Math.max(4, r / 8);
-  for (const s of SECTORS) {
-    const [a, b] = arcs[s];
-    ctx.beginPath();
-    ctx.arc(x, y, r, a + 0.08, b - 0.08);
-    ctx.strokeStyle = t.reached.has(s) ? colours.done : colours.dim;
-    ctx.stroke();
-  }
-  const dx = Math.max(-1.2, Math.min(1.2, -t.current.yaw / HEAD_BLOCK.yawAmpDeg));
-  const dy = Math.max(-1.2, Math.min(1.2, t.current.pitch / HEAD_BLOCK.pitchAmpDeg));
-  ctx.beginPath();
-  ctx.arc(x + dx * r, y + dy * r, Math.max(4, r / 10), 0, 2 * Math.PI);
-  ctx.fillStyle = colours.fg;
-  ctx.fill();
-}

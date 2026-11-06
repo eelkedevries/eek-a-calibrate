@@ -9,7 +9,7 @@
 //
 // Where IndexedDB is missing, refuses to open, or a write fails (quota), the data is kept in
 // memory for this page instead and a warning is published, so nothing fails silently.
-// "Delete all my data" (the Details sheet, and the footer and Data screen of v1) is registered here.
+// "Delete all my data" (the footer of the Details sheet) is registered here.
 import type { FitResult, Preset, SessionGeometry, ValidationReport } from '../core/types.ts';
 import { setDeleteAllHandler, setPrefsStore } from '../app/state.ts';
 

@@ -1,7 +1,8 @@
 // The fit guard (design §4.1 rule 11): each region degrades on its own ladder until its content
 // fits, so nothing is ever cut off or scrolls. A region's tier is its `data-fit` attribute (0 =
 // everything shown); CSS hides what each tier drops. The check runs on every resize of the
-// region and when the web fonts arrive, which changes text widths without a resize.
+// region, when the web fonts arrive, and when the root text size changes (the reader enlarges
+// the text with the page open), both of which change text widths without a resize.
 
 /** The lowest tier at which `fitsAt` holds, or `maxTier` when none does. */
 export function pickTier(maxTier: number, fitsAt: (tier: number) => boolean): number {
@@ -53,6 +54,26 @@ export interface FitGuardOptions {
   onTier?(tier: number): void;
 }
 
+const remChecks = new Set<() => void>();
+let remProbe: HTMLElement | null = null;
+
+/** Calls every guard's check when 1 rem changes size: a hidden 1 rem square, observed. */
+function watchRem(check: () => void): () => void {
+  remChecks.add(check);
+  if (!remProbe?.isConnected) {
+    remProbe = document.createElement('span');
+    remProbe.setAttribute('aria-hidden', 'true');
+    remProbe.style.cssText = 'position:absolute;inset-block-start:0;inset-inline-start:0;inline-size:1rem;block-size:1rem;visibility:hidden;pointer-events:none;contain:strict';
+    document.body.append(remProbe);
+    let first = true;
+    new ResizeObserver(() => {
+      if (first) first = false;
+      else for (const fn of [...remChecks]) fn();
+    }).observe(remProbe);
+  }
+  return () => remChecks.delete(check);
+}
+
 /**
  * Keeps `el` at the lowest tier that fits. Observe only regions whose size the layout sets (a
  * grid cell, a fixed-height bar), so that a change of tier cannot resize the region itself.
@@ -74,10 +95,12 @@ export function fitGuard(el: HTMLElement, opts: FitGuardOptions): () => void {
   const fonts = document.fonts;
   fonts?.addEventListener('loadingdone', check);
   void fonts?.ready.then(check);
+  const stopRem = watchRem(check);
   check();
   return () => {
     stopped = true;
     observer.disconnect();
     fonts?.removeEventListener('loadingdone', check);
+    stopRem();
   };
 }

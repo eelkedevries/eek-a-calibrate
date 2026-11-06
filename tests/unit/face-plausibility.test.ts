@@ -1,10 +1,9 @@
 // Spec v0.4 §16.1: a corrupt face-landmarker result (as some mobile GPUs return on
-// the GPU delegate, without an error) is recognised and discarded, and the meters
-// never show a non-finite reading as a fault.
+// the GPU delegate, without an error) is recognised and discarded, and ?delegate=
+// selects the delegate.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { implausibleReason } from '../../src/core/face/plausibility.ts';
-import { evaluateSetup } from '../../src/app/components/qualityMeter.ts';
 import { parseSettings } from '../../src/app/state.ts';
 import { loadLandmarkFixture } from '../fixtures/landmarks/fixture.ts';
 
@@ -45,15 +44,6 @@ test('a corrupt transformation matrix is rejected', () => {
   const inf = Float32Array.from(fx.matrix);
   inf[12] = Number.POSITIVE_INFINITY;
   assert.match(implausibleReason(fx.landmarks, inf) ?? '', /not finite/);
-});
-
-test('a glare reading without pixels is shown as unknown, not as a fault', () => {
-  const face = { pose: { yawDeg: 0, pitchDeg: 0 }, quality: { ...fx.computed.quality, glare: Number.NaN, centring: fx.computed.quality.centring as [number, number] } };
-  const readings = evaluateSetup({ face, fps: 30, distanceMm: null, mobile: true } as unknown as Parameters<typeof evaluateSetup>[0]);
-  const glare = readings.find((r) => r.id === 'glare')!;
-  assert.equal(glare.ok, null);
-  assert.equal(glare.value, '—');
-  assert.equal(glare.advice, null);
 });
 
 test('?delegate=cpu|gpu selects the face landmarker delegate', () => {

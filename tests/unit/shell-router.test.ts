@@ -1,6 +1,7 @@
-// Routes of spec §17.2: the game's routes, the details deep link, the legacy routes kept until
-// 018, guards, and the fixture parameter of the test hooks (§17.2.5).
+// Routes of spec §17.2: the game's routes, the details deep link, the redirects of the legacy
+// routes, guards, and the fixture parameter of the test hooks (§17.2.5).
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import { hrefFor, parseHash, resolveRoute, ROUTES, type Route } from '../../src/app/router.ts';
 import { fixtureName } from '../../src/app/testHooks.ts';
@@ -40,15 +41,32 @@ test('#/details/<tab> shows the Title with the sheet on that tab; a missing or u
   assert.equal(hrefFor('details', 'data'), '#/details/data');
 });
 
-test('the old Welcome moves to #/welcome; the other legacy routes stay where they were', () => {
-  assert.equal(hrefFor('welcome'), '#/welcome');
-  for (const id of ['welcome', 'camera', 'calibrate', 'validate', 'results', 'live', 'data', 'about'] as const) {
-    const r = routeOf(hrefFor(id));
-    assert.equal((r as { layout: string }).layout, 'legacy', id);
-    assert.equal((r as { id: string }).id, id);
+test('the v1 routes redirect to the screens that replaced them, keeping a query (§17.2.2)', () => {
+  const expected: Record<string, string> = {
+    '#/welcome': '#/',
+    '#/camera': '#/ready',
+    '#/calibrate': '#/ready',
+    '#/validate': '#/ready',
+    '#/results': '#/details/results',
+    '#/live': '#/look',
+    '#/data': '#/details/data',
+    '#/about': '#/details/about',
+  };
+  for (const [from, to] of Object.entries(expected)) assert.deepEqual(resolve(from), { kind: 'redirect', to }, from);
+  assert.deepEqual(resolve('#/live?expert=1'), { kind: 'redirect', to: '#/look?expert=1' });
+  // Every target is a route that resolves, and no route of the app is a legacy one.
+  for (const to of Object.values(expected)) assert.equal(resolve(to).kind, 'route', to);
+  for (const r of ROUTES) assert.equal(Object.hasOwn(expected, `#${r.path}`), false, r.path);
+});
+
+test('nothing in the app links to a v1 hash (§17.2.2)', () => {
+  const root = new URL('../../src/', import.meta.url);
+  const files = readdirSync(root, { recursive: true, encoding: 'utf8' }).filter((f) => /\.(ts|css|html)$/.test(f));
+  assert.ok(files.length > 50);
+  for (const f of files) {
+    const text = readFileSync(new URL(f, root), 'utf8');
+    assert.equal(/#\/(welcome|camera|calibrate|validate|results|live|data|about)\b/.test(text), false, `${f} names a v1 hash`);
   }
-  assert.equal(hrefFor('camera'), '#/camera');
-  assert.equal(ROUTES.find((r) => r.id === 'calibrate')!.immersive, true);
 });
 
 test('an unknown path is not found', () => {

@@ -1,10 +1,13 @@
 # Methods
 
-This page describes how eek-a-calibrate measures gaze and how it reports quality. Every number
-is either a design value of the app (the tunable defaults of `src/core/constants.ts`), a
-formula, or a claim with its source. Values marked *heuristic* are defaults, not values derived
-from evidence. **No accuracy figure for this app is given anywhere**: none will be published
-until the manual checks with real cameras have been done.
+This page describes how eek-a-calibrate measures gaze and how it reports quality, and how the
+game "Pop with your eyes" presents the measurement. Every number is either a design value of the
+app (the tunable defaults of `src/core/constants.ts`, `src/core/position/thresholds.ts` and
+`src/core/game/params.ts`), a formula, or a claim with its source. Values marked *heuristic* are
+defaults, not values derived from evidence; every value of the position guard and of the
+challenge is heuristic. **No accuracy figure for this app is given anywhere**: none will be
+published until the manual checks with real cameras have been done. The game's stars, zones and
+scores are rules of thumb over the measured values below, not accuracy figures.
 
 ## Realistic expectations
 
@@ -85,7 +88,32 @@ Exported angles are positive to the right and **upwards**.
 On phones, layout coordinates map into the safe area of the screen (the viewport minus the
 notch, camera cut-out and home indicator).
 
+## The position guard
+
+Before the warm-up, Get ready checks the camera picture and, on phones, the motion sensors
+against target ranges per device class (phone upright, phone on its side, webcam; all
+heuristic): the face's width as a fraction of the frame's long side (for example 0.28–0.42 on a
+phone held upright, 0.16–0.30 with a webcam), the iris diameter, the face's margins and centring,
+the head's yaw, pitch and roll around the pose expected when looking at the window's centre, the
+phone's upright angle (60–100°) and roll (±10°) from gravity, the face's brightness (60–200),
+backlight and glare (the thresholds of `SETUP` in Appendix A), the eyes, and steadiness (head
+under 30°/s; phone under 20°/s, or 30°/s with *In hand*). Conditions are checked in a fixed
+priority order and only the first is shown, with hysteresis: a new cue must persist 300 ms, a
+shown cue stays at least 1 s, and *Ready* needs 2 s with everything in range (`SETUP.holdMs`).
+*Ready* stores *home*, the pose and position at that moment.
+
+During the game the guard grades every frame against home (and, after the fit, against the
+calibrated head range): *good*, *drifting* (a warning glyph) or *out*. Out for more than 0.5 s,
+or the face lost for more than 0.4 s, pauses a warm-up level or Re-aim (1 s and 0.7 s in Free
+look and the challenge); everything back in range for 1 s resumes it. The guard is presentation
+only: it pauses and resumes the presentation, and never changes which frames are accepted, how
+they are labelled or weighted. A level paused by the guard shows the interrupted bubble again
+with its full settling window.
+
 ## Calibration protocol
+
+The game presents the protocol as its warm-up levels (below); the blocks, layouts, durations,
+order and frame rules are those of this section.
 
 | Preset | Blocks | Validation |
 |---|---|---|
@@ -111,6 +139,50 @@ and ±20° pitch (±32° and ±25° during head movement) and turns at most 60°
 corners are at least 60 px apart, the screen is fullscreen (or in viewport mode) and visible,
 and the frame was not dropped or inside a settling window. The decision is shared by all
 engines.
+
+## The warm-up levels
+
+| Warm-up length | Levels |
+|---|---|
+| Quick | Pop the dots (block A, 9 dots), Test round (6 dots) |
+| Standard | Pop the dots (block A, 13 dots), Follow the firefly (B), Turn your head (C), Test round (12 dots) |
+| Thorough | Standard, with Lean in (A again, closer) before the Test round; *home* is stored again at its start |
+
+- **The bubble** replaces the shrinking ring of a fixation, validation or drift target. With
+  onset t₀, it scales in from 0.6 to 1 times its full size over the first 150 ms of the settling
+  window and stays still to the window's end; over the sampling window its radius shrinks
+  linearly from full to the core's radius, and holds at the core's while sampling is extended;
+  when the item ends, it pops (a 150 ms burst) outside every sampling window, and the next onset
+  follows. Its full diameter is 3° from the geometry, clamped to [64 px, 20 % of the stage's
+  short side]; the core is the same target as before, 0.6° (at least 14 px; 24 px when the
+  geometry is unknown). Under reduced motion the bubble is static at full size and simply
+  disappears. Whether the bubble keeps as many frames per target and as good an accuracy as the
+  ring is still to be piloted (`?target=ring` shows the ring); until then no figure compares
+  them.
+- **The firefly** of Follow the firefly is the same core on a 44 px light disc, with a faint
+  300 ms trail and no path drawn ahead.
+- **Turn your head** shows a still bubble (64 px on phones, 80 px on larger screens) inside
+  four arcs whose fill grows with the measured head turn towards each side; a location is done
+  when 3 of the 4 sectors are reached (at 70 % of ±10° yaw and ±7° pitch, heuristic), or after
+  6 s. *Limited head movement* (Settings) halves the targets.
+- A level card shows how steady the previous level was ("Nice and steady", "Try to keep your
+  head still", "Try to stay in view"), from that level's frame-acceptance log alone (heuristic).
+
+## Warm-up complete: zones, stars, marks
+
+Everything comes from the Test round and the fit, for the selected estimator, on its own valid
+frames.
+
+- **Zones (heuristic).** For each axis separately, the largest n ∈ {1, 2, 3, 4} whose smallest
+  half-cell along that axis is at least need = the 75th-percentile accuracy + 2 × RMS-S2S
+  (0 when even n = 1 fails); the zones are columns × rows. At least two zones unlock the
+  challenge. The square areas-of-interest advice below is unchanged and stays in Details.
+- **Stars (heuristic, "rule of thumb"):** verdict good 3, acceptable 2, poor 1; not tracking or
+  fewer than two zones 0.
+- **Marks:** a Test-round bubble is a hit when the mean gaze on it lies in the zone that
+  contains its target, a miss otherwise or when it had no valid sample.
+- **Cause (heuristic):** from the warm-up's frame log and the guard's light readings, the first
+  that applies of: face often lost, backlit, too dark, much head movement, glare, too far.
 
 ## Personal mapping
 
@@ -159,9 +231,9 @@ Metrics use the raw (unfiltered, uncorrected) predictions of valid frames.
   every estimator. Paired engine differences use a Wilcoxon signed-rank test within the session
   only.
 
-## Live display
+## Free look and the display
 
-Raw output is always recorded; filtering is for display only. The One Euro filter (Casiez,
+Raw output is always recorded; filtering is for display and the game only. The One Euro filter (Casiez,
 Roussel and Vogel 2012) runs on θx and θy with a minimum cut-off of 0.8 Hz, β = 0.3 Hz per °/s
 and a derivative cut-off of 1.0 Hz, and resets after gaps over 200 ms. These values rescale
 gaze-lite's tuning (0.8 Hz, 0.008 per px/s) at about 40 px per degree. Blink hold: the dot
@@ -171,11 +243,17 @@ most 800 ms, and is hidden after 600 ms without valid data.
 Confidence (advisory) = exp(−½(h/h95)²) · exp(−½(spread/2°)²), where h is the leverage of the
 frame in the mapping and spread the RMS distance of the engines from the combined prediction.
 Outside the head range seen during calibration (yaw and pitch widened by 4°, distance ratio by
-0.10 in log units, eye position by 0.05) frames are flagged and the dot greys out.
+0.10 in log units, eye position by 0.05) frames are flagged and the disc greys out.
 
-## Drift and recalibration
+Free look lights the zone that contains the filtered, drift-corrected gaze of the selected
+estimator, and draws a soft disc there whose radius is the 68th percentile of that estimator's
+per-target Test-round accuracy in pixels; the disc fades with the frame's confidence. Expert
+mode adds the raw dot, a dot per engine and a trail, as the earlier Live screen did.
 
-A drift check shows the centre and one seeded validation location (settle 500 ms, sample
+## Drift and recalibration (Re-aim and Quick warm-up)
+
+The game calls the drift check **Re-aim** and the quick recalibration **Quick warm-up**. A drift
+check shows the centre and one seeded validation location (settle 500 ms, sample
 1000 ms each) and measures o, the mean over the two targets of (Ḡ − T), from raw predictions.
 
 - If |o| ≤ max(2°, 1.5 × validation accuracy), the correction −o is added to every following
@@ -188,7 +266,38 @@ Checks are prompted every 5 minutes, because sessions of about 5 minutes are sta
 al. 2024; Yang and Krajbich 2021), and calibration points spread over a session work better than
 front-loaded ones (Prescott et al. 2026). A check is forced after a camera or resolution change,
 a screen layout or scaling change, a backend or delegate change, a worker restart and the
-restoring of a stored calibration. Corrections are kept per estimator.
+restoring of a stored calibration. Corrections are kept per estimator. In the game a check is
+also offered when fewer than half of the last six challenge bubbles popped, after more than 10 s
+in the auto-pause overlay, and after a round that went badly (all heuristic). The chip after
+Re-aim reads "Your aim was fine" when |o| < 0.5° (heuristic) and "Aim fixed" otherwise.
+
+## The challenge
+
+All values here are heuristic, to be tuned in pilot play.
+
+- **Board:** the safe rectangle less 4 % of each axis on each side, split into the zones of
+  Warm-up complete with 16 px between them. The gaze input is the selected estimator's filtered,
+  drift-corrected gaze, snapped to a zone; no gaze dot is drawn.
+- **Bubbles:** 16 a round, diameter clamp(72 px, 40 % of the zone's short side, 20 % of the
+  screen's short side), at the zone's centre ± 10 %, never twice in a row in the same zone,
+  balanced over the zones, and every fifth in the centre zone when there is one. A bubble lives
+  4 s; 500 ms pass between bubbles. Placement is seeded, so a round is reproducible from its seed.
+- **Leaky dwell:** while the lit zone is the bubble's, its dwell fills at 1/dwell per second;
+  outside it drains twice as fast and resets after 300 ms continuously outside; frames held by
+  the blink hold or flagged invalid pause it. A full dwell pops the bubble. The dwell is 1000 ms
+  in round 1 (Pop!), 800 ms in round 2 (Mind the spikes: a spiky decoy in another zone that
+  "bonks" after 600 ms of looking, −50) and 700 ms in round 3 (Drifters: the bubble drifts at up
+  to 3°/s).
+- **Score:** +100 a pop plus 50 × (1 − time to pop / 4 s); × 1.5 on every pop after four in a
+  row. **Stars per round:** 1 at ≥ 50 % popped, 2 at ≥ 75 %, 3 at ≥ 90 % with a median time to
+  pop ≤ 1.6 s. A zone is marked ✓ at ≥ 80 % popped, ~ from 50 %, ✗ below. The best score is kept
+  per set of zones.
+- **The challenge as a quality check:** each pop stores the target, zone, time to pop and the
+  median filtered gaze over its last 400 ms. Offsets that agree in at least three zones
+  (resultant length ≥ 0.6) and whose mean exceeds a quarter of a zone give a global offset
+  correction for the next round. That gaze is already drift-corrected, so the offset is **added**
+  to the correction in use (never put in its place), and it is not applied when the result would
+  exceed the drift limit above. It is logged in the drift log with source `game`.
 
 ## Events
 

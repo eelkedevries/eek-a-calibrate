@@ -1,6 +1,7 @@
 // Details → Settings (design §2.17, §2.11; spec §17.4.6, §17.5.5, §17.6.5, §17.8.1).
 
 export const strings: Readonly<Record<string, string>> = {
+  'details.settings.noDownload': 'no',
   'details.settings.warmup.title': 'Warm-up length',
   'details.settings.warmup.quick': 'Quick',
   'details.settings.warmup.standard': 'Standard',

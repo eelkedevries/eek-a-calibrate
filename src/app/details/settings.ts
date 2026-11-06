@@ -4,9 +4,6 @@
 // cameras) and Expert mode. Each change is stored in `prefs` (§17.10.3) and applied at once
 // where it can be: the theme repaints, the warm-up length and engines apply from the next
 // warm-up, and a camera change from the camera's next start (the screen beneath keeps its camera).
-//
-// The engine sizes and the v1 Welcome screen's engine choice come from here; that screen calls
-// `megabytes` and `engineSpecs` until prompt 018 removes it.
 import { ENGINE_IDS } from '../../core/types.ts';
 import type { EngineId, Preset } from '../../core/types.ts';
 import { ENGINE_SPECS } from '../../engines/specs.ts';
@@ -19,7 +16,7 @@ import { t } from '../strings.en-GB.ts';
 import { checkRow, choiceRow, note, para, sheetPage, switchRow } from './page.ts';
 
 export function megabytes(bytes: number): string {
-  return bytes >= 100_000 ? `${(bytes / 1_000_000).toFixed(1)} MB` : bytes > 0 ? `${Math.round(bytes / 1000)} kB` : t('welcome.engines.noDownload');
+  return bytes >= 100_000 ? `${(bytes / 1_000_000).toFixed(1)} MB` : bytes > 0 ? `${Math.round(bytes / 1000)} kB` : t('details.settings.noDownload');
 }
 
 /** Every engine's spec, from the static table (§16.2.4): no engine code is downloaded to show it. */

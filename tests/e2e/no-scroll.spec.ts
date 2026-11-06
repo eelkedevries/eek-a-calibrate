@@ -1,7 +1,8 @@
-// The no-scroll rule (spec §17.3.3): every route of §17.2 but the #/methods document, and the
-// Details sheet on every page of every tab, with and without a result, at the five sizes, from a
-// table of states that later prompts extend (a route, an optional query or fixture, an optional
-// action).
+// The no-scroll rule (spec §17.3.3): every route of §17.2 but the #/methods document (which may
+// scroll down, never sideways: details.spec.ts), every state fixture of every screen, and the
+// Details sheet on every page of every tab, with and without a result, at the five sizes, with
+// every visible target at least 44 × 44 px. The table of states lists a route, an optional query
+// or fixture, and an optional action.
 import { expect, test, type Page } from '@playwright/test';
 import { onTab, playQuickFlow, TABS, walkTab } from './helpers/details.ts';
 import { expectNoScroll } from './helpers/noScroll.ts';
@@ -59,6 +60,7 @@ export const STATES: NoScrollState[] = [
   { name: 'Title', route: '#/' },
   { name: 'Title, with Skip warm-up', route: '#/', fixture: 'title-skip' },
   { name: 'Title, camera blocked', route: '#/', fixture: 'title-blocked' },
+  { name: 'Title, unsupported browser', route: '#/', fixture: 'title-unsupported' },
   { name: 'Title, Thorough', route: '#/', query: 'preset=thorough' },
   { name: 'Get ready', route: '#/ready' },
   ...(['loading', 'searching', 'adjust', 'holding', 'ready', 'anyway'] as const).map((state) => ({ name: `Get ready, ${state}`, route: '#/ready', fixture: `ready-${state}` })),
@@ -145,7 +147,7 @@ for (const size of SIZES) {
   });
 }
 
-// With a result: the v1 Quick flow gives a fit and a scored Test round, then every page of every
+// With a result: the Quick warm-up gives a fit and a scored Test round, then every page of every
 // tab is checked at each size in the same session (the results live in memory).
 test.describe('No scrolling in Details with a result', () => {
   test.describe.configure({ timeout: 600_000 });

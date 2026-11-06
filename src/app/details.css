@@ -77,7 +77,8 @@
   overflow-wrap: anywhere;
 }
 
-.badge {
+/* The text pill (Auto's choice); the state badges, drawn as svg.badge, are not pills. */
+span.badge {
   display: inline-flex;
   align-items: center;
   min-block-size: 24px;
@@ -443,7 +444,7 @@
 .metric-card__backend {
   font-family: var(--font-mono);
   font-size: 0.875rem;
-  color: var(--color-faint);
+  color: var(--color-muted-text);
 }
 
 /* ---------------------------------------------------------------- Stars, judging, plot */

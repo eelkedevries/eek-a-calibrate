@@ -1,6 +1,6 @@
-// Methods, the long read (#/methods, a document page). Its sections are the v1 About page's copy
-// (strings/about.ts), which the two pages share until prompt 018, plus how the game presents the
-// protocol (spec §17.6–§17.9; every threshold heuristic).
+// Methods, the long read (#/methods, a document page). Its sections are the copy of strings/about.ts,
+// shared with Details → About, plus how the game presents the protocol (spec §17.6–§17.9; every
+// threshold heuristic).
 
 export const strings: Readonly<Record<string, string>> = {
   'methods.title': 'Methods',

@@ -113,7 +113,7 @@ export function restoreEstimators(fit: FitResult, geometry: SessionGeometry | nu
   return new Map(set.ids().map((id) => [id, set.estimator(id)]));
 }
 
-/** The same as one EstimatorSet, for callers that also set the drift offset (Live). */
+/** The same as one EstimatorSet, for callers that also set the drift offset (Free look, the challenge). */
 export function restoreEstimatorSet(fit: FitResult, geometry: SessionGeometry | null): EstimatorSet {
   return new EstimatorSet(fit, MAPPERS, geometry);
 }

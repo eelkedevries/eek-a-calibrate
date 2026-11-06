@@ -4,9 +4,8 @@
 // IDs (editable before a warm-up), and the saving of a session summary. "Delete all my data" is
 // in the sheet's footer.
 //
-// The export is built here, and the v1 Data screen calls it until prompt 018 removes that screen.
-// Challenge rounds (§17.10.1) join it as the trials game-<nnn> of samples.csv and targets.csv, the
-// rows of game.csv and the game member of session.json.
+// The export is built here. Challenge rounds (§17.10.1) join it as the trials game-<nnn> of
+// samples.csv and targets.csv, the rows of game.csv and the game member of session.json.
 // The zip is assembled file by file rather than with buildExport, which writes everything or nothing:
 // geometry.yaml cannot be written without D_ref and events cannot be detected without a finite
 // SD₂d, and the rest of the export must still be produced, with README.txt saying what was left
@@ -36,7 +35,7 @@ import { currentValidationRun, gameRecord } from '../session.ts';
 import { registerDetailsTab, type DetailsPage, type PageContext } from '../shell/detailsSheet.ts';
 import { getState, setState, type Settings } from '../state.ts';
 import { t } from '../strings.en-GB.ts';
-import { setupRecord } from '../screens/camera.ts';
+import { setupRecord } from '../game/setupRecord.ts';
 import { assetHashes, sessionRecords, type GameBlock, type LiveBlock, type SessionBlock } from '../game/liveSession.ts';
 import { warmupHistory } from '../game/gameState.ts';
 import { actionRow, checkRow, note, para, reading, sheetPage } from './page.ts';
@@ -472,7 +471,7 @@ export function download(name: string, bytes: Uint8Array): void {
 }
 
 
-// ----- Shared with the v1 Data screen -----------------------------------------------------
+// ----- Stored records ---------------------------------------------------------------------
 
 function accuracyOf(s: { accuracyPctDiag: number | null; accuracyDeg: number | null; degreesApproximate: boolean }): string {
   const diag = s.accuracyPctDiag !== null && Number.isFinite(s.accuracyPctDiag) ? t('results.unit.diag', { value: s.accuracyPctDiag.toFixed(1) }) : t('details.none');

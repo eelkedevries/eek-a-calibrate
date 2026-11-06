@@ -61,7 +61,6 @@ function testPicture(): SVGSVGElement {
 }
 
 class Distance {
-  private readonly params: URLSearchParams;
   private readonly frame: ToolFrame;
   private readonly startButton: HTMLButtonElement;
   private readonly skipButton: HTMLButtonElement;
@@ -77,8 +76,7 @@ class Distance {
   private readonly mobile = detectDeviceClass().mobile;
 
   constructor(root: HTMLElement, ctx: ScreenContext) {
-    this.params = ctx.params;
-    this.frame = toolFrame(root, { title: t('route.distance'), body: t('distance.body'), back: returnHash(ctx.params) });
+    this.frame = toolFrame(root, { title: t('route.distance'), body: t('distance.body'), back: returnHash() });
     this.frame.stage.append(testPicture(), h('p', { class: 'bs-caption' }, t('distance.caption')));
     this.startButton = h('button', { type: 'button', class: 'btn btn--primary', onclick: () => (this.measured ? this.finish() : void this.runTest()) }, t('distance.start'));
     this.skipButton = h('button', { type: 'button', class: 'btn btn--secondary', onclick: () => (this.stored ? this.useStored(this.stored) : this.finish()) }, t('distance.skip'));
@@ -97,7 +95,7 @@ class Distance {
   }
 
   private finish(): void {
-    location.hash = returnHash(this.params);
+    location.hash = returnHash();
   }
 
   /**
@@ -168,7 +166,7 @@ class Distance {
     setStatus(this.frame.status, 'info', t('distance.bsResult', { cm: (a.distanceMm / 10).toFixed(1), sd: (a.sdMm / 10).toFixed(1) }), ' ', t('distance.iris.camera'));
     let c: Capture;
     try {
-      c = await ensureCapture(requestedEngines(), { onStatus: (key) => setStatus(this.frame.status, 'info', t(`calibrate.status.${key}`)) });
+      c = await ensureCapture(requestedEngines(), { onStatus: (key) => setStatus(this.frame.status, 'info', t(`capture.status.${key}`)) });
     } catch (error) {
       if (!this.mounted) return;
       setStatus(this.frame.status, 'lost', t('distance.iris.noCamera', { message: error instanceof Error ? error.message : String(error) }));

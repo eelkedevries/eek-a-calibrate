@@ -1,9 +1,10 @@
 # Export format
 
-The Your data page exports the session as `eek-a-calibrate_<pid>_<session>_<yyyymmdd-hhmm>.zip`
+Details → Data exports the session as `eek-a-calibrate_<pid>_<session>_<yyyymmdd-hhmm>.zip`
 (local time; characters other than letters, digits, `.`, `_` and `-` become `-`, and an empty
-label becomes `none`). Export is offered once a calibration has set the reference viewing
-distance D_ref; assumed geometry still gives one.
+label becomes `none`). Export is offered once a warm-up has set the reference viewing distance
+D_ref; assumed geometry still gives one. The warm-up's levels are the calibration (`calibration`)
+and the Test round the validation (`validation-1`) of the files below.
 
 ## General rules
 
@@ -37,7 +38,7 @@ reason, in `README.txt`.
 | `validation.csv` | Validation metrics per estimator × mode × target, then one summary row each |
 | `cv.csv` | Cross-validated error of every engine, mapper and relative ridge penalty |
 | `events.csv` | Fixations, saccades, blinks and bad data of the selected estimator |
-| `markers.csv` | Markers set during live recordings (only when there are any) |
+| `markers.csv` | Markers set during Expert mode recordings in Free look (only when there are any) |
 | `game.csv` | Every bubble and spike of the challenge's rounds (only when a round was played) |
 | `geometry.yaml` | Viewport size, viewing distance and conventions, for eek-a-gaze |
 | `session.json` | Versions, assets, settings, geometry, schedules, fitted mappings, validations, drift log, thresholds, licences |
@@ -158,9 +159,10 @@ and the viewing distance is D_ref. With assumed geometry the keys stay, with the
 ### session.json
 
 Schema `eek-a-calibrate/session@1`, written with sorted keys: the app version and commit, the
-sha256 of every runtime and model file, the user agent, capabilities, device class, eyewear
-answer and device check, the set-up chosen on the title screen (`propped`, `in-hand` or
-`webcam`) and the motion sensor's state (`granted`, `denied`, `unavailable` or `not-asked`), the vision host, delegate and backends, the camera settings and clock,
+sha256 of every runtime and model file, the user agent, capabilities, device class, the glasses
+answer of Details → Settings and the device check, the set-up chosen on the Title (`propped`,
+`in-hand` or `webcam`) and the motion sensor's state (`granted`, `denied`, `unavailable` or
+`not-asked`), the vision host, delegate and backends, the camera settings and clock,
 the geometry with its sources and uncertainty, the preset, seeds and schedules, the pursuit lag
 τ, the row weights, the full fit (mapping states), Auto's selection and reason, the validation
 reports with paired engine differences, the drift log (the measured offset o = mean(Ḡ − T),

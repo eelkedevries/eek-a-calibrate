@@ -15,7 +15,7 @@ import { loadManifest } from '../../platform/assets.ts';
 import { detectCapabilities, detectDeviceClass, type CapabilityReport } from '../../platform/capabilities.ts';
 import { activeMotion } from '../../platform/motion.ts';
 import { h } from '../dom.ts';
-import { setupRecord } from '../screens/camera.ts';
+import { setupRecord } from '../game/setupRecord.ts';
 import { activeCapture } from '../session.ts';
 import { registerDetailsTab, rememberDetailsReturn, type DetailsPage, type PageContext } from '../shell/detailsSheet.ts';
 import { getState } from '../state.ts';
@@ -217,7 +217,9 @@ function timingsPage(): DetailsPage {
       const setup = setupRecord();
       const probe = setup.probe;
       const decision = setup.runSet;
-      if (!probe) return sheetPage(t('details.device.timings.title'), {}, para(t('details.device.timings.none')));
+      // An engine that failed to load (a model that does not match its hash, say) is named with its reason.
+      const unavailable = setup.engines.filter((e) => !e.ok).map((e) => reading(ESTIMATOR_NAMES[e.id], t('details.device.timings.unavailable', { reason: e.reason ?? t('details.none') })));
+      if (!probe) return sheetPage(t('details.device.timings.title'), {}, para(t('details.device.timings.none')), ...unavailable);
       const ms = (v: number) => (Number.isFinite(v) ? t('details.results.unit.ms', { value: v.toFixed(1) }) : t('details.none'));
       const dropped = new Map((decision?.dropped ?? []).map((d) => [d.engine, d]));
       return sheetPage(
@@ -231,6 +233,7 @@ function timingsPage(): DetailsPage {
           const why = d ? t(`details.device.timings.dropped.${d.reason}`, { budget: PROBE.budgetMs[id as keyof typeof PROBE.budgetMs] ?? PROBE.totalMs, total: PROBE.totalMs }) : t(kept ? 'details.device.timings.kept' : 'details.device.timings.notRun');
           return reading(ESTIMATOR_NAMES[id], [h('span', { class: 'kv__line' }, ms(probe.engines[id]!.p50Ms)), h('span', { class: 'kv__line kv__line--second' }, why)]);
         }),
+        ...unavailable,
         decision ? reading(t('details.device.timings.total'), ms(decision.totalP50Ms)) : null,
         decision && !decision.applied ? note(t('details.device.timings.manual')) : null,
         note(t('details.device.timings.heuristic')),

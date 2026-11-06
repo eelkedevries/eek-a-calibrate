@@ -5,11 +5,9 @@
 // grey stage alone). CSS switches layouts by aspect ratio (5/4) and height (480 px), never by
 // orientation or user agent; the only orientation read here is the camera side of a phone held
 // sideways (design §4.4).
-import { h } from '../dom.ts';
-import { t } from '../strings.en-GB.ts';
 
-/** Game routes use the shell; legacy routes keep the v1 page until 018; document pages scroll. */
-export type ShellLayout = 'game' | 'legacy' | 'document';
+/** Game routes use the no-scroll shell; document pages (#/methods) scroll. */
+export type ShellLayout = 'game' | 'document';
 export type ShellMode = 'framed' | 'immersive' | 'stimulus' | 'document';
 export type LayoutClass = 'portrait' | 'compact' | 'regular';
 
@@ -79,17 +77,4 @@ export function prepareShell(app: HTMLElement, screenId: string, mode: ShellMode
 export function setMode(app: HTMLElement, mode: ShellMode): void {
   app.dataset.mode = mode;
   app.classList.toggle('on-stage', mode === 'immersive' || mode === 'stimulus');
-}
-
-/** Clears `.app` when a legacy route takes over. */
-export function resetShell(app: HTMLElement): void {
-  runCleanups();
-  app.replaceChildren();
-  delete app.dataset.screen;
-  delete app.dataset.mode;
-}
-
-/** The placeholder frames' way back to the Title (secondary on dark, chip style on the grey). */
-export function backToStart(surface: 'dark' | 'chip'): HTMLAnchorElement {
-  return h('a', { class: `btn ${surface === 'chip' ? 'btn--chip' : 'btn--secondary'}`, href: '#/' }, t('shell.placeholder.back'));
 }

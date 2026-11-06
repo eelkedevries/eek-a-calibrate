@@ -1,7 +1,8 @@
-// Smoke test (spec §10.4, §17.12): the built app loads under /eek-a-calibrate/ on the Title,
-// every request stays on this origin, nothing logs an error or violates the production CSP, the
-// self-hosted fonts load, a hash route survives a reload, the Details sheet behaves as a modal
-// dialog, Play opens Get ready, and the v1 flow stays reachable.
+// Smoke test (spec §10.4, §17.2, §17.12): the built app loads under /eek-a-calibrate/ on the Title,
+// every request stays on this origin (the workers' included), nothing logs an error or violates
+// the production CSP, the self-hosted fonts load, every route survives a reload, the v1 hashes
+// redirect to the screens that replaced them and nothing links to them, the Details sheet behaves
+// as a modal dialog, Play opens Get ready, and the server sends the production headers.
 import { readdirSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 
@@ -83,24 +84,85 @@ test('loads the Title with same-origin requests only, the self-hosted fonts, no 
   }
 });
 
-test('a hash route survives a reload: the Details deep link and a v1 route', async ({ page }) => {
-  const problems = watch(page);
-  await page.goto('./?e2e=1#/details/settings');
-  await expect.poll(() => sheet(page)).toMatchObject({ open: true, tab: 'settings' });
-  expect(await route(page)).toBe('details');
-  await page.reload();
-  await expect.poll(() => sheet(page)).toMatchObject({ open: true, tab: 'settings' });
-  expect(await route(page)).toBe('details');
+/** Each route of §17.2, and the route it shows when opened directly without the game's state (§17.2.3). */
+const ROUTES: readonly [string, string][] = [
+  ['#/', 'title'],
+  ['#/ready', 'ready'],
+  ['#/warmup', 'ready'],
+  ['#/complete', 'ready'],
+  ['#/look', 'title'],
+  ['#/challenge', 'title'],
+  ['#/details/results', 'details'],
+  ['#/details/settings', 'details'],
+  ['#/details/data', 'details'],
+  ['#/details/device', 'details'],
+  ['#/details/about', 'details'],
+  ['#/methods', 'methods'],
+  ['#/screen?from=details', 'screen'],
+  ['#/distance?from=details', 'distance'],
+  ['#/lab?from=details', 'lab'],
+];
 
-  await page.goto('./?e2e=1#/about');
-  await expect(page.locator('main h1')).toBeVisible();
-  expect(await route(page)).toBe('about');
-  const heading = await page.locator('main h1').textContent();
-  await page.reload();
-  await expect(page.locator('main h1')).toHaveText(heading ?? '');
-  expect(await route(page)).toBe('about');
+/** The v1 hashes and where they lead now (§17.2.2). */
+const LEGACY: readonly [string, string][] = [
+  ['#/welcome', '#/'],
+  ['#/camera', '#/ready'],
+  ['#/calibrate', '#/ready'],
+  ['#/validate', '#/ready'],
+  ['#/results', '#/details/results'],
+  ['#/live', '#/look'],
+  ['#/data', '#/details/data'],
+  ['#/about', '#/details/about'],
+];
+const LEGACY_HREF = /#\/(welcome|camera|calibrate|validate|results|live|data|about)(\?|$)/;
+
+/** Every link in the page and in the open sheet, as written. */
+const hrefs = (page: Page) => page.evaluate(() => [...document.querySelectorAll('a[href]')].map((a) => a.getAttribute('href') ?? ''));
+
+test('every route survives a reload, and no screen links to a v1 hash', async ({ page }) => {
+  test.setTimeout(120_000);
+  const problems = watch(page);
+  for (const [hash, id] of ROUTES) {
+    await page.goto(`./?e2e=1${hash}`);
+    await expect.poll(() => route(page), { message: hash }).toBe(id);
+    await expect(page.getByRole('heading', { level: 1 }).first()).toBeAttached();
+    expect((await hrefs(page)).filter((h) => LEGACY_HREF.test(h)), hash).toEqual([]);
+    await page.reload();
+    await expect.poll(() => route(page), { message: `${hash} after a reload` }).toBe(id);
+    if (id === 'details') await expect.poll(async () => (await sheet(page)).open).toBe(true);
+  }
   expect(await cspViolations(page)).toEqual([]);
   expect(problems).toEqual([]);
+});
+
+test('the v1 hashes redirect to the screens that replaced them, keeping their query', async ({ context }) => {
+  // Records every address a page shows, from its first script on, and any CSP violation.
+  await context.addInitScript(() => {
+    const w = window as unknown as { __hashes: string[] };
+    w.__hashes = [location.hash];
+    window.addEventListener('hashchange', () => w.__hashes.push(location.hash));
+    const violations: string[] = [];
+    Object.defineProperty(window, '__cspViolations', { value: violations, configurable: true });
+    document.addEventListener('securitypolicyviolation', (event) => violations.push(`${event.violatedDirective} ${event.blockedURI}`));
+  });
+  for (const [from, to] of LEGACY) {
+    // A new page each time, so that every v1 hash is a page load of its own.
+    const page = await context.newPage();
+    const problems = watch(page);
+    await page.goto(`./?e2e=1${from}`);
+    const hashes = () => page.evaluate(() => (window as unknown as { __hashes: string[] }).__hashes);
+    // The first address after the v1 hash is its new screen (whose own guard may move on from there).
+    await expect.poll(async () => (await hashes())[1] ?? null, { message: from }).toBe(to);
+    expect((await hashes())[0]).toBe(from);
+    await expect(page.getByRole('heading', { level: 1 }).first()).toBeAttached();
+    expect(await cspViolations(page)).toEqual([]);
+    expect(problems).toEqual([]);
+    await page.close();
+  }
+  const page = await context.newPage();
+  await page.goto('./?e2e=1#/about?page=privacy');
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe('#/details/about?page=privacy');
+  await expect.poll(async () => (await sheet(page)).open).toBe(true);
 });
 
 test('the Details sheet traps focus, switches tabs by key, closes on Esc and Done, and returns focus', async ({ page }) => {
@@ -217,21 +279,15 @@ test('the pager shows one page at a time; delete all sits behind a confirmation'
   expect(problems).toEqual([]);
 });
 
-test('Play opens Get ready; the v1 flow stays reachable at #/welcome', async ({ page }) => {
+test('Play opens Get ready in the game shell; nothing on the page scrolls', async ({ page }) => {
   const problems = watch(page);
   await page.goto('./?e2e=1');
+  expect(await page.evaluate(() => document.documentElement.dataset.layout)).toBe('game');
   await page.getByRole('button', { name: 'Play' }).click();
   await expect.poll(() => route(page)).toBe('ready');
   expect(await page.evaluate(() => document.documentElement.dataset.layout)).toBe('game');
-  await page.goto('./?e2e=1#/welcome');
-  await expect.poll(() => route(page)).toBe('welcome');
-  await expect(page.locator('.site-header')).toBeVisible();
-  await expect(page.locator('main h1')).toBeVisible();
-  // The v1 page scrolls as before; the game's routes do not.
-  expect(await page.evaluate(() => document.documentElement.dataset.layout)).toBe('legacy');
-  await page.goto('./?e2e=1#/');
-  expect(await page.evaluate(() => document.documentElement.dataset.layout)).toBe('game');
-  await expect(page.locator('.site-header')).toBeHidden();
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).toBe('hidden');
+  await expect(page.getByRole('heading', { level: 1 }).first()).toBeAttached();
   expect(problems).toEqual([]);
 });
 

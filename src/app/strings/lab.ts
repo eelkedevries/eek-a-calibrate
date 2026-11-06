@@ -1,4 +1,4 @@
-// Diagnostics (#/lab), opened from Details → Device. Some keys serve the v1 camera screen too.
+// Diagnostics (#/lab), opened from Details → Device.
 
 export const strings: Readonly<Record<string, string>> = {
   // Diagnostics, #/lab (WP4; spec §7 screen 10)
@@ -66,9 +66,6 @@ export const strings: Readonly<Record<string, string>> = {
   'lab.frames.faces': 'With a face',
   'lab.frames.rate': 'Effective rate',
   'lab.frames.latency': 'Capture to result',
-  'lab.timing.stage': 'Stage',
-  'lab.timing.last': 'Last',
-  'lab.timing.median': 'Median',
   'lab.timing.landmarker': 'Face landmarker',
   'lab.timing.worker': 'Whole frame in the host',
   'lab.timing.latency': 'Capture to result',
@@ -86,19 +83,10 @@ export const strings: Readonly<Record<string, string>> = {
   'lab.face.luma': 'Face luma (mean, SD)',
   'lab.face.backlight': 'Backlight (face / frame luma)',
   'lab.face.glare': 'Glare in the eye boxes',
-  'lab.engine.engine': 'Engine',
-  'lab.engine.status': 'Status',
-  'lab.engine.backend': 'Backend',
-  'lab.engine.load': 'Load time',
-  'lab.engine.frame': 'Last frame',
-  'lab.engine.median': 'Median time',
   'lab.engine.ok': 'available',
   'lab.engine.unavailable': 'unavailable: {reason}',
   'lab.engine.notSelected': 'not selected',
   'lab.run.stage': 'Stage',
-  'lab.run.okFrames': 'Frames ok',
-  'lab.run.p50': 'Median',
-  'lab.run.p90': '90th percentile',
   'lab.run.landmarker': 'Face landmarker',
   'lab.run.prep': 'Frame preparation',
   'lab.run.total': 'Whole frame',

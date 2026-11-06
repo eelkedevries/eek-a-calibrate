@@ -2,8 +2,8 @@
 // set-up chooser works by keyboard; Play opens the camera and Get ready, where the cue and the
 // status row follow the fake camera and Start warm-up (or Start anyway) becomes available within
 // the speed-divided time; the face model's download is reported from its start in a fresh
-// context; a refused camera shows "Camera blocked" and "Try again" on the Title.
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+// context. A refused camera on the Title is a failure path, in failures.spec.ts.
+import { expect, test, type Page } from '@playwright/test';
 import { t } from '../../src/app/strings.en-GB.ts';
 
 interface GuardSnapshot {
@@ -178,41 +178,5 @@ test.describe('Title and Get ready', () => {
     await expect(dialog).toBeFocused();
     await expect(dialog.getByRole('button', { name: t('guard.pause.warmUp') })).toBeVisible();
     await expect(dialog.getByText(t('guard.pause.byItself'))).toBeVisible();
-  });
-
-  test('a refused camera shows "Camera blocked" and "Try again" on the Title', async ({ playwright, baseURL }) => {
-    // As in failures.spec.ts: the suite's browser grants the camera whatever the permission says,
-    // so this test runs its own Chromium and denies the camera for its context over CDP.
-    const browser = await playwright.chromium.launch({ channel: 'chromium', args: ['--use-fake-device-for-media-stream', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
-    try {
-      const context: BrowserContext = await browser.newContext({ baseURL });
-      const page = await context.newPage();
-      const { targetInfo } = await (await context.newCDPSession(page)).send('Target.getTargetInfo');
-      const cdp = await browser.newBrowserCDPSession();
-      await cdp.send('Browser.setPermission', {
-        permission: { name: 'camera' },
-        setting: 'denied',
-        origin: new URL(baseURL!).origin,
-        browserContextId: targetInfo.browserContextId,
-      });
-      const problems = watch(page);
-      await page.goto('./?e2e=1');
-      await page.getByRole('button', { name: t('title.play') }).click();
-      const alert = page.getByRole('alert').filter({ hasText: t('title.blocked.title') });
-      await expect(alert).toBeVisible();
-      await expect(alert).toContainText(t('title.blocked.body'));
-      const retry = page.getByRole('button', { name: t('title.retry') });
-      await expect(retry).toBeVisible();
-      await expect(retry).toBeFocused();
-      expect(await route(page)).toBe('title');
-      await expect(page.locator('video')).toHaveCount(0);
-      // Trying again with the camera still refused stays on the Title.
-      await retry.click();
-      await expect(alert).toBeVisible();
-      expect(await route(page)).toBe('title');
-      expect(problems).toEqual([]);
-    } finally {
-      await browser.close();
-    }
   });
 });

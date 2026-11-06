@@ -1,8 +1,7 @@
 // The warm-up's orchestration without its interface (spec §17.6, §17.7; §4.7–§4.12): connecting
 // the capture to a block, the session geometry, finishing a calibration recording into the
 // pending fit, scoring a Test round into the session's results, and the game's result from it.
-// The v1 calibrate and validate screens call the same functions until prompt 018 removes them;
-// the warm-up screen drives WarmupSession, level by level.
+// The warm-up screen drives WarmupSession, level by level.
 import { DISTANCE, FIT_BUDGET_MS } from '../../core/constants.ts';
 import { referenceDistanceMm } from '../../core/calibration/dataset.ts';
 import { zoneCount, zoneGrid } from '../../core/game/zones.ts';

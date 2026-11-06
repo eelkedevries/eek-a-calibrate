@@ -14,7 +14,7 @@ import { loadScreenScale, saveGeometry, screenScaleKey, storageStatus } from '..
 import { cardMatch } from '../components/cardMatch.ts';
 import { stateBadge, type BadgeState } from '../details/page.ts';
 import { announce, h, type Child } from '../dom.ts';
-import type { RouteId, Screen, ScreenContext } from '../router.ts';
+import type { Screen, ScreenContext } from '../router.ts';
 import { currentValidationRun } from '../session.ts';
 import { addCleanup } from '../shell/appShell.ts';
 import { detailsReturnHash } from '../shell/detailsSheet.ts';
@@ -50,34 +50,22 @@ export function provisionalGeometry(scale: { pxPerMm: number; pxPerMmSource: Scr
   return { screen: screenGeometry, distance: { ...d }, refDistanceMm: null, degreesApproximate: isDegreesApproximate(screenGeometry, d) };
 }
 
-/** Where the optional measurement returns to (`?from=`): the v1 screen it was started from. */
-const RETURN_ROUTES: readonly RouteId[] = ['welcome', 'camera', 'results', 'live', 'data'];
-
-export function returnRoute(params: URLSearchParams): RouteId | null {
-  const from = params.get('from');
-  return from !== null && (RETURN_ROUTES as readonly string[]).includes(from) ? (from as RouteId) : null;
-}
-
 /**
  * Where the measurement goes when it is finished or skipped: back to the screen Details was
- * opened over (`from=details`), to the v1 screen named, or, without one, to the v1 flow.
+ * opened over, with the sheet on Device (the measurement is opened from Details → Device only).
  */
-export function returnHash(params: URLSearchParams): string {
-  if (params.get('from') === 'details') return detailsReturnHash('device');
-  const from = returnRoute(params);
-  if (from) return `#/${from}`;
-  return getState().fit ? '#/results' : '#/camera';
+export function returnHash(): string {
+  return detailsReturnHash('device');
 }
 
 /** The `from` parameter to pass on to the next page of the measurement. */
 export function fromQuery(params: URLSearchParams): string {
-  const from = params.get('from');
-  return from === 'details' || returnRoute(params) ? `?from=${from}` : '';
+  return params.get('from') === 'details' ? '?from=details' : '';
 }
 
 /**
- * Scores the current validation again under the session's (new) geometry (§14.1.3), so that Live,
- * the drift limit and the export use the new degree values without a visit to Results. Pixel
+ * Scores the current validation again under the session's (new) geometry (§14.1.3), so that Free
+ * look, the drift limit and the export use the new degree values without a visit to Results. Pixel
  * results do not change. Nothing happens while the fit has no validation (after a recalibration).
  */
 export function rescoreValidation(): void {
@@ -206,7 +194,7 @@ class ScreenSize {
     const g = getState().geometry;
     const initial = g && g.screen.pxPerMmSource !== 'assumed' ? g.screen.pxPerMm : ASSUMED_PX_PER_MM;
     this.card = cardMatch(initial * 85.6);
-    this.frame = toolFrame(root, { title: t('route.screen'), body: t('screen.body.across'), back: returnHash(ctx.params) });
+    this.frame = toolFrame(root, { title: t('route.screen'), body: t('screen.body.across'), back: returnHash() });
     this.frame.stage.append(this.card.stage);
     watchSize(this.frame.stage, (w, hgt) => {
       this.card.fit(w, hgt);

@@ -6,7 +6,7 @@
 // ("Tracking", one sentence, Re-aim, Play the challenge) fade after 3 s without input; the glyph
 // then stays in the corner. Re-aim runs over this screen (also by D), and is offered after 5
 // minutes, after more than 10 s in the auto-pause overlay, and, unskippable, when §4.13 forces a
-// check. Expert mode (Details → Settings, or ?expert=1) adds Live's raw and per-engine dots, the
+// check. Expert mode (Details → Settings, or ?expert=1) adds the raw and per-engine dots, the
 // trail, recording (R) with markers (M) and the estimator switch.
 import { ESTIMATOR_NAMES } from '../../core/calibration/select.ts';
 import { trialName } from '../../core/export/samplesCsv.ts';
@@ -177,7 +177,8 @@ class LookScreen {
   constructor(root: HTMLElement, ctx: ScreenContext) {
     this.root = root;
     this.ctx = ctx;
-    this.expert = getState().prefs.expert || ctx.params.get('expert') === '1';
+    // `?expert=1` before the hash or after it, as every query parameter (docs/usage.md).
+    this.expert = getState().prefs.expert || ctx.params.get('expert') === '1' || new URLSearchParams(location.search).get('expert') === '1';
     snapshot = () => this.snapshot();
     this.stage = h('section', { class: 'stage', 'aria-hidden': 'false' }, this.board.el);
     this.board.marks.append(this.disc.el);
@@ -636,7 +637,7 @@ class LookScreen {
   private fixtureReaim(name: FixtureName): void {
     this.phase = 'reaim';
     const geometry = fixtureScreen();
-    const stage = new StimulusStage({ game: true });
+    const stage = new StimulusStage();
     const pips = pipLine(t('reaim.progress'));
     const glyph = guardGlyph(false);
     const corner = cornerCluster(glyph.el, t('warmup.pause'), () => undefined);

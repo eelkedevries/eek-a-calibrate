@@ -120,7 +120,7 @@ class WarmupView {
   constructor(root: HTMLElement, glyph: HTMLElement, onPause: () => void) {
     this.root = root;
     this.heading = h('h1', { class: 'sr-only' }, t('warmup.name'));
-    this.stage = new StimulusStage({ game: true });
+    this.stage = new StimulusStage();
     this.pips = pipLine(t('warmup.progress', { level: 1 }));
     this.pips.el.hidden = true;
     this.corner = cornerCluster(glyph, t('warmup.pause'), onPause);
@@ -273,7 +273,7 @@ class WarmupScreen {
 
   /** "Skip warm-up": the stored calibration that matches this camera and screen, made the session's (§17.4.4). */
   private async restore(capture: Capture, block: Block): Promise<boolean> {
-    const [{ listProfiles }, { matchesCurrentSetup }, { restoreProfile }] = await Promise.all([import('../../platform/storage.ts'), import('./camera.ts'), import('../game/liveSession.ts')]);
+    const [{ listProfiles }, { matchesCurrentSetup }, { restoreProfile }] = await Promise.all([import('../../platform/storage.ts'), import('../game/setupRecord.ts'), import('../game/liveSession.ts')]);
     const profiles = await listProfiles().catch(() => []);
     const p = profiles.find((x) => matchesCurrentSetup(x, capture) && x.fit.fitGeometry && sameLayout(x.fit.fitGeometry.screen, block.geometry()));
     if (!p || !this.mounted) return false;

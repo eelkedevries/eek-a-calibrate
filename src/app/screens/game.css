@@ -107,6 +107,8 @@
   inline-size: 100%;
   block-size: 100%;
   pointer-events: none;
+  /* The room a card has; a short one drops the level card's tip lines (below). */
+  container: card-room / size;
 }
 
 .stim-layer:empty {
@@ -166,14 +168,6 @@
   .stim-card {
     inline-size: min(100%, 400px);
   }
-}
-
-/* The state badges are drawings, not the text pills that share the class name in details.css. */
-svg.badge {
-  min-block-size: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
 }
 
 /* ---------------------------------------------------------------- Level cards (design §2.6) */
@@ -273,6 +267,19 @@ svg.badge {
 
   .level-card__go {
     margin-block-start: 0;
+  }
+}
+
+/*
+ * The fit guard's first rung for a card (design §4.1 rule 11, "drop the tip"): where the room left
+ * for it is shorter than the tallest card with its tip lines (round 3, 287 px at 16 px text; a
+ * phone on its side at 802 × 293, or enlarged text), the hint and the round's "16 bubbles" line
+ * go, and the rule, the countdown and Start now stay. In rem, so that enlarged text drops them
+ * sooner.
+ */
+@container card-room (max-height: 18.25rem) {
+  .level-card__hint {
+    display: none;
   }
 }
 

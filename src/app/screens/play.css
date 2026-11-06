@@ -86,6 +86,8 @@
   place-items: center;
   padding: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l);
   pointer-events: none;
+  /* The room a card has (game.css drops a level card's tip lines when it is short). */
+  container: card-room / size;
 }
 
 .play-layer:empty,

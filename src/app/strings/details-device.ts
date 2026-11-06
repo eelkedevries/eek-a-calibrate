@@ -54,6 +54,7 @@ export const strings: Readonly<Record<string, string>> = {
   'details.device.timings.landmarker': 'Face landmarker',
   'details.device.timings.kept': 'Runs',
   'details.device.timings.notRun': 'Did not load',
+  'details.device.timings.unavailable': 'Unavailable: {reason}',
   'details.device.timings.dropped.budget': 'Left out: over its {budget} ms budget',
   'details.device.timings.dropped.total': 'Left out: total over {total} ms',
   'details.device.timings.dropped.no-data': 'Left out: no usable frames',

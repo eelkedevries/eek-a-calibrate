@@ -32,17 +32,16 @@ wins and the gap is work still to be done.
 - **Engines:** `src/engines/registry.ts` loads each engine folder's default-exported
   `EngineModule` by dynamic import; `src/engines/mappers.ts` aggregates each folder's
   `mappers` export. All four engines are stubs (`probe` → not implemented, `mappers` = []).
-- **App shell:** `src/main.ts` (header, footer with "Delete all my data", live region),
-  `src/app/router.ts` (hash routes, lazy screens with a default-exported `Screen`, a
-  `placeholder()` for routes not yet built), `src/app/state.ts` (settings from the query string,
-  session clock, result slots, delete-all hook), `src/app/strings.en-GB.ts` (flat dotted keys,
-  `t()`), `src/app/testHooks.ts` (`window.__eek` with `?e2e=1`; `registerTestHook`),
-  `src/app/dom.ts`, `src/app/style.css` (light/dark tokens, Okabe–Ito engine colours).
-  Every route in specification §7 shows a placeholder screen.
-- **Tests:** `tests/unit/contracts.test.ts`; `tests/e2e/smoke.spec.ts` (same-origin requests,
-  no console errors or CSP violations, hash-route reload, production headers). The fake camera
-  is built from `tests/fixtures/face/portrait.jpg` (public-domain NASA portrait) by
-  `scripts/make-fake-video.sh`.
+- **App shell:** `src/main.ts` (the game shell `.app` and the polite live region; no other
+  chrome), `src/app/router.ts` (hash routes of §17.2, lazy screens with a default-exported
+  `Screen`, `LEGACY_REDIRECTS`), `src/app/state.ts` (settings from the query string, prefs,
+  session clock, result slots, delete-all hook), `src/app/strings.en-GB.ts` (`t()` over one module
+  per screen under `strings/`), `src/app/testHooks.ts` (`window.__eek` with `?e2e=1`;
+  `registerTestHook`, `registerFixture`), `src/app/dom.ts`, `src/app/style.css` (the eek-a-style
+  and game tokens of `shared.css`). See "The game-first interface" below.
+- **Tests:** `tests/unit/*` (node --test); `tests/e2e/*` (Playwright, see "Integration and
+  polish" below). The fake camera is built from `tests/fixtures/face/portrait.jpg`
+  (public-domain NASA portrait) by `scripts/make-fake-video.sh`.
 - **Core maths (002):** `src/core/maths/` holds the DOM-free numerics of specification §4.8.2–§4.9:
   Cholesky/LU/Jacobi (`linalg.ts`), weighted standardisation with floors, the seeded PCA block
   and clipping (`standardise.ts`, `pca.ts`), weighted ridge whose design already contains the
@@ -74,7 +73,8 @@ wins and the gap is work still to be done.
   `ctx.env` also carries `forceBackend` (`?force=cpu`), which the frozen `RuntimeEnv` lacks: read
   it as `(ctx.env as EngineRuntimeEnv).forceBackend` (`platform/capabilities.ts`). The core
   resolves the ORT `?url` assets itself, so it does not depend on `engines/runtimes/ort.ts`.
-- **`#/lab`:** diagnostics and "Run each engine on 10 frames" (the probe). Crop renderers are
+- **`#/lab`:** diagnostics and "Run each engine on 10 frames" (the probe), opened from Details →
+  Device. Crop renderers are
   discovered from `src/engines/<id>/lab.ts` (default export of the `CropRenderer` shape in
   `src/app/screens/lab.ts`; DOM-free). Test hooks once `lab.ts` has loaded: `__eek.lab()`,
   `labStart`, `labRunAll`, `labCaptureFixture`, `crashWorker`.
@@ -211,44 +211,33 @@ wins and the gap is work still to be done.
   `restoreEstimators`, `restoreEstimatorSet` (for the drift offset), `scoreRecording` (both modes,
   with the receive-time map; re-scores under a newer geometry).
 - **App:** `src/app/session.ts` holds the running capture (`ensureCapture`, stopped on any route
-  other than camera, calibrate, validate, results, live), the pending fit and the validation run.
-  `components/stimulusCanvas.ts`: the stage lives on `<body>` so calibration hands a fullscreen
-  stage to validation without a gesture; `BlockRunner` presents items (rAF onsets, extension,
-  retry, pause by P, button, face lost > 400 ms of capture time or hidden page; abort by Esc or
-  button; invalidation from `platform/presentation.ts`). Test hooks: `__eek.protocol()` and
-  `__eek.simulateFullscreenExit()`. Results re-score the stored validation on every visit.
+  but Get ready, the warm-up, Warm-up complete, Free look, the challenge and the measurement
+  pages), the pending fit and the validation run. `components/stimulusCanvas.ts`: the grey stage
+  (one canvas, embedded in the game shell) and `BlockRunner`, which presents items (rAF onsets,
+  extension, retry, pause by P, the guard, face lost > 400 ms of capture time or a hidden page;
+  abort by Esc; invalidation from `platform/presentation.ts`) and draws through `GameHooks`.
 
-## Setup, live and data screens (after prompt 009)
+## Pipeline pieces from prompt 009
 
-- **Flow (§14.1.1):** Welcome → Camera → Calibrate → Validate → Results → Live → Data. `#/screen`
-  → `#/distance` is one optional action (`?from=` names the screen to return to) on Welcome
-  (Advanced), Results and Data. Measuring after calibration only changes `state.geometry` (scale,
-  distance model, D_ref rescaled by f_new/f_fit) and re-scores the current validation at once
-  (`screen.ts` `rescoreValidation`); the camera keeps running through `#/screen` and `#/distance`.
-  `router.ts`'s `FLOW` lists this order (only the unused WP1 placeholder reads it).
-- **Camera (`screens/camera.ts`):** meters (`components/qualityMeter.ts`, `HoldGate` latches after
-  2 s green; "Continue anyway" after 20 s), picker (`session.setPreferredCamera`), eyewear,
-  probe and `decideRunSet` (rule applied for Auto only; a hand-picked list is reported, not cut).
-  `setupRecord()`/`snapshotCapture()` keep camera, host, probe and eyewear for session.json.
-- **Persistence (`platform/storage.ts`):** IndexedDB `eek-a-calibrate` v1 (`geometry`, `profiles`,
-  `sessions`); reads never create the database; failed writes fall back to memory with a
-  published warning; LRU of 8 profiles; `deleteAllStoredData` is the registered delete-all
-  handler (imported by `main.ts`). Profiles store the fit without `oofDeg`/`rowFrameIndex`, the
-  key parts and the camera label: the fake camera (and some browsers) change device ids on
-  reload, so a profile also matches by camera name and frame size; VAL6 decides.
-- **Drift (`core/calibration/drift.ts`):** drift and RECAL5 schedules (nth stream seeds), `driftOffset`
-  (o = mean(Ḡ − T) from `scoreValidation`), `driftDecision` (the correction added to θ is −o),
-  `nextDriftDueMs`, `forcedDriftReasons`.
-- **Live (`screens/live.ts`):** the stage of `stimulusCanvas.ts` with a toolbar; checks reuse
-  `BlockRunner`, `FrameRecorder`, `CaptureLink` and `runSchedule`. Session blocks (live, drift,
-  recalibration, validation-n), the drift log and per-estimator corrections live in module
-  records keyed by the fit lineage (`sessionRecords()`); a new calibration starts them afresh.
-  The profile is saved when Live opens after a validated fit. `restoreProfile` → Live requires
-  VAL6 ≥ acceptable, then a forced drift check. Test hooks: `__eek.live()`, `__eek.camera()`.
-- **Export (`screens/data.ts`, `buildSessionExport`):** assembled file by file (not `buildExport`)
+The v1 screens of prompt 009 were removed by prompt 018; what they built stays:
+
+- **Persistence (`platform/storage.ts`):** IndexedDB `eek-a-calibrate` (v2 since 017: `geometry`,
+  `profiles`, `sessions`, `prefs`, `scores`); reads never create the database; failed writes fall
+  back to memory with a published warning; LRU of 8 profiles; `deleteAllStoredData` is the
+  registered delete-all handler (imported by `main.ts`). Profiles store the fit without
+  `oofDeg`/`rowFrameIndex`, the key parts and the camera label: the fake camera (and some
+  browsers) change device ids on reload, so a profile also matches by camera name and frame size
+  (`matchesCurrentSetup` in `app/game/setupRecord.ts`); the Test round decides.
+- **Drift (`core/calibration/drift.ts`):** drift and RECAL5 schedules (nth stream seeds),
+  `driftOffset` (o = mean(Ḡ − T) from `scoreValidation`), `driftDecision` (the correction added to
+  θ is −o), `nextDriftDueMs`, `forcedDriftReasons`.
+- **Export (`details/data.ts`, `buildSessionExport`):** assembled file by file (not `buildExport`)
   so geometry.yaml or events.csv can be left out and named in README.txt (§15.2.2); adds
   `markers.csv`; recomputes samples per block with that block's fit, corrections and the current
   geometry (D_t rescaled by focal ratio); live `gaze_*_filt` from the same One Euro stream.
+- **The set-up record (`app/game/setupRecord.ts`):** device class, capabilities, the camera and
+  host in use, the engines' status, and the device probe with its run set (`decideRunSet`, the
+  rule of §7 row 1), recorded by Get ready for session.json and Details → Device.
 
 ## Integration and deploy (after prompt 010)
 
@@ -257,20 +246,14 @@ wins and the gap is work still to be done.
   into `/eek-a-calibrate/`), the protect line in its `scripts/deploy.sh` and a README sentence;
   run 1 of the workflow succeeded on 1 November 2026. A push here does not deploy: start the
   workflow (`npm run deploy`, *Run workflow*, or the GitHub API; `docs/deployment.md`).
-- **End-to-end suite:** `failures.spec.ts` (camera permission denied, in its own new-headless
-  Chromium with the permission denied over CDP, because `--use-fake-ui-for-media-stream` grants
-  the camera regardless; fullscreen exit through `__eek.simulateFullscreenExit()` in calibration
-  and validation; a tampered Peekr model through `context.route`, which also reaches the worker;
-  `__eek.crashWorker()` in the lab and mid-calibration) and `mobile.spec.ts` (390 × 844,
-  `isMobile`, `hasTouch`, the portrait fake camera, safe-area insets set with CDP
-  `Emulation.setSafeAreaInsetsOverride`; the default flow by taps; turning the phone in Live and
-  in a block). A `test.use({ launchOptions })` forces its own worker, so the mobile spec runs in
-  its own browser. `tests/e2e/global-setup.ts` builds both fake videos. Besides the scheduled
-  positions, `mobile.spec.ts` reads the targets as drawn on the stage canvas and matches each to
-  `layoutToPx` with the measured insets (a check without the insets fails).
-- **Narrow phones:** Diagnostics and About no longer scroll sideways at 320–390 CSS px (their
-  definition lists use `minmax(0, …)` tracks; a long camera name in the lab's picker is cut off
-  with an ellipsis; wide lab tables scroll inside their panel).
+- **End-to-end techniques** (still used by the suite of prompt 018): a refused camera runs in its
+  own new-headless Chromium with the permission denied over CDP, because
+  `--use-fake-ui-for-media-stream` grants the camera regardless; a tampered Peekr model through
+  `context.route`, which also reaches the worker; `__eek.crashWorker()`; the mobile spec's
+  `test.use({ launchOptions })` forces its own worker and browser (the portrait fake camera), with
+  safe-area insets set by CDP `Emulation.setSafeAreaInsetsOverride`; besides the scheduled
+  positions it reads the bubbles as drawn on the stage canvas and matches each to `layoutToPx`
+  with the measured insets. `tests/e2e/global-setup.ts` builds both fake videos.
 - **Iris capture:** at least 2 s, continued until 10 open-eye frames or 6 s, so that a slow phone
   can finish; the copy says "a little longer on a slow device".
 - **Test hooks:** `__eek.crashWorker()` is registered by `session.ts` as well as by the lab, so it
@@ -278,8 +261,6 @@ wins and the gap is work still to be done.
 - **Probe limit:** `MessageHost.probe` gives up after 10 s plus, per frame still to come, the
   longer of 1 s and twice the latest submit-to-result time, re-armed on every result
   (`probeTimeoutMs`), so the CPU BlazeGaze path finishes.
-- **Copy:** `invalidationText` (calibration) names the calibration; `invalidationReason` gives
-  the cause alone (`invalid.*` strings) for validation and Live.
 - **Manual checks still owed:** `docs-dev/manual-verification.md` (real cameras, phones, glasses,
   lighting, distances, a low-end laptop, BlazeGaze on WebGL). No accuracy figure is published
   until it has been done.
@@ -293,8 +274,8 @@ wins and the gap is work still to be done.
 - **Recalibration (§16.2.2):** a quick recalibration clears the validation run; Results asks for
   the VAL6 revalidation instead of re-scoring the old run.
 - **Main-thread loading (§16.2.3, §16.2.4):** the frame clock makes no bitmap while the host is
-  busy; engine specs live in `src/engines/<id>/spec.ts` and `src/engines/specs.ts`, so Welcome,
-  About, the export and `fitRecording` load no engine code.
+  busy; engine specs live in `src/engines/<id>/spec.ts` and `src/engines/specs.ts`, so the Title,
+  Details, the export and `fitRecording` load no engine code.
 
 ## Real-device findings (specification v0.4 §16.1)
 
@@ -318,10 +299,8 @@ wins and the gap is work still to be done.
 - **Contracts (additive, §17.11):** `Phase` gains `'game'`; `RecordedFrame.deviceTiltDeg` and
   `.deviceRollDeg`; `createVisionHost(cfg, prefer?, hooks?)` registers the progress listener
   before init.
-- **Status:** the shell and routes (013), the Title and Get ready (014), the warm-up levels and
-  Warm-up complete (015), the Details sheet (017), and Free look, Re-aim and the challenge (016)
-  are built. The legacy screens (Welcome, Camera, Calibrate, Validate, Results, Live, Data,
-  About) stay until 018.
+- **Status:** built and integrated (013–018). The v1 screens (Welcome, Camera, Calibrate,
+  Validate, Results, Live, Data, About) are gone; their hashes redirect (§17.2.2).
 
 ## Title, Get ready and the position guard (after prompt 014)
 
@@ -367,16 +346,16 @@ wins and the gap is work still to be done.
   and hit/miss), `stars.ts` (stars, outcome); `zoneGrid` chooses columns and rows separately with
   `halfCellDegAxis` (added to `metrics/aoi.ts`; `aoiGrid` unchanged).
 - **Orchestration (`app/game/warmupRunner.ts`):** `CaptureLink`, `sessionGeometry`,
-  `finishCalibration`, `applyTestRound` and `chosenEstimator` moved here from the v1 calibrate and
-  validate screens (which call them, and re-export them for Live, until 018); `WarmupSession`
+  `finishCalibration`, `applyTestRound` and `chosenEstimator` (from the v1 calibrate and validate
+  screens); `WarmupSession`
   runs one warm-up (geometry measured at the start of Level 1, the recorders, level frames, the
   refit of a quick warm-up); `warmupResultFrom` turns the scored Test round into zones, stars,
   marks and the cause for the selected estimator in mode `own`.
-- **Stage (`components/stimulusCanvas.ts`):** `new StimulusStage({ game: true })` embeds the
-  stage in the shell; `RunContext.game` (`GameHooks`) draws the bubble, firefly and head arcs
+- **Stage (`components/stimulusCanvas.ts`):** `new StimulusStage()` embeds the grey stage in the
+  shell; `RunContext.game` (`GameHooks`) draws the bubble, firefly and head arcs
   (`components/{bubble,firefly,headArcs}.ts`; `?target=ring` keeps the §4.7 ring), pops between
   items, reports progress to the pip line and waits out pauses through the screen (`paused`,
-  `resumed`); `resume(reason)` never ends another reason's pause. The v1 path is unchanged.
+  `resumed`); `resume(reason)` never ends another reason's pause.
 - **Screens:** `screens/warmup.ts` (level cards, HUD, the guard in context `warmup` /
   `warmup-head`, Pause card, three-pause card, screen-changed card, Checking your aim…) and
   `screens/complete.ts` (zone map, stars, outcome copy and actions; an actions fit guard), styled
@@ -395,9 +374,9 @@ wins and the gap is work still to be done.
   `#/details/<tab>?page=<id>` open a page; `ctx.whileShown`/`ctx.every` run live parts (Device
   readings) only while their page is shown.
 - **Extracted code:** the export (`buildSessionExport`, `storeSessionSummary`) lives in
-  `details/data.ts`, the Results computations (`estimatorRows`, `bestCandidates`, …) in
+  `details/data.ts`, the Results computations (`bestCandidates`, `reportFunnel`, …) in
   `details/results.ts`, the engine sizes in `details/settings.ts`, Methods' sections in
-  `screens/methods.ts`; the v1 Results, Data, About and Welcome screens call them until 018.
+  `screens/methods.ts`.
 - **Preferences:** `state.prefs` (`Prefs`: warm-up length, engines, glasses, sound, speech,
   Limited head movement, theme, camera, Expert mode, set-up choice) via `setPrefs`, stored in
   IndexedDB v2 `prefs` (storage.ts registers the store with `setPrefsStore`); `main.ts` loads them
@@ -412,18 +391,16 @@ wins and the gap is work still to be done.
 - **Storage v2:** `prefs` and `scores` stores (`upgradePlan` adds what is missing); best scores per
   zone set with `recordScore`/`bestScore`/`listScores` (`scoreKey(cols, rows)`).
 - **Tool pages:** `#/screen`, `#/distance` and `#/lab` are framed game routes (`toolFrame` in
-  `screens/screen.ts`, `pages.css`); `from=details` returns to the screen Details was opened over
-  (`detailsReturnHash`). The card match lies at true size in the stage (across, upright, or upright
+  `screens/screen.ts`, `pages.css`); they return to Details → Device over the screen Details was
+  opened over (`detailsReturnHash`). The card match lies at true size in the stage (across, upright, or upright
   and cut, matching the card's width). The lab's cards page in the stage (`Section` select).
 
 ## Free look, Re-aim and the challenge (after prompt 016)
 
-- **Live machinery (`app/game/liveSession.ts`):** extracted from the v1 Live screen, which now
-  calls it: the session's records (lineage of fits, blocks `live`, `drift`, `recalibration`,
+- **Live machinery (`app/game/liveSession.ts`):** extracted from the v1 Live screen: the session's records (lineage of fits, blocks `live`, `drift`, `recalibration`,
   `validation` and `game`, the drift log with `source` `check` or `game`, the corrections, a
   restored profile, forced-check reasons), `GazeStream` (estimator set, One Euro, blink hold),
-  `applyDriftCheck`, `refitWithRecalibration`/`adoptRecalibration`, `applyRevalidation`,
-  `settleRestore`, `adoptQuickWarmup` and `adoptRestoreTestRound` (called by the warm-up screen),
+  `applyDriftCheck`, `settleRestore`, `adoptQuickWarmup` and `adoptRestoreTestRound` (called by the warm-up screen),
   `applyGameOffset` (the challenge's correction, added to the one in use within the §4.13 limit),
   `runReaim` (the drift schedule as two bubbles over the screen that offered it, with its chip or
   card), and `LivePlay` (the capture, guard and overlay, records and stream for Free look and the
@@ -449,9 +426,60 @@ wins and the gap is work still to be done.
   `samples.csv` and `targets.csv`, rows of the new `game.csv`, and `session.json`'s `game` member
   (set-up, warm-ups with their pauses, rounds, offset corrections).
 
+## Integration and polish (after prompt 018)
+
+- **Routes (§17.2):** `#/` Title, `#/ready` Get ready, `#/warmup` (level cards, levels, Checking,
+  the Quick warm-up), `#/complete`, `#/look`, `#/challenge`, `#/details/<tab>` (the sheet over the
+  Title; `?page=<id>`), `#/methods` (a document that may scroll down, never sideways),
+  `#/screen`, `#/distance` and `#/lab` (opened from Details → Device). `LEGACY_REDIRECTS` in
+  `router.ts`: `#/welcome` → `#/`; `#/camera`, `#/calibrate`, `#/validate` → `#/ready`;
+  `#/results` → `#/details/results`; `#/live` → `#/look`; `#/data` → `#/details/data`;
+  `#/about` → `#/details/about`; a query after the hash is kept. A unit test checks that nothing
+  under `src/` names a v1 hash.
+- **Removed with the v1 screens:** `screens/{welcome,camera,calibrate,validate,results,live,data,
+  about}.ts`, `legacy.css`, the v1 header and footer of `main.ts`, the `legacy` layout of the
+  router and shell, the components `banner`, `progress`, `qualityMeter`, `gazeDot` and
+  `metricTable`, the v1 path of `stimulusCanvas.ts` (instruction and pause cards, corner buttons,
+  progress bar, caption, the shared `<body>` stage, the pose guide's drawing), the string modules
+  `site`, `welcome`, `calibrate`, `validate`, `live`, `drift`, `stimulus`, `meters` and
+  `components` (the few keys still used moved to `shell`, `capture`, `storage` and
+  `details-settings`), and the test hooks `__eek.protocol()`, `__eek.live()` and
+  `__eek.camera()`. The schedules' `instruction` items keep their `textKey` (data of the frozen
+  contract); nothing shows them.
+- **Test hooks:** `__eek.state()`, `route()`, `sheet()`, `fixture()`, `injectGeometry()`,
+  `engines()`; `loading()`, `guard()`, `forceGuard()` (Get ready); `warmup()`; `result()`,
+  `forceZones(cols, rows)`; `look()`; `challenge()`; `simulateFullscreenExit()` (any running
+  span, through `simulateInvalidation` in `platform/presentation.ts`); `crashWorker()`; `lab()`
+  and its actions. Fixtures (`?fixture=`): `title-skip|blocked|unsupported`,
+  `ready-loading|searching|adjust|holding|ready|anyway`, `guard-overlay`, `guard-overlay-late`,
+  `warmup-card|card-2|pop|follow|turn|checking|pause|changed|rotated|fix`,
+  `complete-great|good|rough|rough-two|failed|restore|quick`,
+  `look|look-faded|look-offer|look-reaim`, `reaim-fixed|fine|large`,
+  `challenge-card-1|card-2|card-3|play|offer|done-well|done-final|done-badly|done-shift`.
+- **End-to-end suite (`tests/e2e/`, shared steps in `helpers/game.ts`):** `smoke` (Title,
+  same-origin requests with the workers', fonts, CSP, every route surviving a reload, the
+  redirects, the sheet as a modal dialog, headers), `vision` and `engines` (through `#/lab`),
+  `ready` (Title and Get ready), `flow` (the whole game with every engine to Round complete, then
+  Details → Results; the Standard cards), `live-data` (Free look, Re-aim, a round, the export with
+  `game.csv`, Skip warm-up), `failures` (camera blocked; a fullscreen exit in a level and in a
+  round; a tampered model, shown in Details → Device → Engine timings; a worker crash in the lab
+  and in a level), `mobile` (portrait and landscape by taps, the camera side at 90° and 270°, the
+  safe rectangle, a turn in a level and in Free look), `details`, `no-scroll` (every route and
+  fixture at 360×640, 390×844, 844×390, 1280×650 and 1440×900 with the 44 px check), `a11y` (the
+  whole game by keyboard alone, names and roles, reduced motion; `A11Y_EXTRA=1` runs the further
+  sizes of design §4.1 rule 13 and 125 % text once) and `visual` (each board's state at its size;
+  `VISUAL_018=update` writes `docs-dev/reviews/visual-018/`). Contrast is a unit test
+  (`tests/unit/a11y-contrast.test.ts`, from the token values).
+- **Polish:** small text is never set in `--color-faint` (it fails 4.5 : 1 on surfaces; muted is
+  used); the Details text pill is `span.badge`, so the state badges (`svg.badge`) draw on every
+  screen; the Title's name and meta line wrap under enlarged text; the fit guards also re-run when
+  the root text size changes; the sheet's tabs keep 44 px; a level or round card drops its tip
+  lines when the room left for it is short (the container `card-room` on the card layers), so
+  that round 3's card fits at 802×293; the theme-colour follows the chosen theme.
+
 ## In progress
 
-v1 (prompts 001–011) is complete, with the final-review fixes of specification §16.2. Next:
-prompts 013–018 (the game-first interface), in order; then the owner's manual checks, including
-the pilot of the bubble target against the ring (§17.12); phase-2 items (specification §13) only
-by new prompts.
+v1 (prompts 001–011), its review fixes (012, specification §16) and the game-first interface
+(013–018, §17) are complete. Next: the owner's manual checks (`docs-dev/manual-verification.md`),
+including the pilot of the bubble target against the ring (§17.12.4) before any accuracy figure is
+published; phase-2 items (specification §13) only by new prompts.

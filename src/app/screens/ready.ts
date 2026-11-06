@@ -43,9 +43,9 @@ import { t } from '../strings.en-GB.ts';
 import { registerFixture, testMode } from '../testHooks.ts';
 import { startSpan } from '../game/gameState.ts';
 import { measuredScale } from '../game/warmupRunner.ts';
-import { decideRunSet, matchesCurrentSetup, recordProbe, snapshotCapture } from './camera.ts';
+import { decideRunSet, matchesCurrentSetup, recordProbe, snapshotCapture } from '../game/setupRecord.ts';
 
-/** The probe starts once a face has been seen this long, so that the engines have work (as on #/camera). */
+/** The probe starts once a face has been seen this long, so that the engines have work. */
 const PROBE_AFTER_FACE_MS = 1000;
 /** The height of the cue's tip line (14 px × 1.55 and the 2 px gap), kept free under the headline. */
 const TIP_RESERVE_PX = 24;

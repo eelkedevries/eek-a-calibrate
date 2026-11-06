@@ -31,7 +31,7 @@ import type { ProbeResult } from '../../vision/protocol.ts';
 import './pages.css';
 import { checkRow } from '../details/page.ts';
 import { h } from '../dom.ts';
-import type { Screen, ScreenContext } from '../router.ts';
+import type { Screen } from '../router.ts';
 import { addCleanup } from '../shell/appShell.ts';
 import { detailsReturnHash } from '../shell/detailsSheet.ts';
 import { icon } from '../shell/icons.ts';
@@ -39,7 +39,7 @@ import { splitBlocks } from '../shell/pager.ts';
 import { getState } from '../state.ts';
 import { t } from '../strings.en-GB.ts';
 import { registerTestHook } from '../testHooks.ts';
-import { guardPanel, returnHash, toolFrame } from './screen.ts';
+import { guardPanel, toolFrame } from './screen.ts';
 
 // ----- Crop renderer contract -------------------------------------------------
 
@@ -355,11 +355,11 @@ class Lab {
   private shape = '';
   private root: HTMLElement | null = null;
 
-  mount(root: HTMLElement, ctx: ScreenContext): () => void {
+  mount(root: HTMLElement): () => void {
     this.root = root;
     const settings = getState().settings;
     if (Array.isArray(settings.engines)) for (const id of settings.engines) this.selected.add(id);
-    this.layout(root, ctx);
+    this.layout(root);
     void loadRenderers().then((r) => {
       this.renderers = r;
       this.buildCropSlots();
@@ -391,9 +391,9 @@ class Lab {
     return { id, title: t(`lab.section.${id}`), el };
   }
 
-  private layout(root: HTMLElement, ctx: ScreenContext): void {
-    // Diagnostics is opened from Details → Device: Back returns there unless the address names a v1 screen.
-    const back = ctx.params.get('from') && ctx.params.get('from') !== 'details' ? returnHash(ctx.params) : detailsReturnHash('device');
+  private layout(root: HTMLElement): void {
+    // Diagnostics is opened from Details → Device: Back returns there.
+    const back = detailsReturnHash('device');
     const frame = toolFrame(root, { title: t('route.lab'), body: t('lab.lead'), back });
     this.startButton = h('button', { type: 'button', class: 'btn btn--primary', onclick: () => void this.toggle() }, t('lab.start'));
     this.runButton = h('button', { type: 'button', class: 'btn btn--secondary', disabled: true, onclick: () => void this.runAll() }, t('lab.runAll'));
@@ -971,8 +971,8 @@ registerTestHook('labCaptureFixture', () => current?.captureFixture() ?? Promise
 registerTestHook('crashWorker', () => crashWorkerHosts());
 
 const screen: Screen = {
-  mount(root, ctx) {
-    return new Lab().mount(root, ctx);
+  mount(root) {
+    return new Lab().mount(root);
   },
 };
 

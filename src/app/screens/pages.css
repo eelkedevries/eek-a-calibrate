@@ -381,7 +381,7 @@
 .lab-deck__nav .pager__label {
   font-family: var(--font-mono);
   font-size: 0.875rem;
-  color: var(--color-faint);
+  color: var(--color-muted-text);
 }
 
 .lab-crops {

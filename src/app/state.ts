@@ -24,7 +24,7 @@ export interface Settings {
   select: 'auto' | EstimatorId;
   seed: number;
   seedSource: 'query' | 'clock';
-  /** Minutes between timed drift prompts in Live; 0 turns them off. */
+  /** Minutes between timed Re-aim prompts in Free look and the challenge; 0 turns them off. */
   driftEveryMin: number;
   host: 'worker' | 'inline' | null;
   force: 'cpu' | null;
@@ -184,7 +184,7 @@ function oneOf<T extends string>(value: string | null, allowed: readonly T[]): T
   return value !== null && (allowed as readonly string[]).includes(value) ? (value as T) : null;
 }
 
-/** Reads the settings from the query string, both before the hash and after it (`#/live?pid=…`). */
+/** Reads the settings from the query string, both before the hash and after it (`#/look?pid=…`). */
 export function parseSettings(location: Pick<Location, 'search' | 'hash'>, nowMs = Date.now()): Settings {
   const params = new URLSearchParams(location.search);
   const hashQuery = location.hash.indexOf('?');
@@ -286,6 +286,10 @@ export function applyTheme(theme: Theme): void {
   if (typeof document === 'undefined') return;
   if (theme === 'light') document.documentElement.dataset.theme = 'light';
   else delete document.documentElement.dataset.theme;
+  // The browser's toolbar follows the theme chosen here, not the system's colour scheme.
+  const background = getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim();
+  const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (meta && background) meta.content = background;
 }
 
 /**

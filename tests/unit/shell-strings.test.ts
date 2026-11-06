@@ -17,13 +17,13 @@ test('t() keeps its signature: placeholders filled, a missing key returned as is
   assert.equal(t('track.levelOf', { level: 2, levels: 4 }), 'Level 2 of 4');
   assert.equal(t('no.such.key'), 'no.such.key');
   assert.equal(t('constructor'), 'constructor');
-  assert.equal(t('welcome.start') !== 'welcome.start', true);
+  assert.equal(t('title.play') !== 'title.play', true);
 });
 
-test('the shell copy is British English without em dashes (§17.3.6)', () => {
-  for (const name of ['shell', 'track', 'details', 'title', 'ready', 'guard', 'warmup', 'complete', 'look', 'challenge', 'methods']) {
-    for (const [key, value] of Object.entries(STRING_MODULES[name]!)) {
-      assert.ok(!value.includes('—'), `${key} has an em dash`);
+test('the interface copy is British English without em dashes (§17.3.6)', () => {
+  for (const [name, table] of Object.entries(STRING_MODULES)) {
+    for (const [key, value] of Object.entries(table)) {
+      assert.ok(!value.includes('—'), `${key} (strings/${name}.ts) has an em dash`);
     }
   }
   assert.equal(t('title.name'), 'Pop with your eyes');

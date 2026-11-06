@@ -1,5 +1,5 @@
 // Details → About (design §2.17; spec §17.2.1, Appendix B). The engines' licences, citations and
-// published evidence are the v1 About page's (strings/about.ts), shared with Methods.
+// published evidence are in strings/about.ts, shared with Methods.
 
 export const strings: Readonly<Record<string, string>> = {
   'details.about.title': 'About the game',

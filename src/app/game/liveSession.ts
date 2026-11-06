@@ -1,15 +1,14 @@
-// The live machinery after a calibration (spec §4.10, §4.11, §4.13, §4.15, §17.8, §17.9.3),
-// extracted from the v1 Live screen so that Free look, Re-aim, the challenge and that screen share
-// it until prompt 018 removes the latter: the session's records (the lineage of fits, the recorded
+// The live machinery after a calibration (spec §4.10, §4.11, §4.13, §4.15, §17.8, §17.9.3), shared
+// by Free look, Re-aim and the challenge: the session's records (the lineage of fits, the recorded
 // blocks, the drift log and the corrections, a restored profile, the forced-check reasons), the
 // estimator set and the One Euro display stream with the blink hold, the drift check's scoring
-// and decision, the quick recalibration with its required revalidation, and Re-aim, the drift
+// and decision, the quick warm-up's refit with its required revalidation, and Re-aim, the drift
 // check as the game presents it (two bubbles over the screen that offered it).
 //
 // Raw outputs are what is recorded; filtering is for display and the game only (§4.11).
 import manifestUrl from '../../../assets-manifest.json?url';
 import { driftDecision, driftLimitDeg, driftOffset, driftSchedule, forcedDriftReasons, type DriftContext, type DriftForceReason } from '../../core/calibration/drift.ts';
-import { FIT_BUDGET_MS, SETUP } from '../../core/constants.ts';
+import { SETUP } from '../../core/constants.ts';
 import type { DriftLogEntry } from '../../core/export/sessionJson.ts';
 import { trialName } from '../../core/export/samplesCsv.ts';
 import { BLINK_HOLD_INITIAL, blinkHold, type BlinkHoldState } from '../../core/filters/blinkHold.ts';
@@ -27,7 +26,7 @@ import type { Home } from '../../core/position/home.ts';
 import { bubbleDiameterPx } from '../../core/warmup/bubble.ts';
 import { ENGINE_IDS, Flags } from '../../core/types.ts';
 import type { EngineId, EstimatorId, FitResult, FrameResult, GazeSample, RecordedFrame, Recording, ScreenGeometry, SessionGeometry, TargetItem, ValidationReport, Vec2 } from '../../core/types.ts';
-import { fitRecording, frameBaseFlags, restoreEstimatorSet, scoreRecording, type EstimatorSet, type ScoredRecording } from '../../fit/fitClient.ts';
+import { frameBaseFlags, restoreEstimatorSet, scoreRecording, type EstimatorSet } from '../../fit/fitClient.ts';
 import { loadManifest } from '../../platform/assets.ts';
 import { HAPTICS, playSound, vibrate } from '../../platform/feedback.ts';
 import type { Presentation as Block, Invalidation } from '../../platform/presentation.ts';
@@ -44,7 +43,7 @@ import { targetSizes } from '../components/target.ts';
 import { announce, h } from '../dom.ts';
 import { openDetails } from '../shell/detailsSheet.ts';
 import { isFullscreen } from '../../platform/fullscreen.ts';
-import { activeMotionSource, currentValidationRun, ensureCapture, readyHome, requestedEngines, resetSessionResults, setValidationRun, type Capture, type ValidationRun } from '../session.ts';
+import { activeMotionSource, currentValidationRun, ensureCapture, readyHome, requestedEngines, resetSessionResults, type Capture, type ValidationRun } from '../session.ts';
 import { endSpan, playableZones, recalibrationNumber, setWarmupMode, span, startSpan } from './gameState.ts';
 import { getState, setPrefs, setState } from '../state.ts';
 import { t } from '../strings.en-GB.ts';
@@ -248,15 +247,6 @@ export async function profileParts(fit: FitResult, cameraHash: string | null, vi
     video: `${video.w}x${video.h}`,
     engines: engines.join(','),
   };
-}
-
-/**
- * The stored calibration was made with this camera at this frame size. Some browsers change device
- * ids between visits, so a camera of the same name also counts; the VAL6 check then decides.
- */
-export function sameCamera(p: { parts: ProfileKeyParts; cameraLabel: string }, hash: string | null, label: string, video: { width: number; height: number }): boolean {
-  const camera = p.parts.cameraHash === (hash ?? 'unknown') || (p.cameraLabel !== '' && p.cameraLabel === label);
-  return camera && p.parts.video === `${video.width}x${video.height}`;
 }
 
 export function ownReport(reports: readonly ValidationReport[] | null, id: EstimatorId): ValidationReport | null {
@@ -559,37 +549,6 @@ export function applyGameOffset(rec: LiveRecords, estimator: EstimatorId, offset
   return { applied: out.applied, correction: out.correctionDeg };
 }
 
-/** RECAL5 refitted with the calibration at weight ×2 (§4.13): the new fit. */
-export function refitWithRecalibration(rec: LiveRecords, run: CheckDone, engines: EngineId[], onProgress: (fraction: number) => void): Promise<FitResult> {
-  const base = rec.base?.calibration;
-  if (!base) return Promise.reject(new Error('There is no calibration to refit.'));
-  const { settings } = getState();
-  return fitRecording(base, { seed: settings.seed, engines, maxMs: FIT_BUDGET_MS, recalibration: [...rec.recalibrations, run.rec] }, (_stage, fraction) => onProgress(fraction));
-}
-
-/** Records a quick recalibration's refit: the lineage grows, corrections and the old validation go. */
-export function adoptRecalibration(rec: LiveRecords, run: CheckDone, oldFit: FitResult, fit: FitResult, geometry: SessionGeometry, estimator: EstimatorId, nominalFps: number): void {
-  rec.recalibrations.push(run.rec);
-  rec.blocks.push(checkBlock(rec, 'recalibration', trialName('drift', Math.max(1, rec.driftChecks)), run, oldFit, geometry, estimator, nominalFps));
-  rec.lineage.push(fit);
-  rec.corrections = {};
-  rec.revalidationNeeded = true;
-  // Any recalibration invalidates the previous validation (§4.13): its run belongs to the old fit.
-  setValidationRun(null);
-  setState({ fit, validation: null });
-}
-
-/** Scores a VAL6 revalidation and makes it the session's validation; the in-use report, or null. */
-export function applyRevalidation(rec: LiveRecords, run: CheckDone, fit: FitResult, geometry: SessionGeometry, estimator: EstimatorId, nominalFps: number): { scored: ScoredRecording; report: ValidationReport | null } {
-  const n = rec.validationCount + 1;
-  rec.validationCount = n;
-  const scored = scoreRecording(fit, run.rec, geometry, { nominalFps, receivedMs: run.receivedMs });
-  setState({ validation: [...scored.own, ...scored.intersection] });
-  setValidationRun({ recording: run.rec, receivedMs: run.receivedMs, nominalFps });
-  rec.blocks.push(checkBlock(rec, 'validation', trialName('validation', n), run, fit, geometry, estimator, nominalFps));
-  return { scored, report: ownReport(scored.own, estimator) };
-}
-
 /** A restored calibration's VAL6 has been judged: usable at "acceptable" or better, and a drift check is forced. */
 export function settleRestore(rec: LiveRecords, verdict: ValidationReport['verdict']): boolean {
   const restored = rec.restored;
@@ -721,7 +680,7 @@ export async function runReaim(o: ReaimOptions): Promise<ReaimOutcome> {
   const schedule = driftSchedule({ seed: settings.seed, check: n, preset: settings.preset, speed: settings.speed });
   const items = schedule.items.filter((i): i is TargetItem => i.kind === 'target');
   const glyph = positionGlyph();
-  const stage = new StimulusStage({ game: true });
+  const stage = new StimulusStage();
   const pips = pipLine(t('reaim.progress'));
   const layer = h('div', { class: 'stim-layer reaim__layer' });
   let runner: BlockRunner | null = null;
